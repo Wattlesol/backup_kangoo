@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Production Artisan Wrapper - Suppresses deprecation warnings
+export PHP_ERROR_REPORTING="E_ALL & ~E_DEPRECATED & ~E_STRICT"
+
+php -d error_reporting="E_ALL & ~E_DEPRECATED & ~E_STRICT" artisan "$@"

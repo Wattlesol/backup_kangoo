@@ -1,0 +1,45 @@
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+.env
+.env.backup
+.phpunit.result.cache
+docker-compose.override.yml
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+
+# IDE files
+/.idea
+/.vscode
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Test and temporary files
+test_*.php
+debug_*.php
+fix_*.php
+import_*.php
+check_*.php
+cleanup_*.php
+*.backup
+*.bak
+*.orig
+*.tmp
+*.temp
+
+# Logs
+*.log
+laravel.log
