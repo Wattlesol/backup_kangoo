@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
@@ -77,6 +78,7 @@ require __DIR__.'/frontend.php';
 
 Route::group(['prefix' => 'auth'], function() {
     Route::get('login', [HomeController::class, 'authLogin'])->name('auth.login');
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])->name('auth.login.post');
     Route::get('register', [HomeController::class, 'authRegister'])->name('auth.register');
     Route::get('recover-password', [HomeController::class, 'authRecoverPassword'])->name('auth.recover-password');
     Route::get('confirm-email', [HomeController::class, 'authConfirmEmail'])->name('auth.confirm-email');

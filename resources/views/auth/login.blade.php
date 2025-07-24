@@ -17,7 +17,7 @@
 
                     <!-- Validation Errors -->
                     <x-auth-validation-errors class="mb-4" :errors="$errors" />
-                    <form method="POST" action="{{ route('login') }}" data-toggle="validator">
+                    <form method="POST" action="{{ request()->is('auth/login') ? route('auth.login.post') : route('login') }}" data-toggle="validator">
                         {{csrf_field()}}
                       <div class="row">
                          <div class="col-lg-12">

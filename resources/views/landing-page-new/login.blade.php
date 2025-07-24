@@ -99,16 +99,16 @@
                                         <div class="px-5 py-3 bg-primary">
                                             <ul class="iq-social-list-text d-flex align-items-center justify-content-center flex-wrap m-0 list-inline">
                                                 <li class="me-3 pe-3">
-                                                    <a href="{{ route('auth.login', ['email' => 'admin@admin.com', 'password' => '12345678']) }}" class="text-capitalize text-white">{{__('landingpage.admin')}}</a>
+                                                    <a href="{{ route('auth.login', ['email' => 'admin@admin.com', 'password' => '123456']) }}" class="text-capitalize text-white">{{__('landingpage.admin')}}</a>
                                                 </li>
                                                 <li class="me-3 pe-3">
-                                                    <a href="{{ route('auth.login', ['email' => 'demo@provider.com', 'password' => '12345678']) }}" class="text-capitalize text-white">{{__('messages.provider')}}</a>
+                                                    <a href="{{ route('auth.login', ['email' => 'demo@provider.com', 'password' => '123456']) }}" class="text-capitalize text-white">{{__('messages.provider')}}</a>
                                                 </li>
                                                 <li class="me-3 pe-3">
-                                                    <a href="{{ route('auth.login', ['email' => 'demo@handyman.com', 'password' => '12345678']) }}" class="text-capitalize text-white">{{__('messages.handyman')}}</a>
+                                                    <a href="{{ route('auth.login', ['email' => 'demo@handyman.com', 'password' => '123456']) }}" class="text-capitalize text-white">{{__('messages.handyman')}}</a>
                                                 </li>
                                                 <li>
-                                                    <a href="{{ route('auth.login', ['email' => 'demo@user.com', 'password' => '12345678']) }}" class="text-capitalize text-white">{{__('landingpage.user')}}</a>
+                                                    <a href="{{ route('auth.login', ['email' => 'demo@user.com', 'password' => '123456']) }}" class="text-capitalize text-white">{{__('landingpage.user')}}</a>
                                                 </li>
                                             </ul>
                                         </div>
