@@ -213,5 +213,31 @@ return [
     'no_products_found' => 'No Products Found',
     'no_stores_found' => 'No Stores Found',
     'showing_results' => 'Showing results',
-    'of' => 'of'
+    'of' => 'of',
+
+    // Unified Store
+    'unified_store' => 'Unified Store',
+    'unified_store_description' => 'Discover all products from all providers in one place with advanced filtering',
+    'filters' => 'Filters',
+    'price_range' => 'Price Range',
+    'min_price' => 'Min Price',
+    'max_price' => 'Max Price',
+    'price_range_info' => 'Range: $:min - $:max',
+    'providers' => 'Providers',
+    'all_providers' => 'All Providers',
+    'availability' => 'Availability',
+    'in_stock_only' => 'In Stock Only',
+    'featured_only' => 'Featured Only',
+    'clear_filters' => 'Clear Filters',
+    'reset_filters' => 'Reset Filters',
+    'sort_name' => 'Name A-Z',
+    'sort_price_low' => 'Price: Low to High',
+    'sort_price_high' => 'Price: High to Low',
+    'sort_newest' => 'Newest First',
+    'sort_featured' => 'Featured First',
+    'loading_products' => 'Loading products...',
+    'try_different_filters' => 'Try adjusting your filters or search terms',
+    'error_loading_products' => 'Error loading products. Please try again.',
+    'showing' => 'Showing',
+    'no_products' => 'No products found'
 ];

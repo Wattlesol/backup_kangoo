@@ -656,12 +656,18 @@ Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list
 Route::post('/service-list',[HomeController::class, 'getAjaxServiceList'])->name('service-list');
 
 // Frontend E-commerce Routes
+// Main Store Route (Unified Store)
+Route::get('store', [FrontendProductController::class, 'unifiedStore'])->name('store.unified');
+
+// Individual product and store pages
+Route::get('product/{slug}', [FrontendProductController::class, 'show'])->name('products.show');
+Route::get('store/{slug}', [FrontendProductController::class, 'storeShow'])->name('stores.show');
+
+// Legacy routes (kept for backward compatibility)
 Route::get('products', [FrontendProductController::class, 'index'])->name('products.index');
 Route::get('products/search', [FrontendProductController::class, 'search'])->name('products.search');
 Route::get('products/category/{slug}', [FrontendProductController::class, 'category'])->name('products.category');
-Route::get('product/{slug}', [FrontendProductController::class, 'show'])->name('products.show');
 Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores.index');
-Route::get('store/{slug}', [FrontendProductController::class, 'storeShow'])->name('stores.show');
 
 // AJAX endpoints for frontend
 Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');

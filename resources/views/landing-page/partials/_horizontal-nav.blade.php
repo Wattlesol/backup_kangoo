@@ -51,28 +51,13 @@
             </li>
             @endif
 
-            <!-- Store Menu with Dropdown -->
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle {{ request()->routeIs('products.*') || request()->routeIs('stores.*') ? 'active' : '' }}"
-                   href="#" id="storeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <!-- Store Link -->
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('store.unified') || request()->routeIs('products.*') || request()->routeIs('stores.*') ? 'active' : '' }}" href="{{ route('store.unified') }}">
                     {{__('landingpage.store')}}
                 </a>
-                <ul class="dropdown-menu" aria-labelledby="storeDropdown">
-                    <li><a class="dropdown-item {{ request()->routeIs('products.category.*') ? 'active' : '' }}" href="{{ route('products.index') }}?view=categories">
-                        <i class="fas fa-tags me-2"></i>{{__('landingpage.product_categories')}}
-                    </a></li>
-                    <li><a class="dropdown-item {{ request()->routeIs('products.index') ? 'active' : '' }}" href="{{ route('products.index') }}">
-                        <i class="fas fa-box me-2"></i>{{__('landingpage.products')}}
-                    </a></li>
-                    <li><a class="dropdown-item {{ request()->routeIs('stores.*') ? 'active' : '' }}" href="{{ route('stores.index') }}">
-                        <i class="fas fa-store me-2"></i>{{__('landingpage.stores')}}
-                    </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ route('products.search') }}">
-                        <i class="fas fa-search me-2"></i>{{__('landingpage.search_products')}}
-                    </a></li>
-                </ul>
             </li>
+
             @if(auth()->check() && auth()->user()->user_type == 'user' && $sectionData['bookings'] == 1)
                 <li class="nav-item">
                     <a class="nav-link {{ request()->routeIs('booking.*') ? 'active' : '' }}" href="{{ route('booking.list') }}">{{__('landingpage.bookings')}}</a>

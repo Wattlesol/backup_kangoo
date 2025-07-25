@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Store;
 use App\Models\ShoppingCart;
+use App\Models\User;
 
 class ProductController extends Controller
 {
@@ -341,5 +342,52 @@ class ProductController extends Controller
             'data' => $stores,
             'message' => 'Stores fetched successfully'
         ]);
+    }
+
+    /**
+     * Display unified store page with all products from all providers
+     */
+    public function unifiedStore(Request $request)
+    {
+        $categoryId = $request->get('category');
+        $search = $request->get('q');
+        $location = $request->get('location');
+        $sort = $request->get('sort', 'name');
+        $priceMin = $request->get('price_min');
+        $priceMax = $request->get('price_max');
+        $providerId = $request->get('provider');
+        $inStockOnly = $request->get('in_stock_only', false);
+        $featuredOnly = $request->get('featured_only', false);
+
+        // Get all categories with product counts
+        $categories = ProductCategory::withCount('products')->active()->ordered()->get();
+        $featuredCategories = ProductCategory::withCount('products')->active()->featured()->ordered()->get();
+
+        // Get all providers who have products
+        $providers = User::whereHas('createdProducts', function($q) {
+            $q->active();
+        })->where('user_type', 'provider')->where('status', 1)->get(['id', 'first_name', 'last_name']);
+
+        // Get price range for filtering
+        $priceRange = Product::active()->selectRaw('MIN(base_price) as min_price, MAX(base_price) as max_price')->first();
+
+        $pageTitle = __('landingpage.store');
+
+        return view('landing-page.store.unified', compact(
+            'categories',
+            'featuredCategories',
+            'providers',
+            'priceRange',
+            'pageTitle',
+            'categoryId',
+            'search',
+            'location',
+            'sort',
+            'priceMin',
+            'priceMax',
+            'providerId',
+            'inStockOnly',
+            'featuredOnly'
+        ));
     }
 }
