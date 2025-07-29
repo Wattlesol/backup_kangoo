@@ -588,13 +588,25 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     });
 
     Route::group(['middleware' => ['permission:store list']], function () {
-        Route::resource('store', StoreController::class);
-        Route::get('store-index-data',[StoreController::class,'index_data'])->name('store.index_data');
-        Route::post('store-action',[StoreController::class, 'action'])->name('store.action');
-        Route::post('store/{id}', [StoreController::class, 'destroy'])->name('store.destroy');
-        Route::post('store-approve', [StoreController::class, 'approve'])->name('store.approve');
-        Route::get('store-pending', [StoreController::class, 'pending'])->name('store.pending');
-        Route::get('store-pending-data',[StoreController::class,'pending_data'])->name('store.pending_data');
+        Route::resource('admin/stores', StoreController::class)->names([
+            'index' => 'store.index',
+            'create' => 'store.create',
+            'store' => 'store.store',
+            'show' => 'store.show',
+            'edit' => 'store.edit',
+            'update' => 'store.update',
+            'destroy' => 'store.destroy'
+        ]);
+        // Product Approval System Routes
+        Route::group(['prefix' => 'admin/product-approval', 'as' => 'product-approval.'], function () {
+            Route::get('pending', [App\Http\Controllers\Admin\ProductApprovalController::class, 'pending'])->name('pending');
+            Route::get('rejected', [App\Http\Controllers\Admin\ProductApprovalController::class, 'rejected'])->name('rejected');
+            Route::get('review/{id}', [App\Http\Controllers\Admin\ProductApprovalController::class, 'review'])->name('review');
+            Route::post('{id}/approve', [App\Http\Controllers\Admin\ProductApprovalController::class, 'approve'])->name('approve');
+            Route::post('{id}/reject', [App\Http\Controllers\Admin\ProductApprovalController::class, 'reject'])->name('reject');
+            Route::post('{id}/reconsider', [App\Http\Controllers\Admin\ProductApprovalController::class, 'reconsider'])->name('reconsider');
+            Route::post('bulk-action', [App\Http\Controllers\Admin\ProductApprovalController::class, 'bulkAction'])->name('bulk-action');
+        });
     });
 
     Route::group(['middleware' => ['permission:order list']], function () {
@@ -606,6 +618,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::get('order-statistics', [OrderController::class, 'statistics'])->name('order.statistics');
         Route::post('order-bulk-action', [OrderController::class, 'bulkAction'])->name('order.bulk-action');
         Route::get('order-export', [OrderController::class, 'export'])->name('order.export');
+        Route::get('order/{id}/print', [OrderController::class, 'print'])->name('order.print');
     });
 
     // Dynamic Pricing Routes (Admin only)
@@ -624,24 +637,28 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::group(['prefix' => 'provider', 'middleware' => ['role:provider']], function () {
         Route::get('dashboard', [ProviderOrderController::class, 'dashboard'])->name('provider.dashboard');
 
-        // Store Management
-        Route::get('store', [ProviderStoreController::class, 'index'])->name('provider.store.index');
-        Route::get('store/create', [ProviderStoreController::class, 'create'])->name('provider.store.create');
-        Route::post('store', [ProviderStoreController::class, 'store'])->name('provider.store.store');
-        Route::get('store/edit', [ProviderStoreController::class, 'edit'])->name('provider.store.edit');
-        Route::put('store', [ProviderStoreController::class, 'update'])->name('provider.store.update');
+        // Product Management (Single Store Architecture)
+        Route::group(['middleware' => ['permission:provider_store manage']], function () {
+            Route::get('store', [ProviderStoreController::class, 'index'])->name('provider.store.index');
+            Route::get('store/products', [ProviderStoreController::class, 'products'])->name('provider.store.products');
+            Route::get('store/products-data', [ProviderStoreController::class, 'products_data'])->name('provider.store.products_data');
+        });
 
         // Store Products
-        Route::get('store/products', [ProviderStoreController::class, 'products'])->name('provider.store.products');
-        Route::get('store/products-data', [ProviderStoreController::class, 'products_data'])->name('provider.store.products_data');
-        Route::post('store/add-product', [ProviderStoreController::class, 'addProduct'])->name('provider.store.add-product');
-        Route::put('store/product/{id}', [ProviderStoreController::class, 'updateProduct'])->name('provider.store.update-product');
-        Route::delete('store/product/{id}', [ProviderStoreController::class, 'removeProduct'])->name('provider.store.remove-product');
+        Route::group(['middleware' => ['permission:provider_store manage']], function () {
+            Route::get('store/products', [ProviderStoreController::class, 'products'])->name('provider.store.products');
+            Route::get('store/products-data', [ProviderStoreController::class, 'products_data'])->name('provider.store.products_data');
+            Route::post('store/add-product', [ProviderStoreController::class, 'addProduct'])->name('provider.store.add-product');
+            Route::put('store/product/{id}', [ProviderStoreController::class, 'updateProduct'])->name('provider.store.update-product');
+            Route::delete('store/product/{id}', [ProviderStoreController::class, 'removeProduct'])->name('provider.store.remove-product');
+        });
 
         // Product Management
-        Route::resource('product', ProviderProductController::class, ['as' => 'provider']);
-        Route::get('product-index-data', [ProviderProductController::class, 'index_data'])->name('provider.product.index_data');
-        Route::get('available-products', [ProviderProductController::class, 'availableProducts'])->name('provider.product.available');
+        Route::group(['middleware' => ['permission:provider_product manage']], function () {
+            Route::resource('product', ProviderProductController::class, ['as' => 'provider']);
+            Route::get('product-index-data', [ProviderProductController::class, 'index_data'])->name('provider.product.index_data');
+            Route::get('available-products', [ProviderProductController::class, 'availableProducts'])->name('provider.product.available');
+        });
 
         // Order Management
         Route::get('orders', [ProviderOrderController::class, 'index'])->name('provider.order.index');
@@ -673,10 +690,24 @@ Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores
 Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
 Route::get('api/stores', [FrontendProductController::class, 'getStores'])->name('api.stores');
 
+// Cart routes (works for both authenticated and guest users)
+Route::prefix('cart')->name('cart.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Frontend\CartController::class, 'index'])->name('index');
+    Route::post('/add', [App\Http\Controllers\Frontend\CartController::class, 'add'])->name('add');
+    Route::put('/update', [App\Http\Controllers\Frontend\CartController::class, 'update'])->name('update');
+    Route::delete('/remove', [App\Http\Controllers\Frontend\CartController::class, 'remove'])->name('remove');
+    Route::delete('/clear', [App\Http\Controllers\Frontend\CartController::class, 'clear'])->name('clear');
+    Route::get('/count', [App\Http\Controllers\Frontend\CartController::class, 'count'])->name('count');
+    Route::post('/transfer-guest', [App\Http\Controllers\Frontend\CartController::class, 'transferGuestCart'])->name('transfer-guest');
+});
+
+// Frontend pages
+Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.cart');
+
 // Authenticated frontend routes
 Route::middleware('auth')->group(function () {
-    Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.cart');
     Route::get('checkout', [FrontendProductController::class, 'checkout'])->name('products.checkout');
+    Route::get('order-success', [FrontendProductController::class, 'orderSuccess'])->name('products.order-success');
 });
 
 

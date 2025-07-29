@@ -265,6 +265,11 @@ class User extends Authenticatable implements HasMedia
         return $this->hasMany(Product::class, 'created_by');
     }
 
+    public function providerProducts()
+    {
+        return $this->hasMany(Product::class, 'provider_id');
+    }
+
     public function orders()
     {
         return $this->hasMany(Order::class, 'customer_id');

@@ -8,7 +8,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Models\Store;
-use App\Models\StoreProduct;
+// Removed StoreProduct import - using direct product-provider relationships
 use Yajra\DataTables\DataTables;
 use Illuminate\Support\Str;
 
@@ -137,19 +137,17 @@ class ProductController extends Controller
             $data['dimensions'] = json_encode($data['dimensions']);
         }
 
+        // Set provider_id for provider products
+        $data['provider_id'] = $auth_user->id;
+
+        // Provider products need approval before being available
+        $data['approval_status'] = 'pending';
+        $data['is_available'] = false; // Not available until approved
+        $data['status'] = false; // Inactive until approved
+
         $product = Product::create($data);
 
-        // Automatically add to provider's store if exists
-        $store = Store::where('provider_id', $auth_user->id)->where('status', 'approved')->first();
-        if ($store) {
-            StoreProduct::create([
-                'store_id' => $store->id,
-                'product_id' => $product->id,
-                'store_price' => $product->base_price,
-                'stock_quantity' => $product->stock_quantity,
-                'is_available' => true
-            ]);
-        }
+        // In single-store architecture, products need admin approval before being available
 
         return redirect()->route('provider.product.index')->withSuccess('Product created successfully');
     }
@@ -233,19 +231,7 @@ class ProductController extends Controller
 
         $product->update($data);
 
-        // Update store product price if exists
-        $store = Store::where('provider_id', $auth_user->id)->first();
-        if ($store) {
-            $storeProduct = StoreProduct::where('store_id', $store->id)
-                                      ->where('product_id', $product->id)
-                                      ->first();
-            if ($storeProduct) {
-                $storeProduct->update([
-                    'store_price' => $product->base_price,
-                    'stock_quantity' => $product->stock_quantity
-                ]);
-            }
-        }
+        // In single-store architecture, product updates are automatically reflected
 
         return redirect()->route('provider.product.index')->withSuccess('Product updated successfully');
     }
@@ -270,40 +256,5 @@ class ProductController extends Controller
         return comman_custom_response(['message'=> 'Product deleted successfully' , 'status' => true]);
     }
 
-    /**
-     * Get available products to add to store
-     */
-    public function availableProducts(Request $request)
-    {
-        $auth_user = authSession();
-        $store = Store::where('provider_id', $auth_user->id)->firstOrFail();
-        
-        // Get products not already in store
-        $existingProductIds = StoreProduct::where('store_id', $store->id)->pluck('product_id');
-        
-        $query = Product::with(['category'])
-                       ->active()
-                       ->whereNotIn('id', $existingProductIds);
-        
-        // Include admin products and provider's own products
-        $query->where(function($q) use ($auth_user) {
-            $q->where('created_by_type', 'admin')
-              ->orWhere(function($sq) use ($auth_user) {
-                  $sq->where('created_by', $auth_user->id)
-                     ->where('created_by_type', 'provider');
-              });
-        });
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%");
-            });
-        }
-
-        $products = $query->limit(20)->get();
-
-        return response()->json($products);
-    }
+    // Removed availableProducts method - not needed in single-store architecture
 }

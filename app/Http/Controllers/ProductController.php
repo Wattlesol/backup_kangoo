@@ -193,6 +193,13 @@ class ProductController extends Controller
             $data['meta_data'] = json_encode($data['meta_data']);
         }
 
+        // Auto-approve admin products
+        if ($data['created_by_type'] === 'admin') {
+            $data['approval_status'] = 'approved';
+            $data['approved_at'] = now();
+            $data['approved_by'] = auth()->id();
+        }
+
         // Create or update product
         if (isset($data['id']) && $data['id']) {
             // Update existing product

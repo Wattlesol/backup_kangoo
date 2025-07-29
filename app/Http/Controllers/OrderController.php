@@ -225,6 +225,28 @@ class OrderController extends Controller
     }
 
     /**
+     * Print order as PDF
+     */
+    public function print($id)
+    {
+        $order = Order::with([
+            'customer',
+            'store.provider',
+            'items.product',
+            'items.productVariant',
+            'statusHistories.changedBy'
+        ])->findOrFail($id);
+
+        $data = \App\Models\AppSetting::first();
+
+        // Return view for printing instead of PDF download
+        return view('order.print', [
+            'order' => $order,
+            'data' => $data
+        ]);
+    }
+
+    /**
      * Bulk actions on orders
      */
     public function bulkAction(Request $request)

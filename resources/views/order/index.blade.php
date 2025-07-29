@@ -23,41 +23,61 @@
 
     <div class="card">
         <div class="card-body">
-                    <!-- Statistics Cards -->
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="card bg-primary text-white">
-                                <div class="card-body text-center">
-                                    <h3 id="total-orders">{{ $statistics['total'] ?? 0 }}</h3>
-                                    <p class="mb-0">{{ __('messages.total_orders') }}</p>
+            <!-- Statistics Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="d-flex align-items-center justify-content-center mb-2">
+                                <div class="avatar-60 bg-soft-primary rounded">
+                                    <i class="fa fa-shopping-cart fa-2x text-primary"></i>
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card bg-warning text-white">
-                                <div class="card-body text-center">
-                                    <h3 id="pending-orders">{{ $statistics['pending'] ?? 0 }}</h3>
-                                    <p class="mb-0">{{ __('messages.pending_orders') }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card bg-success text-white">
-                                <div class="card-body text-center">
-                                    <h3 id="delivered-orders">{{ $statistics['delivered'] ?? 0 }}</h3>
-                                    <p class="mb-0">{{ __('messages.delivered_orders') }}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card bg-info text-white">
-                                <div class="card-body text-center">
-                                    <h3 id="total-revenue">{{ getPriceFormat($statistics['revenue'] ?? 0) }}</h3>
-                                    <p class="mb-0">{{ __('messages.total_revenue') }}</p>
-                                </div>
-                            </div>
+                            <h4 class="mb-1" id="total-orders">{{ $statistics['total'] ?? 0 }}</h4>
+                            <p class="mb-0 text-muted">Total Orders</p>
                         </div>
                     </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="d-flex align-items-center justify-content-center mb-2">
+                                <div class="avatar-60 bg-soft-warning rounded">
+                                    <i class="fa fa-clock fa-2x text-warning"></i>
+                                </div>
+                            </div>
+                            <h4 class="mb-1" id="pending-orders">{{ $statistics['pending'] ?? 0 }}</h4>
+                            <p class="mb-0 text-muted">Pending Orders</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="d-flex align-items-center justify-content-center mb-2">
+                                <div class="avatar-60 bg-soft-success rounded">
+                                    <i class="fa fa-check-circle fa-2x text-success"></i>
+                                </div>
+                            </div>
+                            <h4 class="mb-1" id="delivered-orders">{{ $statistics['delivered'] ?? 0 }}</h4>
+                            <p class="mb-0 text-muted">Delivered Orders</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="d-flex align-items-center justify-content-center mb-2">
+                                <div class="avatar-60 bg-soft-info rounded">
+                                    <i class="fa fa-dollar-sign fa-2x text-info"></i>
+                                </div>
+                            </div>
+                            <h4 class="mb-1" id="total-revenue">{{ getPriceFormat($statistics['revenue'] ?? 0) }}</h4>
+                            <p class="mb-0 text-muted">Total Revenue</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="row justify-content-between">
                 <div>
@@ -127,14 +147,14 @@
                             <thead>
                                 <tr>
                                     <th><input type="checkbox" class="form-check-input" id="select-all-table"></th>
-                                    <th>{{ __('messages.order_number') }}</th>
-                                    <th>{{ __('messages.customer') }}</th>
-                                    <th>{{ __('messages.store') }}</th>
-                                    <th>{{ __('messages.total_amount') }}</th>
-                                    <th>{{ __('messages.order_status') }}</th>
-                                    <th>{{ __('messages.payment_status') }}</th>
-                                    <th>{{ __('messages.order_date') }}</th>
-                                    <th>{{ __('messages.action') }}</th>
+                                    <th>Order Number</th>
+                                    <th>Customer</th>
+                                    <th>Store</th>
+                                    <th>Total Amount</th>
+                                    <th>Order Status</th>
+                                    <th>Payment Status</th>
+                                    <th>Order Date</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -147,6 +167,84 @@
     </div>
 
 @section('bottom_script')
+<style>
+.avatar-60 {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+}
+.bg-soft-primary {
+    background-color: rgba(108, 117, 125, 0.1);
+}
+.bg-soft-success {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+.bg-soft-info {
+    background-color: rgba(23, 162, 184, 0.1);
+}
+.bg-soft-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+.bg-soft-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+.table td {
+    vertical-align: middle;
+}
+
+/* Action Buttons Styling */
+.btn-group .dropdown-menu {
+    min-width: 160px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.btn-group .dropdown-item {
+    padding: 8px 16px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.btn-group .dropdown-item:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+}
+
+.btn-group .dropdown-item i {
+    width: 16px;
+    margin-right: 8px;
+}
+
+.btn-group .dropdown-divider {
+    margin: 4px 0;
+}
+
+/* Ensure dropdowns work properly */
+.btn-group {
+    position: relative;
+}
+
+.btn-group .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    display: none;
+    float: left;
+    list-style: none;
+    text-align: left;
+    background-color: #fff;
+    background-clip: padding-box;
+    margin: 2px 0 0;
+}
+
+.btn-group.show .dropdown-menu {
+    display: block;
+}
+</style>
 <script>
 $(document).ready(function() {
     // Initialize DataTable
@@ -192,12 +290,64 @@ $(document).ready(function() {
                 $('#datatable_wrapper').show();
                 $('#empty-state').hide();
             }
+
+            // Initialize dropdowns after table draw
+            initializeDropdowns();
         }
     });
 
     $('#column_status, #column_payment_status, #column_store').on('change', function() {
         window.renderedDataTable.ajax.reload();
     });
+
+    // Initialize dropdowns function
+    function initializeDropdowns() {
+        // Initialize Bootstrap dropdowns
+        $('.dropdown-toggle').dropdown();
+
+        // Handle dropdown clicks
+        $(document).off('click.dropdown').on('click.dropdown', '.dropdown-toggle', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Close all other dropdowns
+            $('.btn-group').removeClass('show');
+            $('.dropdown-menu').hide();
+
+            // Toggle current dropdown
+            const $btnGroup = $(this).closest('.btn-group');
+            const $dropdownMenu = $btnGroup.find('.dropdown-menu');
+
+            if ($btnGroup.hasClass('show')) {
+                $btnGroup.removeClass('show');
+                $dropdownMenu.hide();
+            } else {
+                $btnGroup.addClass('show');
+                $dropdownMenu.show();
+            }
+        });
+
+        // Close dropdowns when clicking outside
+        $(document).off('click.dropdown-outside').on('click.dropdown-outside', function(e) {
+            if (!$(e.target).closest('.btn-group').length) {
+                $('.btn-group').removeClass('show');
+                $('.dropdown-menu').hide();
+            }
+        });
+
+        // Handle dropdown item clicks
+        $(document).off('click.dropdown-item').on('click.dropdown-item', '.dropdown-item', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Close dropdown after click
+            $(this).closest('.btn-group').removeClass('show');
+            $(this).closest('.dropdown-menu').hide();
+        });
+    }
+
+    // Initial dropdown initialization
+    initializeDropdowns();
 });
 
 function showStatistics() {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Store;
 use App\Models\User;
+use App\Models\Product;
 use App\Models\Country;
 use App\Models\State;
 use App\Models\City;
@@ -14,145 +15,61 @@ use Illuminate\Support\Str;
 class StoreController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Display the main store configuration.
+     * In single-store architecture, there's only one store to manage.
      *
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request)
     {
-        $filter = [
-            'status' => $request->status,
-            'provider_id' => $request->provider_id,
-            'location' => $request->location,
-        ];
-        $pageTitle = trans('messages.list_form_title',['form' => trans('messages.store')] );
+        $pageTitle = 'Store Management';
         $auth_user = authSession();
-        $assets = ['datatable'];
-        $providers = User::where('user_type', 'provider')->get();
-        return view('store.index', compact('pageTitle','auth_user','assets','filter','providers'));
-    }
 
-    public function index_data(DataTables $datatable, Request $request)
-    {
-        $query = Store::with(['provider', 'approvedBy'])->withCount('products');
-        $filter = $request->filter;
+        // Get the main store (there should only be one)
+        $store = Store::where('store_type', 'main')->first();
 
-        if (isset($filter)) {
-            if (isset($filter['status']) && $filter['status'] != '') {
-                $query->where('status', $filter['status']);
-            }
-            if (isset($filter['provider_id']) && $filter['provider_id'] != '') {
-                $query->where('provider_id', $filter['provider_id']);
-            }
-            if (isset($filter['location']) && $filter['location'] != '') {
-                $query->where(function($q) use ($filter) {
-                    $q->where('city', 'like', '%' . $filter['location'] . '%')
-                      ->orWhere('state', 'like', '%' . $filter['location'] . '%')
-                      ->orWhere('address', 'like', '%' . $filter['location'] . '%');
-                });
-            }
-        }
-        // Apply permission-based filtering
-        $user = auth()->user();
-        if ($user->user_type === 'admin') {
-            $query = $query->withTrashed();
-        } elseif ($user->user_type === 'provider') {
-            // Providers can only see their own stores
-            $query->where('provider_id', $user->id);
-        } else {
-            // Regular users shouldn't access this endpoint, but if they do, show nothing
-            $query->whereRaw('1 = 0');
+        if (!$store) {
+            // If no store exists, redirect to create
+            return redirect()->route('store.create');
         }
 
-        return $datatable->eloquent($query)
-            ->addColumn('check', function ($row) {
-                return '<input type="checkbox" class="form-check-input select-table-row"  id="datatable-row-'.$row->id.'"  name="datatable_ids[]" value="'.$row->id.'" onclick="dataTableRowCheck('.$row->id.')">';
-            })
-            ->editColumn('name', function($query) {
-                return '<a class="btn-link btn-link-hover" href='.route('store.show', $query->id).'>'.$query->name.'</a>';
-            })
-            ->addColumn('provider', function($query) {
-                return $query->provider ? $query->provider->display_name : '-';
-            })
-            ->addColumn('products_count', function($query) {
-                return $query->products_count ?? 0;
-            })
-            ->editColumn('status', function($query) {
-                $statusColors = [
-                    'pending' => 'warning',
-                    'approved' => 'success',
-                    'rejected' => 'danger',
-                    'suspended' => 'secondary'
-                ];
-                $color = $statusColors[$query->status] ?? 'secondary';
-                return '<span class="badge badge-'.$color.'">'.ucfirst($query->status).'</span>';
-            })
-            ->editColumn('is_active' , function ($query){
-                $disabled = $query->trashed() ? 'disabled': '';
-                return '<div class="custom-control custom-switch custom-switch-text custom-switch-color custom-control-inline">
-                    <div class="custom-switch-inner">
-                        <input type="checkbox" class="custom-control-input  change_status" data-type="store_status" '.($query->is_active ? "checked" : "").' '.$disabled.' value="'.$query->id.'" id="'.$query->id.'" data-id="'.$query->id.'">
-                        <label class="custom-control-label" for="'.$query->id.'" data-on-label="" data-off-label=""></label>
-                    </div>
-                </div>';
-            })
-            ->editColumn('created_at', function($query) {
-                return dateAgoFormate($query->created_at, true);
-            })
-            ->addColumn('action', function($store){
-                return view('store.action',compact('store'))->render();
-            })
-            ->addIndexColumn()
-            ->rawColumns(['action','status','is_active','check','name'])
-            ->filterColumn('name', function($query, $keyword) {
-                $query->where('name', 'like', "%{$keyword}%");
-            })
-            ->filterColumn('provider', function($query, $keyword) {
-                $query->whereHas('provider', function($q) use ($keyword) {
-                    $q->where('display_name', 'like', "%{$keyword}%");
-                });
-            })
-            ->filterColumn('status', function($query, $keyword) {
-                $query->where('status', 'like', "%{$keyword}%");
-            })
-            ->filterColumn('is_active', function($query, $keyword) {
-                $query->where('is_active', 'like', "%{$keyword}%");
-            })
-            ->filterColumn('created_at', function($query, $keyword) {
-                $query->where('created_at', 'like', "%{$keyword}%");
-            })
-            ->filterColumn('products_count', function($query, $keyword) {
-                $query->having('products_count', 'like', "%{$keyword}%");
-            })
-            ->toJson();
+        // Get store statistics
+        $totalProducts = Product::count();
+        $activeProducts = Product::where('status', true)->where('is_available', true)->count();
+        $pendingProducts = Product::where('approval_status', 'pending')->count();
+        $totalOrders = \App\Models\Order::count();
+
+        return view('store.index', compact('pageTitle', 'auth_user', 'store', 'totalProducts', 'activeProducts', 'pendingProducts', 'totalOrders'));
     }
+
+    // Removed index_data method - not needed for single store architecture
 
     /**
-     * Show the form for creating a new resource.
+     * Show the form for creating/editing the main store.
+     * In single-store architecture, we only create/edit one store.
      *
      * @return \Illuminate\Http\Response
      */
     public function create(Request $request)
     {
-        $id = $request->id;
         $auth_user = authSession();
 
-        $storedata = Store::with(['provider', 'country', 'state', 'city'])->find($id);
-        $pageTitle = trans('messages.update_form_title',['form'=>trans('messages.store')]);
+        // Check if main store already exists
+        $store = Store::where('store_type', 'main')->first();
 
-        if($storedata == null){
-            $pageTitle = trans('messages.add_form_title',['form' => trans('messages.store')]);
-            $storedata = new Store;
+        if ($store) {
+            // If store exists, redirect to edit
+            return redirect()->route('store.edit', $store->id);
         }
 
-        $providers = User::where('user_type', 'provider')->get();
-        $countries = Country::get();
+        $pageTitle = 'Create Store';
 
-        return view('store.create', compact('pageTitle' ,'storedata','auth_user','providers','countries'));
+        return view('store.create', compact('pageTitle', 'auth_user'));
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store the main store configuration.
+     * In single-store architecture, only admins can create/update the store.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
@@ -161,31 +78,49 @@ class StoreController extends Controller
     {
         $data = $request->all();
 
-        // Set provider_id from authenticated user if not provided
-        if (!isset($data['provider_id']) || !$data['provider_id']) {
-            $data['provider_id'] = auth()->id();
-        }
+        // Validate required fields
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'required|string',
+            'address' => 'required|string',
+        ]);
 
-        $data['slug'] = Str::slug($data['name'] . '-' . $data['provider_id']);
+        // Set admin as creator
+        $data['created_by'] = auth()->id();
+        $data['store_type'] = 'main';
+        $data['slug'] = Str::slug($data['name']);
+        $data['is_active'] = true;
 
         // Handle business_hours as JSON
         if (isset($data['business_hours'])) {
             $data['business_hours'] = json_encode($data['business_hours']);
         }
 
-        // Create or update store
+        // Handle store settings as JSON
+        if (isset($data['store_settings'])) {
+            $data['store_settings'] = json_encode($data['store_settings']);
+        }
+
+        // Handle payment methods as JSON
+        if (isset($data['payment_methods'])) {
+            $data['payment_methods'] = json_encode($data['payment_methods']);
+        }
+
+        // Handle shipping methods as JSON
+        if (isset($data['shipping_methods'])) {
+            $data['shipping_methods'] = json_encode($data['shipping_methods']);
+        }
+
+        // Create or update the main store
         if (isset($data['id']) && $data['id']) {
             // Update existing store
             $result = Store::updateOrCreate(['id' => $data['id']], $data);
+            $message = 'Store updated successfully';
         } else {
-            // Create new store
-            unset($data['id']); // Remove id if it exists but is null/empty
+            // Create new store (should only happen once)
+            unset($data['id']);
             $result = Store::create($data);
-        }
-
-        $message = trans('messages.update_form',['form' => trans('messages.store')]);
-        if($result->wasRecentlyCreated){
-            $message = trans('messages.save_form',['form' => trans('messages.store')]);
+            $message = 'Main store created successfully';
         }
 
         if($request->is('api/*')) {
@@ -196,6 +131,22 @@ class StoreController extends Controller
     }
 
     /**
+     * Show the form for editing the main store.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        $auth_user = authSession();
+        $store = Store::where('store_type', 'main')->findOrFail($id);
+
+        $pageTitle = 'Edit Store';
+
+        return view('store.edit', compact('pageTitle', 'store', 'auth_user'));
+    }
+
+    /**
      * Display the specified resource.
      *
      * @param  int  $id
@@ -203,7 +154,7 @@ class StoreController extends Controller
      */
     public function show($id)
     {
-        $store = Store::with(['provider', 'country', 'state', 'city', 'approvedBy', 'products'])->withCount('products')->findOrFail($id);
+        $store = Store::with(['createdBy', 'country', 'state', 'city'])->findOrFail($id);
         $pageTitle = trans('messages.view_form_title',['form'=>trans('messages.store')]);
         $auth_user = authSession();
         return view('store.view', compact('pageTitle','store','auth_user'));
@@ -248,64 +199,5 @@ class StoreController extends Controller
         return comman_custom_response(['message'=> $msg , 'status' => true]);
     }
 
-    public function approve(Request $request)
-    {
-        $data = $request->validate([
-            'store_id' => 'required|exists:stores,id',
-            'action' => 'required|in:approve,reject',
-            'rejection_reason' => 'required_if:action,reject|string|max:500'
-        ]);
-
-        $store = Store::findOrFail($data['store_id']);
-
-        if ($data['action'] == 'approve') {
-            $store->update([
-                'status' => 'approved',
-                'approved_at' => now(),
-                'approved_by' => auth()->id(),
-                'rejection_reason' => null
-            ]);
-            $message = trans('messages.store_approved_successfully');
-        } else {
-            $store->update([
-                'status' => 'rejected',
-                'rejection_reason' => $data['rejection_reason'],
-                'approved_at' => null,
-                'approved_by' => null
-            ]);
-            $message = trans('messages.store_rejected_successfully');
-        }
-
-        return comman_custom_response(['message'=> $message , 'status' => true]);
-    }
-
-    public function pending()
-    {
-        $pageTitle = trans('messages.pending_stores');
-        $auth_user = authSession();
-        $assets = ['datatable'];
-        return view('store.pending', compact('pageTitle','auth_user','assets'));
-    }
-
-    public function pending_data(DataTables $datatable, Request $request)
-    {
-        $query = Store::with(['provider'])->where('status', 'pending');
-
-        return $datatable->eloquent($query)
-            ->editColumn('name', function($query) {
-                return '<a class="btn-link btn-link-hover" href='.route('store.show', $query->id).'>'.$query->name.'</a>';
-            })
-            ->editColumn('provider', function($query) {
-                return $query->provider ? $query->provider->display_name : '-';
-            })
-            ->editColumn('created_at', function($query) {
-                return dateAgoFormate($query->created_at, true);
-            })
-            ->addColumn('action', function($store){
-                return view('store.pending_action',compact('store'))->render();
-            })
-            ->addIndexColumn()
-            ->rawColumns(['action','name'])
-            ->toJson();
-    }
+    // Removed approval methods - not needed for single store architecture
 }

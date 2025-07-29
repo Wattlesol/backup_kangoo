@@ -166,7 +166,7 @@ if (auth()->user()->user_type == "provider"){
 ->nickname('booking')->data('permission', 'booking list');
 
     // Provider E-commerce Menu
-    $menu->add('<span>'.__('messages.my_store').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.my_store').'</span></span>', ['route' => 'provider.store.index'])
+    $menu->add('<span>Product Management</span><span class="custom-tooltip"><span class="tooltip-text">Manage your products in the store</span></span>', ['route' => 'provider.store.index'])
     ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M3 21H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M5 21V7L12 3L19 7V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -218,9 +218,10 @@ $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-t
 ->nickname('booking')
 ->data('permission', 'booking create');
 
-// E-commerce Menu Section
+// E-commerce Menu Section (Admin Only)
 $menu->add(__('messages.sidebar_form_title',['form' => 'E-commerce']), ['class' => 'category-main'])
-->data('permission', ['product_category list','product list','store list','order list']);
+->data('permission', ['product_category list','product list','store list','order list'])
+->data('role', ['admin', 'demo_admin']);
 
 $menu->add('<span>Product Categories</span><span class="custom-tooltip"><span class="tooltip-text">Product Categories</span></span>', ['route' => 'productcategory.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -230,6 +231,7 @@ $menu->add('<span>Product Categories</span><span class="custom-tooltip"><span cl
 <path d="M15 11V17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>')
 ->data('permission', 'product_category list')
+->data('role', ['admin', 'demo_admin'])
 ->link->attr(['class' => '']);
 
 $menu->add('<span>Products</span><span class="custom-tooltip"><span class="tooltip-text">Products</span></span>', ['route' => 'product.index'])
@@ -239,15 +241,26 @@ $menu->add('<span>Products</span><span class="custom-tooltip"><span class="toolt
 <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>')
 ->data('permission', 'product list')
+->data('role', ['admin', 'demo_admin'])
 ->link->attr(['class' => '']);
 
-$menu->add('<span>Stores</span><span class="custom-tooltip"><span class="tooltip-text">Stores</span></span>', ['route' => 'store.index'])
+$menu->add('<span>Product Approvals</span><span class="custom-tooltip"><span class="tooltip-text">Review and approve provider products</span></span>', ['route' => 'product-approval.pending'])
+->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+</svg>')
+->data('permission', 'product list')
+->data('role', ['admin', 'demo_admin'])
+->link->attr(['class' => '']);
+
+$menu->add('<span>Store</span><span class="custom-tooltip"><span class="tooltip-text">Store Management</span></span>', ['route' => 'store.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M3 21H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M5 21V7L12 3L19 7V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M9 9H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>')
 ->data('permission', 'store list')
+->data('role', ['admin', 'demo_admin'])
 ->link->attr(['class' => '']);
 
 $menu->add('<span>Orders</span><span class="custom-tooltip"><span class="tooltip-text">Orders</span></span>', ['route' => 'order.index'])
@@ -257,6 +270,7 @@ $menu->add('<span>Orders</span><span class="custom-tooltip"><span class="tooltip
 <path d="M2.5 12C2.5 7.52166 2.5 5.28249 3.89124 3.89124C5.28249 2.5 7.52166 2.5 12 2.5C16.4783 2.5 18.7175 2.5 20.1088 3.89124C21.5 5.28249 21.5 7.52166 21.5 12C21.5 16.4783 21.5 18.7175 20.1088 20.1088C18.7175 21.5 16.4783 21.5 12 21.5C7.52166 21.5 5.28249 21.5 3.89124 20.1088C2.5 18.7175 2.5 16.4783 2.5 12Z" stroke="currentColor" stroke-width="1.5"/>
 </svg>')
 ->data('permission', 'order list')
+->data('role', ['admin', 'demo_admin'])
 ->link->attr(['class' => '']);
 
 $menu->add('<span>Dynamic Pricing</span><span class="custom-tooltip"><span class="tooltip-text">Dynamic Pricing</span></span>', ['route' => 'dynamic-pricing.index'])
@@ -265,6 +279,7 @@ $menu->add('<span>Dynamic Pricing</span><span class="custom-tooltip"><span class
 <path d="M17 5H9.5C8.57174 5 7.6815 5.36875 7.02513 6.02513C6.36875 6.6815 6 7.57174 6 8.5C6 9.42826 6.36875 10.3185 7.02513 10.9749C7.6815 11.6313 8.57174 12 9.5 12H14.5C15.4283 12 16.3185 12.3687 16.9749 13.0251C17.6313 13.6815 18 14.5717 18 15.5C18 16.4283 17.6313 17.3185 16.9749 17.9749C16.3185 18.6313 15.4283 19 14.5 19H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>')
 ->data('permission', 'dynamic_pricing list')
+->data('role', ['admin', 'demo_admin'])
 ->link->attr(['class' => '']);
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.time')]), ['class' => 'category-main'])->data('permission', 'user list');

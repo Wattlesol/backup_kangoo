@@ -22,6 +22,13 @@
 <!-- Cart Section -->
 <div class="section-padding">
     <div class="container-fluid">
+        <!-- Vue.js Shopping Cart Component -->
+        <div id="cart-app">
+            <shopping-cart></shopping-cart>
+        </div>
+
+        <!-- Fallback for non-JS users -->
+        <noscript>
         @if($cartSummary['items']->count() > 0)
             <div class="row">
                 <!-- Cart Items -->
@@ -199,6 +206,7 @@
                 </div>
             </div>
         @endif
+        </noscript>
     </div>
 </div>
 
@@ -206,130 +214,18 @@
 
 @section('after_script')
 <script>
+// Initialize Vue.js cart app
+const { createApp } = Vue;
+
+const CartApp = {
+    // Cart functionality is handled by the shopping-cart component
+};
+
+createApp(CartApp).mount('#cart-app');
+
+// Fallback jQuery for non-Vue functionality (if needed)
 $(document).ready(function() {
-    // Quantity controls
-    $('.quantity-btn').on('click', function() {
-        const action = $(this).data('action');
-        const quantityInput = $(this).siblings('.quantity-input');
-        const cartItem = $(this).closest('.cart-item');
-        const itemId = cartItem.data('item-id');
-        let currentQuantity = parseInt(quantityInput.val());
-        
-        if (action === 'increase') {
-            currentQuantity++;
-        } else if (action === 'decrease' && currentQuantity > 1) {
-            currentQuantity--;
-        }
-        
-        quantityInput.val(currentQuantity);
-        updateCartItem(itemId, currentQuantity);
-    });
-
-    // Quantity input change
-    $('.quantity-input').on('change', function() {
-        const cartItem = $(this).closest('.cart-item');
-        const itemId = cartItem.data('item-id');
-        const quantity = parseInt($(this).val());
-        
-        if (quantity > 0) {
-            updateCartItem(itemId, quantity);
-        }
-    });
-
-    // Remove item
-    $('.remove-item').on('click', function() {
-        const cartItem = $(this).closest('.cart-item');
-        const itemId = cartItem.data('item-id');
-        
-        if (confirm('Are you sure you want to remove this item from your cart?')) {
-            removeCartItem(itemId);
-        }
-    });
-
-    function updateCartItem(itemId, quantity) {
-        $.ajax({
-            url: `/api/cart/${itemId}`,
-            method: 'PUT',
-            data: {
-                quantity: quantity,
-                _token: $('meta[name="csrf-token"]').attr('content')
-            },
-            success: function(response) {
-                if (response.status) {
-                    // Update item total
-                    const cartItem = $(`.cart-item[data-item-id="${itemId}"]`);
-                    const unitPrice = parseFloat(response.data.unit_price);
-                    const totalPrice = unitPrice * quantity;
-                    
-                    cartItem.find('.item-total').text('$' + totalPrice.toFixed(2));
-                    
-                    // Recalculate cart totals
-                    recalculateCartTotals();
-                } else {
-                    alert(response.message || 'Failed to update cart item');
-                }
-            },
-            error: function() {
-                alert('Failed to update cart item');
-            }
-        });
-    }
-
-    function removeCartItem(itemId) {
-        $.ajax({
-            url: `/api/cart/${itemId}`,
-            method: 'DELETE',
-            data: {
-                _token: $('meta[name="csrf-token"]').attr('content')
-            },
-            success: function(response) {
-                if (response.status) {
-                    // Remove item from DOM
-                    $(`.cart-item[data-item-id="${itemId}"]`).fadeOut(300, function() {
-                        $(this).remove();
-                        
-                        // Check if store group is empty
-                        const storeGroup = $(this).closest('.store-group');
-                        if (storeGroup.find('.cart-item').length === 0) {
-                            storeGroup.remove();
-                        }
-                        
-                        // Check if cart is empty
-                        if ($('.cart-item').length === 0) {
-                            location.reload();
-                        } else {
-                            recalculateCartTotals();
-                        }
-                    });
-                } else {
-                    alert(response.message || 'Failed to remove cart item');
-                }
-            },
-            error: function() {
-                alert('Failed to remove cart item');
-            }
-        });
-    }
-
-    function recalculateCartTotals() {
-        let subtotal = 0;
-        let totalItems = 0;
-        
-        $('.cart-item').each(function() {
-            const quantity = parseInt($(this).find('.quantity-input').val());
-            const itemTotal = parseFloat($(this).find('.item-total').text().replace('$', ''));
-            
-            subtotal += itemTotal;
-            totalItems += quantity;
-        });
-        
-        $('#cart-subtotal').text('$' + subtotal.toFixed(2));
-        $('#cart-total').text('$' + subtotal.toFixed(2)); // Add delivery fees calculation if needed
-        
-        // Update items count
-        $('.cart-items h4').text(`Cart Items (${totalItems})`);
-        $('.card-body .d-flex:first-child span:first-child').text(`Subtotal (${totalItems} items)`);
-    }
+    // Add any additional cart functionality here if needed
 });
 </script>
 

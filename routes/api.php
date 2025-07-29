@@ -56,6 +56,28 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+// Test route for customer store APIs
+Route::get('/test-store', function() {
+    try {
+        $store = App\Models\Store::where('store_type', 'main')->first();
+        $products = App\Models\Product::where('is_available', true)->limit(5)->get();
+
+        return response()->json([
+            'status' => true,
+            'store' => $store ? $store->name : 'No main store found',
+            'products_count' => $products->count(),
+            'sample_products' => $products->pluck('name'),
+            'message' => 'Customer store APIs are working!'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => false,
+            'error' => $e->getMessage(),
+            'message' => 'API test failed'
+        ]);
+    }
+});
+
 Route::post('register',[API\User\UserController::class, 'register']);
 Route::post('login',[API\User\UserController::class,'login']);
 Route::post('forgot-password',[ API\User\UserController::class,'forgotPassword']);
@@ -201,6 +223,14 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::delete('cart/{id}', [API\CartController::class, 'remove']);
     Route::delete('cart', [API\CartController::class, 'clear']);
     Route::get('cart/count', [API\CartController::class, 'count']);
+    Route::get('cart/validate', [API\CartController::class, 'validate']);
+    Route::get('cart/totals', [API\CartController::class, 'totals']);
+    Route::get('cart/check-product', [API\CartController::class, 'checkProduct']);
+
+    // Checkout Management
+    Route::get('checkout/summary', [API\CheckoutController::class, 'summary']);
+    Route::post('checkout/process', [API\CheckoutController::class, 'process']);
+    Route::get('checkout/payment-methods', [API\CheckoutController::class, 'paymentMethods']);
 
     // Order Management
     Route::get('orders', [API\OrderController::class, 'index']);

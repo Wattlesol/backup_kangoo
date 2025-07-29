@@ -16,7 +16,8 @@ class Store extends BaseModel implements HasMedia
     protected $table = 'stores';
 
     protected $fillable = [
-        'provider_id',
+        'created_by',
+        'store_type',
         'name',
         'description',
         'slug',
@@ -30,6 +31,12 @@ class Store extends BaseModel implements HasMedia
         'status',
         'is_active',
         'business_hours',
+        'store_settings',
+        'payment_methods',
+        'shipping_methods',
+        'terms_and_conditions',
+        'privacy_policy',
+        'return_policy',
         'delivery_radius',
         'minimum_order_amount',
         'delivery_fee',
@@ -41,6 +48,9 @@ class Store extends BaseModel implements HasMedia
     protected $casts = [
         'is_active' => 'boolean',
         'business_hours' => 'array',
+        'store_settings' => 'array',
+        'payment_methods' => 'array',
+        'shipping_methods' => 'array',
         'delivery_radius' => 'decimal:2',
         'minimum_order_amount' => 'decimal:2',
         'delivery_fee' => 'decimal:2',
@@ -50,14 +60,14 @@ class Store extends BaseModel implements HasMedia
     ];
 
     // Relationships
-    public function provider()
+    public function createdBy()
     {
-        return $this->belongsTo(User::class, 'provider_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function approvedBy()
+    public function products()
     {
-        return $this->belongsTo(User::class, 'approved_by');
+        return $this->hasMany(Product::class);
     }
 
     public function country()
@@ -75,17 +85,8 @@ class Store extends BaseModel implements HasMedia
         return $this->belongsTo(City::class);
     }
 
-    public function storeProducts()
-    {
-        return $this->hasMany(StoreProduct::class);
-    }
-
-    public function products()
-    {
-        return $this->belongsToMany(Product::class, 'store_products')
-                    ->withPivot(['store_price', 'stock_quantity', 'is_available'])
-                    ->withTimestamps();
-    }
+    // In single-store architecture, all products belong to the main store
+    // Products are directly linked to providers via provider_id
 
     public function orders()
     {
@@ -98,6 +99,11 @@ class Store extends BaseModel implements HasMedia
         return $query->where('is_active', true);
     }
 
+    public function scopeMain($query)
+    {
+        return $query->where('store_type', 'main');
+    }
+
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');
@@ -108,13 +114,9 @@ class Store extends BaseModel implements HasMedia
         return $query->where('status', 'pending');
     }
 
-    public function scopeNearby($query, $latitude, $longitude, $radius = 50)
+    public function scopeRejected($query)
     {
-        return $query->selectRaw("*,
-            (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance",
-            [$latitude, $longitude, $latitude])
-            ->having('distance', '<', $radius)
-            ->orderBy('distance');
+        return $query->where('status', 'rejected');
     }
 
     // Accessors

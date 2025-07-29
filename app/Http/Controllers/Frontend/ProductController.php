@@ -219,6 +219,41 @@ class ProductController extends Controller
     }
 
     /**
+     * Display order success page
+     */
+    public function orderSuccess(Request $request)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return redirect()->route('login')->with('message', 'Please login to view your orders');
+        }
+
+        // Get order IDs from query parameter
+        $orderIds = $request->get('orders');
+        if (!$orderIds) {
+            return redirect()->route('frontend.index')->with('error', 'No orders found');
+        }
+
+        // Convert comma-separated string to array
+        $orderIds = explode(',', $orderIds);
+
+        // Get orders for the current user
+        $orders = Order::with(['items', 'store'])
+                      ->where('customer_id', $user->id)
+                      ->whereIn('id', $orderIds)
+                      ->get();
+
+        if ($orders->isEmpty()) {
+            return redirect()->route('frontend.index')->with('error', 'Orders not found');
+        }
+
+        $pageTitle = 'Order Success';
+
+        return view('landing-page.products.order-success', compact('orders', 'pageTitle'));
+    }
+
+    /**
      * Display stores listing
      */
     public function stores(Request $request)
@@ -249,23 +284,30 @@ class ProductController extends Controller
 
     /**
      * Get product data for AJAX requests
+     * Updated for single-store architecture
      */
     public function getProducts(Request $request)
     {
         $perPage = $request->get('per_page', 12);
         $categoryId = $request->get('category_id');
         $search = $request->get('search');
-        $latitude = $request->get('latitude');
-        $longitude = $request->get('longitude');
         $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
+        $priceMin = $request->get('price_min');
+        $priceMax = $request->get('price_max');
+        $providerId = $request->get('provider_id');
+        $inStockOnly = $request->get('in_stock_only', false);
+        $featuredOnly = $request->get('featured_only', false);
 
-        $query = Product::with(['category', 'creator', 'variants'])
-                       ->active();
+        // Only show available and approved products
+        $query = Product::with(['category', 'creator', 'provider', 'variants'])
+                       ->where('is_available', true)
+                       ->where('status', true)
+                       ->where('approval_status', 'approved');
 
         // Filter by category
         if ($categoryId) {
-            $query->byCategory($categoryId);
+            $query->where('product_category_id', $categoryId);
         }
 
         // Search functionality
@@ -273,24 +315,32 @@ class ProductController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('short_description', 'like', "%{$search}%")
                   ->orWhere('sku', 'like', "%{$search}%");
             });
         }
 
-        // Location-based filtering
-        if ($latitude && $longitude) {
-            $nearbyStores = Store::nearby($latitude, $longitude, 50)
-                               ->approved()
-                               ->active()
-                               ->pluck('id');
+        // Price range filtering
+        if ($priceMin) {
+            $query->whereRaw('COALESCE(selling_price, base_price) >= ?', [$priceMin]);
+        }
+        if ($priceMax) {
+            $query->whereRaw('COALESCE(selling_price, base_price) <= ?', [$priceMax]);
+        }
 
-            $query->where(function($q) use ($nearbyStores) {
-                $q->where('created_by_type', 'admin')
-                  ->orWhereHas('storeProducts', function($sq) use ($nearbyStores) {
-                      $sq->whereIn('store_id', $nearbyStores)
-                         ->where('is_available', true);
-                  });
-            });
+        // Provider filtering
+        if ($providerId) {
+            $query->where('provider_id', $providerId);
+        }
+
+        // Stock filtering
+        if ($inStockOnly) {
+            $query->where('stock_quantity', '>', 0);
+        }
+
+        // Featured products only
+        if ($featuredOnly) {
+            $query->where('is_featured', true);
         }
 
         // Sorting
@@ -299,15 +349,31 @@ class ProductController extends Controller
                 $query->orderBy('name', $sortOrder);
                 break;
             case 'price':
-                $query->orderBy('base_price', $sortOrder);
+                $query->orderByRaw('COALESCE(selling_price, base_price) ' . $sortOrder);
                 break;
             case 'created_at':
-            default:
                 $query->orderBy('created_at', $sortOrder);
+                break;
+            case 'popularity':
+                // Order by featured first, then by created date
+                $query->orderBy('is_featured', 'desc')->orderBy('created_at', 'desc');
+                break;
+            default:
+                $query->orderBy('created_at', 'desc');
                 break;
         }
 
         $products = $query->paginate($perPage);
+
+        // Transform products for frontend
+        $products->getCollection()->transform(function ($product) {
+            $product->price_formatted = getPriceFormat($product->selling_price ?: $product->base_price);
+            $product->category_name = $product->category ? $product->category->name : '';
+            $product->provider_name = $product->provider ? $product->provider->display_name : '';
+            $product->image_url = $product->getFirstMediaUrl('product_images') ?: null;
+            $product->url = route('products.show', $product->slug);
+            return $product;
+        });
 
         return response()->json([
             'status' => true,
@@ -346,12 +412,22 @@ class ProductController extends Controller
 
     /**
      * Display unified store page with all products from all providers
+     * Updated for single-store architecture
      */
     public function unifiedStore(Request $request)
     {
+        // Get the main store
+        $mainStore = Store::where('store_type', 'main')->first();
+
+        if (!$mainStore || !$mainStore->is_active) {
+            return view('landing-page.store.unavailable', [
+                'pageTitle' => 'Store Unavailable',
+                'message' => 'The store is currently unavailable. Please check back later.'
+            ]);
+        }
+
         $categoryId = $request->get('category');
         $search = $request->get('q');
-        $location = $request->get('location');
         $sort = $request->get('sort', 'name');
         $priceMin = $request->get('price_min');
         $priceMax = $request->get('price_max');
@@ -359,21 +435,33 @@ class ProductController extends Controller
         $inStockOnly = $request->get('in_stock_only', false);
         $featuredOnly = $request->get('featured_only', false);
 
-        // Get all categories with product counts
-        $categories = ProductCategory::withCount('products')->active()->ordered()->get();
-        $featuredCategories = ProductCategory::withCount('products')->active()->featured()->ordered()->get();
+        // Get all categories with product counts (only for available products)
+        $categories = ProductCategory::withCount(['products' => function($q) {
+            $q->where('is_available', true)->where('status', true)->where('approval_status', 'approved');
+        }])->active()->ordered()->get();
 
-        // Get all providers who have products
-        $providers = User::whereHas('createdProducts', function($q) {
-            $q->active();
+        $featuredCategories = ProductCategory::withCount(['products' => function($q) {
+            $q->where('is_available', true)->where('status', true)->where('approval_status', 'approved')->where('is_featured', true);
+        }])->active()->featured()->ordered()->get();
+
+        // Get all providers who have available and approved products
+        $providers = User::whereHas('providerProducts', function($q) {
+            $q->where('is_available', true)
+              ->where('status', true)
+              ->where('approval_status', 'approved');
         })->where('user_type', 'provider')->where('status', 1)->get(['id', 'first_name', 'last_name']);
 
-        // Get price range for filtering
-        $priceRange = Product::active()->selectRaw('MIN(base_price) as min_price, MAX(base_price) as max_price')->first();
+        // Get price range for filtering (from available and approved products only)
+        $priceRange = Product::where('is_available', true)
+                            ->where('status', true)
+                            ->where('approval_status', 'approved')
+                            ->selectRaw('MIN(COALESCE(selling_price, base_price)) as min_price, MAX(COALESCE(selling_price, base_price)) as max_price')
+                            ->first();
 
-        $pageTitle = __('landingpage.store');
+        $pageTitle = $mainStore->name;
 
         return view('landing-page.store.unified', compact(
+            'mainStore',
             'categories',
             'featuredCategories',
             'providers',
@@ -381,7 +469,6 @@ class ProductController extends Controller
             'pageTitle',
             'categoryId',
             'search',
-            'location',
             'sort',
             'priceMin',
             'priceMax',

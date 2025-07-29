@@ -2,17 +2,53 @@
 
 @section('title', __('landingpage.store'))
 
+@section('after_style')
+<style>
+/* Ensure store page uses exact app primary color */
+.store-page .text-primary {
+    color: #5F60B9 !important;
+}
+.store-page .btn-primary {
+    background-color: #5F60B9 !important;
+    border-color: #5F60B9 !important;
+}
+.store-page .btn-outline-primary {
+    color: #5F60B9 !important;
+    border-color: #5F60B9 !important;
+}
+.store-page .btn-outline-primary:hover {
+    background-color: #5F60B9 !important;
+    border-color: #5F60B9 !important;
+}
+.store-page .bg-primary {
+    background-color: #5F60B9 !important;
+}
+.store-page .spinner-border.text-primary {
+    color: #5F60B9 !important;
+}
+.store-page .form-check-input:checked {
+    background-color: #5F60B9 !important;
+    border-color: #5F60B9 !important;
+}
+</style>
+@endsection
+
 @section('content')
-<div class="py-5" style="background-color: #f8f9fa;">
+<div class="store-page py-5" style="background-color: #f8f9fa;">
     <div class="container-fluid">
         <!-- Page Header -->
         <div class="row mb-5">
             <div class="col-12">
                 <div class="text-center">
                     <h1 class="h2 fw-bold text-primary mb-2">
-                        {{__('landingpage.store')}}
+                        {{ $mainStore->name }}
                     </h1>
-                    <p class="text-muted mb-0">{{__('landingpage.store_description')}}</p>
+                    <p class="text-muted mb-0">{{ $mainStore->description }}</p>
+                    @if($mainStore->address)
+                        <p class="text-muted small mb-0">
+                            <i class="fas fa-map-marker-alt"></i> {{ $mainStore->address }}
+                        </p>
+                    @endif
                 </div>
             </div>
         </div>

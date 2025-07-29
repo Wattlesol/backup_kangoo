@@ -5,7 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Store;
-use App\Models\StoreProduct;
+use App\Models\Product;
 use App\Http\Resources\API\StoreResource;
 use App\Http\Resources\API\ProductResource;
 use Illuminate\Support\Facades\Validator;
@@ -16,26 +16,20 @@ class StoreController extends Controller
     public function index(Request $request)
     {
         try {
-            $latitude = $request->get('latitude');
-            $longitude = $request->get('longitude');
-            $radius = $request->get('radius', 50);
-            $perPage = $request->get('per_page', 15);
+            // In single store architecture, return the main store
+            $mainStore = Store::with(['createdBy', 'country', 'state', 'city'])
+                             ->where('store_type', 'main')
+                             ->active()
+                             ->first();
 
-            $query = Store::with(['provider', 'country', 'state', 'city'])
-                         ->approved()
-                         ->active();
-
-            // Location-based filtering
-            if ($latitude && $longitude) {
-                $query = $query->nearby($latitude, $longitude, $radius);
+            if (!$mainStore) {
+                return comman_message_response(__('messages.store_not_found'));
             }
-
-            $stores = $query->paginate($perPage);
 
             $response = [
                 'status' => true,
-                'data' => StoreResource::collection($stores),
-                'message' => __('messages.list_fetch_successfully', ['item' => __('messages.store')])
+                'data' => new StoreResource($mainStore),
+                'message' => __('messages.detail_fetch_successfully', ['item' => __('messages.store')])
             ];
 
             return comman_custom_response($response);
@@ -69,54 +63,51 @@ class StoreController extends Controller
     public function products($storeId, Request $request)
     {
         try {
-            $store = Store::approved()->active()->findOrFail($storeId);
-            
+            $store = Store::where('store_type', 'main')->active()->findOrFail($storeId);
+
             $perPage = $request->get('per_page', 15);
             $categoryId = $request->get('category_id');
             $search = $request->get('search');
+            $providerId = $request->get('provider_id');
 
-            $query = StoreProduct::with(['product.category', 'product.variants'])
-                                ->where('store_id', $storeId)
-                                ->where('is_available', true)
-                                ->whereHas('product', function($q) {
-                                    $q->active();
-                                });
+            // In single store architecture, get all approved and available products
+            $query = Product::with(['category', 'provider', 'variants'])
+                           ->where('is_available', true)
+                           ->where('status', true)
+                           ->where('approval_status', 'approved');
 
             // Filter by category
             if ($categoryId) {
-                $query->whereHas('product', function($q) use ($categoryId) {
-                    $q->where('product_category_id', $categoryId);
-                });
+                $query->where('product_category_id', $categoryId);
+            }
+
+            // Filter by provider
+            if ($providerId) {
+                $query->where('provider_id', $providerId);
             }
 
             // Search functionality
             if ($search) {
-                $query->whereHas('product', function($q) use ($search) {
+                $query->where(function($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                       ->orWhere('description', 'like', "%{$search}%")
                       ->orWhere('sku', 'like', "%{$search}%");
                 });
             }
 
-            $storeProducts = $query->paginate($perPage);
+            $products = $query->paginate($perPage);
 
-            // Transform to product resources with store-specific data
-            $products = $storeProducts->getCollection()->map(function($storeProduct) {
-                $product = $storeProduct->product;
-                $product->store_price = $storeProduct->store_price;
-                $product->store_stock = $storeProduct->stock_quantity;
-                $product->final_price = $storeProduct->final_price;
-                return new ProductResource($product);
-            });
+            // Return products with single store architecture
+            $productCollection = ProductResource::collection($products);
 
             $response = [
                 'status' => true,
-                'data' => $products,
+                'data' => $productCollection,
                 'pagination' => [
-                    'current_page' => $storeProducts->currentPage(),
-                    'last_page' => $storeProducts->lastPage(),
-                    'per_page' => $storeProducts->perPage(),
-                    'total' => $storeProducts->total(),
+                    'current_page' => $products->currentPage(),
+                    'last_page' => $products->lastPage(),
+                    'per_page' => $products->perPage(),
+                    'total' => $products->total(),
                 ],
                 'store' => new StoreResource($store),
                 'message' => __('messages.list_fetch_successfully', ['item' => __('messages.product')])

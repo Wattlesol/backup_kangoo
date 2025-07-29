@@ -13,17 +13,29 @@ return new class extends Migration
      */
     public function up()
     {
+        // Drop the store_products table as we're using direct product-provider relationships
+        Schema::dropIfExists('store_products');
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        // Recreate the store_products table if needed for rollback
         Schema::create('store_products', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('store_id');
             $table->unsignedBigInteger('product_id');
-            $table->decimal('store_price', 10, 2); // Store-specific price
+            $table->decimal('store_price', 10, 2);
             $table->integer('stock_quantity')->default(0);
             $table->boolean('track_inventory')->default(true);
             $table->boolean('is_available')->default(true);
             $table->integer('minimum_order_quantity')->default(1);
             $table->integer('maximum_order_quantity')->nullable();
-            $table->text('store_notes')->nullable(); // Store-specific notes about the product
+            $table->text('store_notes')->nullable();
             $table->timestamps();
             $table->softDeletes();
             
@@ -35,15 +47,5 @@ return new class extends Migration
             $table->index(['product_id', 'is_available']);
             $table->index('stock_quantity');
         });
-    }
-
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
-    public function down()
-    {
-        Schema::dropIfExists('store_products');
     }
 };

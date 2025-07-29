@@ -47,7 +47,7 @@ class SettingController extends Controller
         $user_data = User::find($user_id);
         $envSettting = $envSettting_value = [];
         if($auth_user['user_type'] == 'provider'){
-            date_default_timezone_set($admin->time_zone ?? 'UTC');
+            date_default_timezone_set($auth_user->time_zone ?? 'UTC');
 
             $current_time = \Carbon\Carbon::now();
             $time = $current_time->toTimeString();

@@ -95,26 +95,12 @@ class ProductController extends Controller
             $latitude = $request->get('latitude');
             $longitude = $request->get('longitude');
 
-            $product = Product::with(['category', 'creator', 'variants', 'storeProducts.store'])
+            $product = Product::with(['category', 'creator', 'provider', 'variants'])
                              ->active()
                              ->findOrFail($id);
 
-            // Get available stores for this product
-            $availableStores = collect();
-            
-            if ($latitude && $longitude) {
-                $availableStores = Store::nearby($latitude, $longitude, 50)
-                                       ->approved()
-                                       ->active()
-                                       ->whereHas('storeProducts', function($q) use ($id) {
-                                           $q->where('product_id', $id)
-                                             ->where('is_available', true);
-                                       })
-                                       ->with(['storeProducts' => function($q) use ($id) {
-                                           $q->where('product_id', $id);
-                                       }])
-                                       ->get();
-            }
+            // In single store architecture, get the main store
+            $mainStore = Store::where('store_type', 'main')->active()->first();
 
             $response = [
                 'status' => true,
@@ -191,20 +177,11 @@ class ProductController extends Controller
                 $query->byCategory($categoryId);
             }
 
-            // Location-based filtering
+            // In single store architecture, location filtering is simplified
+            // All products are available in the main store
             if ($latitude && $longitude) {
-                $nearbyStores = Store::nearby($latitude, $longitude, 50)
-                                   ->approved()
-                                   ->active()
-                                   ->pluck('id');
-
-                $query->where(function($q) use ($nearbyStores) {
-                    $q->where('created_by_type', 'admin')
-                      ->orWhereHas('storeProducts', function($sq) use ($nearbyStores) {
-                          $sq->whereIn('store_id', $nearbyStores)
-                             ->where('is_available', true);
-                      });
-                });
+                // Could add provider location filtering here if needed
+                // For now, all products are available regardless of location
             }
 
             $products = $query->orderBy('name')

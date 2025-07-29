@@ -211,12 +211,91 @@ class CartController extends Controller
     {
         try {
             $user = Auth::user();
-            $count = ShoppingCart::byUser($user->id)->sum('quantity');
+            $count = ShoppingCart::getCartCount($user->id);
 
             $response = [
                 'status' => true,
                 'data' => ['count' => $count],
                 'message' => __('messages.cart_count_fetched')
+            ];
+
+            return comman_custom_response($response);
+
+        } catch (\Exception $e) {
+            return comman_message_response(__('messages.failed'));
+        }
+    }
+
+    /**
+     * Validate cart before checkout
+     */
+    public function validate()
+    {
+        try {
+            $user = Auth::user();
+            $errors = ShoppingCart::validateCart($user->id);
+
+            if (!empty($errors)) {
+                return comman_custom_response([
+                    'status' => false,
+                    'data' => ['errors' => $errors],
+                    'message' => 'Cart validation failed'
+                ]);
+            }
+
+            $response = [
+                'status' => true,
+                'message' => 'Cart is valid'
+            ];
+
+            return comman_custom_response($response);
+
+        } catch (\Exception $e) {
+            return comman_message_response(__('messages.failed'));
+        }
+    }
+
+    /**
+     * Get cart totals with tax and delivery
+     */
+    public function totals(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $deliveryAddress = $request->get('delivery_address');
+
+            $totals = ShoppingCart::calculateTotals($user->id, $deliveryAddress);
+
+            $response = [
+                'status' => true,
+                'data' => $totals,
+                'message' => 'Cart totals calculated successfully'
+            ];
+
+            return comman_custom_response($response);
+
+        } catch (\Exception $e) {
+            return comman_message_response(__('messages.failed'));
+        }
+    }
+
+    /**
+     * Check if product is in cart
+     */
+    public function checkProduct(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $productId = $request->get('product_id');
+            $variantId = $request->get('variant_id');
+            $storeId = $request->get('store_id');
+
+            $inCart = ShoppingCart::isInCart($user->id, $productId, $variantId, $storeId);
+
+            $response = [
+                'status' => true,
+                'data' => ['in_cart' => $inCart],
+                'message' => 'Product check completed'
             ];
 
             return comman_custom_response($response);
