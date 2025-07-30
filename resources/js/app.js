@@ -43,9 +43,7 @@ import Payment from './components/Payment.vue'
 import PostJobForm from './sections/PostJobForm.vue'
 import BookingPostJob from './sections/BookingPostJob.vue'
 import Wallet from './components/Wallet.vue'
-import ShoppingCart from './components/ShoppingCart.vue'
-import CartIcon from './components/CartIcon.vue'
-import AddToCartButton from './components/AddToCartButton.vue'
+
 const pinia = createPinia();
 
 const app = createApp()
@@ -85,9 +83,7 @@ app.component('payment', Payment)
 app.component('post-job-form',PostJobForm)
 app.component('booking-post-job',BookingPostJob)
 app.component('wallet', Wallet)
-app.component('shopping-cart', ShoppingCart)
-app.component('cart-icon', CartIcon)
-app.component('add-to-cart-button', AddToCartButton)
+
 
 /*--------------------------------------
 Calculate Header height

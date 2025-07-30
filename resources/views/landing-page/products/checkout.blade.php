@@ -1,4 +1,4 @@
-@extends('landing-page.layouts.app')
+@extends('landing-page.layouts.default')
 
 @section('title', $pageTitle)
 
@@ -11,7 +11,6 @@
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('frontend.index') }}">Home</a></li>
                     <li class="breadcrumb-item"><a href="{{ route('store.unified') }}">Store</a></li>
-                    <li class="breadcrumb-item"><a href="{{ route('products.cart') }}">Cart</a></li>
                     <li class="breadcrumb-item active" aria-current="page">Checkout</li>
                 </ol>
             </nav>
@@ -30,90 +29,242 @@
     <div class="row">
         <!-- Checkout Form -->
         <div class="col-lg-8">
-            <div id="checkout-app">
-                <checkout-process 
-                    :cart-summary="{{ json_encode($cartSummary) }}"
-                    :user="{{ json_encode(auth()->user()) }}"
-                ></checkout-process>
-            </div>
+            <form id="checkout-form" method="POST" action="{{ route('orders.store') }}">
+                @csrf
+                <input type="hidden" name="product_id" value="{{ $product->id }}">
+                <input type="hidden" name="quantity" value="{{ $quantity }}">
+
+                <!-- Customer Information -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user me-2"></i>
+                            Customer Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="first_name" name="first_name"
+                                       value="{{ auth()->user()->first_name ?? '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="last_name" name="last_name"
+                                       value="{{ auth()->user()->last_name ?? '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                       value="{{ auth()->user()->email ?? '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                <input type="tel" class="form-control" id="phone" name="phone"
+                                       value="{{ auth()->user()->contact_number ?? '' }}" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delivery Address -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            Delivery Address
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label for="address" class="form-label">Street Address <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="address" name="address"
+                                       placeholder="Enter your full address" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="city" class="form-label">City <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="city" name="city" required>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="state" class="form-label">State <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="state" name="state" required>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="zip" class="form-label">ZIP Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="zip" name="zip" required>
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label for="delivery_notes" class="form-label">Delivery Notes (Optional)</label>
+                                <textarea class="form-control" id="delivery_notes" name="delivery_notes" rows="2"
+                                          placeholder="Any special delivery instructions..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Method -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-credit-card me-2"></i>
+                            Payment Method
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check p-3 border rounded h-100">
+                                    <input class="form-check-input" type="radio" name="payment_method" id="cash_on_delivery" value="cash" checked>
+                                    <label class="form-check-label w-100" for="cash_on_delivery">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-money-bill-wave me-3 text-success fa-2x"></i>
+                                            <div>
+                                                <div class="fw-bold">Cash on Delivery</div>
+                                                <div class="text-muted small">Pay when you receive your order</div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check p-3 border rounded h-100">
+                                    <input class="form-check-input" type="radio" name="payment_method" id="online_payment" value="online">
+                                    <label class="form-check-label w-100" for="online_payment">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-credit-card me-3 text-primary fa-2x"></i>
+                                            <div>
+                                                <div class="fw-bold">Online Payment</div>
+                                                <div class="text-muted small">Pay securely with card or digital wallet</div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
 
         <!-- Order Summary -->
         <div class="col-lg-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-light">
+            <div class="card shadow-sm sticky-top" style="top: 20px;">
+                <div class="card-header bg-primary text-white">
                     <h5 class="card-title mb-0">
-                        <i class="fas fa-receipt me-2"></i>
+                        <i class="fas fa-shopping-bag me-2"></i>
                         Order Summary
                     </h5>
                 </div>
                 <div class="card-body">
-                    <!-- Cart Items -->
+                    <!-- Product Item -->
                     <div class="order-items">
-                        @foreach($cartSummary['items'] as $item)
-                        <div class="order-item d-flex align-items-center mb-3">
+                        <div class="order-item d-flex align-items-center p-3 bg-light rounded mb-3">
                             <div class="item-image me-3">
-                                @if($item->product && $item->product->getFirstMediaUrl('product_images'))
-                                    <img src="{{ $item->product->getFirstMediaUrl('product_images') }}" 
-                                         alt="{{ $item->product_name }}" 
-                                         class="img-fluid rounded"
-                                         style="width: 50px; height: 50px; object-fit: cover;">
+                                @if($product->getFirstMediaUrl('product_images'))
+                                    <img src="{{ $product->getFirstMediaUrl('product_images') }}"
+                                         alt="{{ $product->name }}"
+                                         class="img-fluid rounded shadow-sm"
+                                         style="width: 70px; height: 70px; object-fit: cover;">
                                 @else
-                                    <div class="bg-light rounded d-flex align-items-center justify-content-center" 
-                                         style="width: 50px; height: 50px;">
-                                        <i class="fas fa-image text-muted"></i>
+                                    <div class="bg-white rounded d-flex align-items-center justify-content-center shadow-sm"
+                                         style="width: 70px; height: 70px;">
+                                        <i class="fas fa-mobile-alt text-primary fa-2x"></i>
                                     </div>
                                 @endif
                             </div>
                             <div class="item-details flex-grow-1">
-                                <h6 class="mb-1">{{ $item->product_name }}</h6>
-                                @if($item->productVariant)
-                                    <small class="text-muted">{{ $item->productVariant->attribute_display }}</small>
-                                @endif
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted">Qty: {{ $item->quantity }}</span>
-                                    <span class="fw-bold">{{ getPriceFormat($item->total_price) }}</span>
+                                <h6 class="mb-1 fw-bold">{{ $product->name }}</h6>
+                                <small class="text-muted">{{ $product->category->name ?? 'Uncategorized' }}</small>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <span class="badge bg-secondary">Qty: {{ $quantity }}</span>
+                                    <span class="fw-bold text-primary">{{ getPriceFormat($product->effective_price * $quantity) }}</span>
                                 </div>
                             </div>
                         </div>
-                        @endforeach
                     </div>
 
-                    <hr>
-
                     <!-- Order Totals -->
+                    @php
+                        $subtotal = $product->effective_price * $quantity;
+                        $tax = $subtotal * 0.10;
+                        $deliveryFee = 5.00;
+                        $total = $subtotal + $tax + $deliveryFee;
+                    @endphp
                     <div class="order-totals">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Subtotal ({{ $cartSummary['total_items'] }} items):</span>
-                            <span>{{ getPriceFormat($cartSummary['subtotal']) }}</span>
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span>Subtotal ({{ $quantity }} {{ $quantity == 1 ? 'item' : 'items' }}):</span>
+                            <span class="fw-semibold">{{ getPriceFormat($subtotal) }}</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Tax:</span>
-                            <span id="tax-amount">{{ getPriceFormat($cartSummary['subtotal'] * 0.10) }}</span>
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span>Tax (10%):</span>
+                            <span class="fw-semibold" id="tax-amount">{{ getPriceFormat($tax) }}</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
+                        <div class="d-flex justify-content-between py-2 border-bottom">
                             <span>Delivery Fee:</span>
-                            <span id="delivery-fee">{{ getPriceFormat(5.00) }}</span>
+                            <span class="fw-semibold" id="delivery-fee">{{ getPriceFormat($deliveryFee) }}</span>
                         </div>
-                        <hr>
-                        <div class="d-flex justify-content-between fw-bold fs-5">
-                            <span>Total:</span>
-                            <span class="text-primary" id="total-amount">
-                                {{ getPriceFormat($cartSummary['subtotal'] + ($cartSummary['subtotal'] * 0.10) + 5.00) }}
+                        <div class="d-flex justify-content-between py-3 bg-light rounded mt-3 px-3">
+                            <span class="fw-bold fs-5">Total:</span>
+                            <span class="fw-bold fs-5 text-primary" id="total-amount">
+                                {{ getPriceFormat($total) }}
                             </span>
+                        </div>
+                    </div>
+
+                    <!-- Security Badge -->
+                    <div class="text-center mt-4 p-3 bg-light rounded">
+                        <i class="fas fa-shield-alt text-success fa-2x mb-2"></i>
+                        <h6 class="text-success mb-1">Secure Checkout</h6>
+                        <small class="text-muted">SSL encrypted payment</small>
+                    </div>
+
+                    <!-- Place Order Button -->
+                    <div class="mt-4">
+                        <button type="submit"
+                                form="checkout-form"
+                                class="btn btn-primary btn-lg w-100 py-3"
+                                id="place-order-btn">
+                            <i class="fas fa-lock me-2"></i>
+                            <span>Place Order - {{ getPriceFormat($total) }}</span>
+                        </button>
+                        <div class="text-center mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-check-circle text-success me-1"></i>
+                                Money-back guarantee • Free returns
+                            </small>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Security Notice -->
-            <div class="card mt-3">
-                <div class="card-body text-center">
-                    <i class="fas fa-shield-alt text-success fa-2x mb-2"></i>
-                    <h6>Secure Checkout</h6>
-                    <small class="text-muted">
-                        Your payment information is encrypted and secure.
-                    </small>
+            <!-- Trust Badges -->
+            <div class="card mt-3 border-0">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="p-2">
+                                <i class="fas fa-shipping-fast text-primary fa-2x mb-2"></i>
+                                <div class="small fw-bold">Fast Delivery</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">2-3 days</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2">
+                                <i class="fas fa-undo text-success fa-2x mb-2"></i>
+                                <div class="small fw-bold">Easy Returns</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">30 days</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2">
+                                <i class="fas fa-headset text-info fa-2x mb-2"></i>
+                                <div class="small fw-bold">24/7 Support</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">Always here</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -123,13 +274,89 @@
 
 @section('bottom_script')
 <script>
-// Initialize checkout app
+// Enhanced checkout functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('checkout-form');
+    const placeOrderBtn = document.getElementById('place-order-btn');
+
+    // Form validation
+    function validateForm() {
+        const requiredFields = form.querySelectorAll('input[required], select[required]');
+        let isValid = true;
+
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                isValid = false;
+                field.classList.add('is-invalid');
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        });
+
+        return isValid;
+    }
+
+    // Real-time validation
+    form.addEventListener('input', function(e) {
+        if (e.target.hasAttribute('required')) {
+            if (e.target.value.trim()) {
+                e.target.classList.remove('is-invalid');
+                e.target.classList.add('is-valid');
+            } else {
+                e.target.classList.remove('is-valid');
+                e.target.classList.add('is-invalid');
+            }
+        }
+    });
+
+    // Payment method selection styling
+    const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
+    paymentRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            paymentRadios.forEach(r => {
+                const parent = r.closest('.form-check');
+                if (r.checked) {
+                    parent.classList.add('border-primary', 'bg-light');
+                } else {
+                    parent.classList.remove('border-primary', 'bg-light');
+                }
+            });
+        });
+    });
+
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        if (!validateForm()) {
+            alert('Please fill in all required fields.');
+            return;
+        }
+
+        // Show loading state
+        placeOrderBtn.disabled = true;
+        placeOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing Order...';
+
+        // Submit form
+        setTimeout(() => {
+            form.submit();
+        }, 500);
+    });
+
+    // Initialize payment method styling
+    const checkedRadio = document.querySelector('input[name="payment_method"]:checked');
+    if (checkedRadio) {
+        checkedRadio.dispatchEvent(new Event('change'));
+    }
+});
+
+// Initialize checkout app (keeping Vue.js for compatibility)
 const { createApp } = Vue;
 
 const CheckoutApp = {
     components: {
         'checkout-process': {
-            props: ['cartSummary', 'user'],
+            props: ['product', 'quantity', 'user'],
             data() {
                 return {
                     currentStep: 1,
@@ -149,27 +376,9 @@ const CheckoutApp = {
                     deliveryNotes: '',
                     paymentMethod: 'cash',
                     
-                    // Payment methods
-                    paymentMethods: [
-                        {
-                            id: 'cash',
-                            name: 'Cash on Delivery',
-                            description: 'Pay when your order is delivered',
-                            icon: 'fas fa-money-bill-wave'
-                        },
-                        {
-                            id: 'card',
-                            name: 'Credit/Debit Card',
-                            description: 'Pay securely with your card',
-                            icon: 'fas fa-credit-card'
-                        },
-                        {
-                            id: 'wallet',
-                            name: 'Wallet',
-                            description: 'Pay from your wallet balance',
-                            icon: 'fas fa-wallet'
-                        }
-                    ]
+                    // Payment methods (loaded dynamically)
+                    paymentMethods: [],
+                    loadingPaymentMethods: false
                 }
             },
             
@@ -189,14 +398,50 @@ const CheckoutApp = {
             },
             
             methods: {
+                getPaymentMethodName() {
+                    const method = this.paymentMethods.find(m => m.id === this.paymentMethod);
+                    return method ? method.name : 'Unknown Payment Method';
+                },
+
+                async loadPaymentMethods() {
+                    this.loadingPaymentMethods = true;
+                    try {
+                        const response = await axios.get('/api/product-payment-methods');
+                        if (response.data.status) {
+                            this.paymentMethods = response.data.data.methods;
+                            // Set default payment method to first available
+                            if (this.paymentMethods.length > 0) {
+                                this.paymentMethod = this.paymentMethods[0].id;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to load payment methods:', error);
+                        // Fallback to cash only
+                        this.paymentMethods = [{
+                            id: 'cash',
+                            name: 'Cash on Delivery',
+                            description: 'Pay when your order is delivered',
+                            icon: 'fas fa-money-bill-wave',
+                            enabled: true
+                        }];
+                        this.paymentMethod = 'cash';
+                    } finally {
+                        this.loadingPaymentMethods = false;
+                    }
+                },
+
                 nextStep() {
                     if (this.currentStep === 1 && this.canProceedToStep2) {
                         this.currentStep = 2;
+                        // Load payment methods when entering payment step
+                        if (this.paymentMethods.length === 0) {
+                            this.loadPaymentMethods();
+                        }
                     } else if (this.currentStep === 2) {
                         this.currentStep = 3;
                     }
                 },
-                
+
                 prevStep() {
                     if (this.currentStep > 1) {
                         this.currentStep--;
@@ -205,21 +450,39 @@ const CheckoutApp = {
                 
                 async placeOrder() {
                     if (!this.canPlaceOrder) return;
-                    
+
                     this.loading = true;
                     this.error = '';
-                    
+
                     try {
-                        const response = await axios.post('/api/checkout/process', {
+                        // First create the order for direct product purchase
+                        const response = await axios.post('/api/orders', {
+                            product_id: this.product.id,
+                            quantity: this.quantity,
                             delivery_address: this.deliveryAddress,
                             delivery_phone: this.deliveryPhone,
                             delivery_notes: this.deliveryNotes,
                             payment_method: this.paymentMethod
                         });
-                        
+
                         if (response.data.status) {
-                            // Redirect to success page or show success message
-                            window.location.href = '/order-success?orders=' + response.data.data.orders.map(o => o.id).join(',');
+                            const orders = response.data.data.orders;
+                            const totalAmount = response.data.data.total_amount;
+
+                            // Handle different payment methods
+                            if (this.paymentMethod === 'cash') {
+                                // Cash on delivery - redirect to success page
+                                window.location.href = '/order-success?orders=' + orders.map(o => o.id).join(',');
+                            } else if (this.paymentMethod === 'stripe' || this.paymentMethod === 'card') {
+                                // Stripe payment - create payment session
+                                await this.processStripePayment(orders[0].id, totalAmount);
+                            } else if (this.paymentMethod === 'wallet') {
+                                // Wallet payment
+                                await this.processWalletPayment(orders[0].id, totalAmount);
+                            } else {
+                                // Other payment methods - redirect to success for now
+                                window.location.href = '/order-success?orders=' + orders.map(o => o.id).join(',');
+                            }
                         } else {
                             this.error = response.data.message || 'Failed to place order';
                         }
@@ -229,9 +492,53 @@ const CheckoutApp = {
                     } finally {
                         this.loading = false;
                     }
+                },
+
+                async processStripePayment(orderId, totalAmount) {
+                    try {
+                        const response = await axios.post('/api/create-product-stripe-payment', {
+                            order_id: orderId,
+                            total_amount: totalAmount,
+                            currency_code: 'USD' // You can make this dynamic
+                        });
+
+                        if (response.data.status) {
+                            // Redirect to Stripe checkout
+                            window.location.href = response.data.data.url;
+                        } else {
+                            this.error = response.data.message || 'Failed to create payment session';
+                        }
+                    } catch (error) {
+                        this.error = 'Failed to process payment. Please try again.';
+                        console.error('Stripe payment error:', error);
+                    }
+                },
+
+                async processWalletPayment(orderId, totalAmount) {
+                    try {
+                        const response = await axios.post('/api/process-product-wallet-payment', {
+                            order_id: orderId,
+                            total_amount: totalAmount
+                        });
+
+                        if (response.data.status) {
+                            // Wallet payment successful - redirect to success page
+                            window.location.href = '/order-success?orders=' + orderId;
+                        } else {
+                            this.error = response.data.message || 'Wallet payment failed';
+                        }
+                    } catch (error) {
+                        this.error = 'Wallet payment failed. Please try again.';
+                        console.error('Wallet payment error:', error);
+                    }
                 }
             },
-            
+
+            mounted() {
+                // Load payment methods on component mount
+                this.loadPaymentMethods();
+            },
+
             template: `
                 <div class="checkout-process">
                     <!-- Progress Steps -->
@@ -331,18 +638,35 @@ const CheckoutApp = {
                                 </h5>
                             </div>
                             <div class="card-body">
-                                <div class="payment-methods">
+                                <!-- Loading state for payment methods -->
+                                <div v-if="loadingPaymentMethods" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading payment methods...</span>
+                                    </div>
+                                    <p class="mt-2 text-muted">Loading payment methods...</p>
+                                </div>
+
+                                <!-- Payment methods -->
+                                <div v-else class="payment-methods">
+                                    <div v-if="paymentMethods.length === 0" class="alert alert-warning">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        No payment methods available. Please contact support.
+                                    </div>
+
                                     <div v-for="method in paymentMethods" :key="method.id" class="payment-method mb-3">
                                         <div class="form-check">
-                                            <input v-model="paymentMethod" :value="method.id" :id="method.id" type="radio" class="form-check-input">
-                                            <label :for="method.id" class="form-check-label w-100">
+                                            <input v-model="paymentMethod" :value="method.id" :id="method.id" type="radio" class="form-check-input" :disabled="!method.enabled">
+                                            <label :for="method.id" class="form-check-label w-100" :class="{ 'text-muted': !method.enabled }">
                                                 <div class="payment-option">
                                                     <div class="payment-icon">
                                                         <i :class="method.icon"></i>
                                                     </div>
                                                     <div class="payment-details">
-                                                        <div class="payment-name">{{ method.name }}</div>
-                                                        <div class="payment-description">{{ method.description }}</div>
+                                                        <div class="payment-name" v-text="method.name"></div>
+                                                        <div class="payment-description" v-text="method.description"></div>
+                                                        <div v-if="!method.enabled" class="text-danger small">
+                                                            <i class="fas fa-exclamation-circle me-1"></i>Currently unavailable
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </label>
@@ -354,7 +678,7 @@ const CheckoutApp = {
                                     <button @click="prevStep" class="btn btn-outline-secondary">
                                         <i class="fas fa-arrow-left me-2"></i>Back
                                     </button>
-                                    <button @click="nextStep" class="btn btn-primary">
+                                    <button @click="nextStep" :disabled="loadingPaymentMethods || !paymentMethod" class="btn btn-primary">
                                         Review Order <i class="fas fa-arrow-right ms-2"></i>
                                     </button>
                                 </div>
@@ -376,25 +700,25 @@ const CheckoutApp = {
                                 <div class="order-review mb-4">
                                     <h6>Delivery Address:</h6>
                                     <address class="mb-3">
-                                        <strong>{{ deliveryAddress.name }}</strong><br>
-                                        {{ deliveryAddress.address }}<br>
-                                        {{ deliveryAddress.city }}, {{ deliveryAddress.state }} {{ deliveryAddress.zip }}<br>
-                                        {{ deliveryAddress.country }}<br>
-                                        <strong>Phone:</strong> {{ deliveryPhone }}
+                                        <strong v-text="deliveryAddress.name"></strong><br>
+                                        <span v-text="deliveryAddress.address"></span><br>
+                                        <span v-text="deliveryAddress.city + ', ' + deliveryAddress.state + ' ' + deliveryAddress.zip"></span><br>
+                                        <span v-text="deliveryAddress.country"></span><br>
+                                        <strong>Phone:</strong> <span v-text="deliveryPhone"></span>
                                     </address>
                                     
                                     <h6>Payment Method:</h6>
-                                    <p>{{ paymentMethods.find(m => m.id === paymentMethod)?.name }}</p>
+                                    <p v-text="getPaymentMethodName()"></p>
                                     
                                     <div v-if="deliveryNotes">
                                         <h6>Delivery Notes:</h6>
-                                        <p>{{ deliveryNotes }}</p>
+                                        <p v-text="deliveryNotes"></p>
                                     </div>
                                 </div>
                                 
                                 <!-- Error Message -->
                                 <div v-if="error" class="alert alert-danger">
-                                    {{ error }}
+                                    <span v-text="error"></span>
                                 </div>
                                 
                                 <div class="d-flex justify-content-between">
@@ -404,7 +728,7 @@ const CheckoutApp = {
                                     <button @click="placeOrder" :disabled="!canPlaceOrder || loading" class="btn btn-success btn-lg">
                                         <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
                                         <i v-else class="fas fa-shopping-bag me-2"></i>
-                                        {{ loading ? 'Placing Order...' : 'Place Order' }}
+                                        <span v-text="loading ? 'Placing Order...' : 'Place Order'"></span>
                                     </button>
                                 </div>
                             </div>

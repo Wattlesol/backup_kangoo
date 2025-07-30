@@ -1,4 +1,4 @@
-@extends('landing-page.layouts.app')
+@extends('landing-page.layouts.default')
 
 @section('title', $pageTitle)
 
@@ -92,10 +92,15 @@
                                     <i class="fas fa-print me-1"></i>
                                     Print Receipt
                                 </a>
-                                <a href="{{ route('orders.track', $order->id) }}" 
+                                <a href="{{ route('customer.order.show', $order->id) }}"
+                                   class="btn btn-info btn-sm me-2">
+                                    <i class="fas fa-eye me-1"></i>
+                                    View Order
+                                </a>
+                                <a href="{{ url('/store') }}"
                                    class="btn btn-primary btn-sm">
-                                    <i class="fas fa-truck me-1"></i>
-                                    Track Order
+                                    <i class="fas fa-shopping-bag me-1"></i>
+                                    Continue Shopping
                                 </a>
                             </div>
                         </div>

@@ -208,7 +208,14 @@ $(document).ready(function() {
                                 <div class="mt-auto">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span class="h5 text-primary mb-0">${product.price_format}</span>
-                                        <a href="/product/${product.slug}" class="btn btn-primary btn-sm">View Details</a>
+                                        ${product.is_in_stock ?
+                                            `<a href="/checkout?product_id=${product.id}&quantity=1" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-shopping-bag me-1"></i>Buy Now
+                                            </a>` :
+                                            `<button class="btn btn-secondary btn-sm" disabled>
+                                                <i class="fas fa-times me-1"></i>Out of Stock
+                                            </button>`
+                                        }
                                     </div>
                                 </div>
                             </div>

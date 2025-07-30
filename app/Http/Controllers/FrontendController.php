@@ -164,7 +164,7 @@ class FrontendController extends Controller
         // Check if Order model exists
         if (class_exists('App\Models\Order')) {
             $orders = \App\Models\Order::where('customer_id', $user->id)
-                ->with(['product', 'product.category'])
+                ->with(['items.product', 'items.product.category', 'store'])
                 ->orderBy('created_at', 'desc')
                 ->get();
 

@@ -71,24 +71,6 @@ use App\Http\Controllers\QualityControlController;
 |
 */
 
-// FRONTEND E-COMMERCE ROUTES - MUST BE FIRST TO PREVENT CONFLICTS WITH ADMIN ROUTES
-// Main Store Route (Unified Store)
-Route::get('store', [App\Http\Controllers\Frontend\ProductController::class, 'unifiedStore'])->name('store.unified');
-
-// Individual product and store pages - MUST BE BEFORE ADMIN ROUTES
-Route::get('product/{slug}', [App\Http\Controllers\Frontend\ProductController::class, 'show'])->name('products.show')->where('slug', '[a-z0-9-]+');
-Route::get('store/{slug}', [App\Http\Controllers\Frontend\ProductController::class, 'storeShow'])->name('stores.show');
-
-// Legacy routes (kept for backward compatibility)
-Route::get('products', [App\Http\Controllers\Frontend\ProductController::class, 'index'])->name('products.index');
-Route::get('products/search', [App\Http\Controllers\Frontend\ProductController::class, 'search'])->name('products.search');
-Route::get('products/category/{slug}', [App\Http\Controllers\Frontend\ProductController::class, 'category'])->name('products.category');
-Route::get('stores', [App\Http\Controllers\Frontend\ProductController::class, 'stores'])->name('stores.index');
-
-// AJAX endpoints for frontend
-Route::get('api/products', [App\Http\Controllers\Frontend\ProductController::class, 'getProducts'])->name('api.products');
-Route::get('api/stores', [App\Http\Controllers\Frontend\ProductController::class, 'getStores'])->name('api.stores');
-
 
 
 require __DIR__.'/auth.php';
@@ -673,7 +655,23 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list');
 Route::post('/service-list',[HomeController::class, 'getAjaxServiceList'])->name('service-list');
 
-// Frontend E-commerce Routes moved to top of file to prevent conflicts
+// Frontend E-commerce Routes
+// Main Store Route (Unified Store)
+Route::get('store', [FrontendProductController::class, 'unifiedStore'])->name('store.unified');
+
+// Individual product and store pages
+Route::get('product/{slug}', [FrontendProductController::class, 'show'])->name('products.show');
+Route::get('store/{slug}', [FrontendProductController::class, 'storeShow'])->name('stores.show');
+
+// Legacy routes (kept for backward compatibility)
+Route::get('products', [FrontendProductController::class, 'index'])->name('products.index');
+Route::get('products/search', [FrontendProductController::class, 'search'])->name('products.search');
+Route::get('products/category/{slug}', [FrontendProductController::class, 'category'])->name('products.category');
+Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores.index');
+
+// AJAX endpoints for frontend
+Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
+Route::get('api/stores', [FrontendProductController::class, 'getStores'])->name('api.stores');
 
 // Cart routes (works for both authenticated and guest users)
 Route::prefix('cart')->name('cart.')->group(function () {
@@ -692,7 +690,9 @@ Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.c
 // Authenticated frontend routes
 Route::middleware('auth')->group(function () {
     Route::get('checkout', [FrontendProductController::class, 'checkout'])->name('products.checkout');
+    Route::post('orders', [FrontendProductController::class, 'storeOrder'])->name('orders.store');
     Route::get('order-success', [FrontendProductController::class, 'orderSuccess'])->name('products.order-success');
+    Route::get('my-order/{id}', [FrontendProductController::class, 'showOrder'])->name('customer.order.show');
 });
 
 

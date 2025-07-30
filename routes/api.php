@@ -215,22 +215,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('payment-gateway-list',[API\FrontendSettingController::class,'getPaymentGatewayList']);
     Route::get('payment-gateways',[API\PaymentController::class, 'paymentGateways']);
 
-    // E-commerce Authenticated Routes
-    // Cart Management
-    Route::get('cart', [API\CartController::class, 'index']);
-    Route::post('cart/add', [API\CartController::class, 'add']);
-    Route::put('cart/{id}', [API\CartController::class, 'update']);
-    Route::delete('cart/{id}', [API\CartController::class, 'remove']);
-    Route::delete('cart', [API\CartController::class, 'clear']);
-    Route::get('cart/count', [API\CartController::class, 'count']);
-    Route::get('cart/validate', [API\CartController::class, 'validate']);
-    Route::get('cart/totals', [API\CartController::class, 'totals']);
-    Route::get('cart/check-product', [API\CartController::class, 'checkProduct']);
-
-    // Checkout Management
-    Route::get('checkout/summary', [API\CheckoutController::class, 'summary']);
-    Route::post('checkout/process', [API\CheckoutController::class, 'process']);
-    Route::get('checkout/payment-methods', [API\CheckoutController::class, 'paymentMethods']);
+    // E-commerce Authenticated Routes (Direct Purchase - No Cart)
+    // Direct Order Creation
+    Route::post('orders', [API\OrderController::class, 'createDirectOrder']);
 
     // Order Management
     Route::get('orders', [API\OrderController::class, 'index']);
@@ -238,6 +225,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('orders', [API\OrderController::class, 'create']);
     Route::post('orders/{id}/cancel', [API\OrderController::class, 'cancel']);
     Route::get('orders/{id}/track', [API\OrderController::class, 'track']);
+
+    // Product Payment Management
+    Route::get('product-payment-methods', [App\Http\Controllers\ProductPaymentController::class, 'getPaymentMethods']);
+    Route::post('create-product-stripe-payment', [App\Http\Controllers\ProductPaymentController::class, 'createStripePayment']);
+    Route::post('process-product-wallet-payment', [App\Http\Controllers\ProductPaymentController::class, 'processWalletPayment']);
+    Route::post('retry-product-payment', [App\Http\Controllers\ProductPaymentController::class, 'retryPayment']);
 
     // Provider functionality (Single Store Architecture - no store management for providers)
 

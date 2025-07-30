@@ -96,13 +96,20 @@
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center">
-                                                    @if($order->product && $order->product->product_image)
-                                                        <img src="{{ $order->product->product_image }}" alt="{{ $order->product->name }}" class="rounded me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                                    @php
+                                                        $firstItem = $order->items->first();
+                                                        $product = $firstItem ? $firstItem->product : null;
+                                                    @endphp
+                                                    @if($product && $product->getFirstMediaUrl('product_images'))
+                                                        <img src="{{ $product->getFirstMediaUrl('product_images') }}" alt="{{ $firstItem->product_name }}" class="rounded me-2" style="width: 40px; height: 40px; object-fit: cover;">
                                                     @endif
                                                     <div>
-                                                        <strong>{{ $order->product->name ?? 'Product Deleted' }}</strong>
-                                                        @if($order->product && $order->product->category)
-                                                            <br><small class="text-muted">{{ $order->product->category->name }}</small>
+                                                        <strong>{{ $firstItem->product_name ?? 'Product Deleted' }}</strong>
+                                                        @if($product && $product->category)
+                                                            <br><small class="text-muted">{{ $product->category->name }}</small>
+                                                        @endif
+                                                        @if($order->items->count() > 1)
+                                                            <br><small class="text-muted">+{{ $order->items->count() - 1 }} more items</small>
                                                         @endif
                                                     </div>
                                                 </div>

@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Store;
-use App\Models\ShoppingCart;
+
 use App\Models\User;
+use App\Models\Order;
 
 class ProductController extends Controller
 {
@@ -182,27 +183,12 @@ class ProductController extends Controller
         ));
     }
 
-    /**
-     * Display shopping cart
-     */
-    public function cart()
-    {
-        $user = auth()->user();
 
-        if (!$user) {
-            return redirect()->route('login')->with('message', 'Please login to view your cart');
-        }
-
-        $cartSummary = ShoppingCart::getCartSummary($user->id);
-        $pageTitle = 'Shopping Cart';
-
-        return view('landing-page.products.cart', compact('cartSummary', 'pageTitle'));
-    }
 
     /**
-     * Display checkout page
+     * Display checkout page for direct product purchase
      */
-    public function checkout()
+    public function checkout(Request $request)
     {
         $user = auth()->user();
 
@@ -210,15 +196,129 @@ class ProductController extends Controller
             return redirect()->route('login')->with('message', 'Please login to checkout');
         }
 
-        $cartSummary = ShoppingCart::getCartSummary($user->id);
+        // Get product information from request parameters
+        $productId = $request->get('product_id');
+        $quantity = $request->get('quantity', 1);
 
-        if ($cartSummary['items']->isEmpty()) {
-            return redirect()->route('products.cart')->with('error', 'Your cart is empty');
+        if (!$productId) {
+            return redirect()->route('store')->with('error', 'Please select a product to purchase');
         }
 
-        $pageTitle = 'Checkout';
+        $product = Product::with(['store', 'category'])->findOrFail($productId);
 
-        return view('landing-page.products.checkout', compact('cartSummary', 'pageTitle'));
+        $pageTitle = 'Checkout - ' . $product->name;
+
+        return view('landing-page.products.checkout', compact('product', 'quantity', 'pageTitle'));
+    }
+
+    /**
+     * Store a new order from direct product purchase
+     */
+    public function storeOrder(Request $request)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return redirect()->route('login')->with('message', 'Please login to place an order');
+        }
+
+        // Validate the request
+        $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'phone' => 'required|string|max:20',
+            'address' => 'required|string|max:500',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'zip' => 'required|string|max:20',
+            'payment_method' => 'required|in:cash,online',
+        ]);
+
+        try {
+            $product = Product::findOrFail($request->product_id);
+            $quantity = $request->quantity;
+
+            // Calculate totals
+            $subtotal = $product->effective_price * $quantity;
+            $tax = $subtotal * 0.10; // 10% tax
+            $deliveryFee = 5.00;
+            $total = $subtotal + $tax + $deliveryFee;
+
+            // Create the order
+            $order = Order::create([
+                'order_number' => Order::generateOrderNumber(),
+                'customer_id' => $user->id,
+                'store_id' => null, // Admin order (unified store)
+                'order_type' => 'admin',
+                'status' => 'pending',
+                'payment_status' => $request->payment_method === 'cash' ? 'pending' : 'pending',
+                'payment_method' => $request->payment_method,
+                'total_amount' => $total,
+                'subtotal' => $subtotal,
+                'tax_amount' => $tax,
+                'delivery_fee' => $deliveryFee,
+                'currency' => 'SAR', // Saudi Riyal
+                'delivery_address' => [
+                    'name' => $request->first_name . ' ' . $request->last_name,
+                    'email' => $request->email,
+                    'phone' => $request->phone,
+                    'address' => $request->address,
+                    'city' => $request->city,
+                    'state' => $request->state,
+                    'zip' => $request->zip,
+                ],
+                'delivery_phone' => $request->phone,
+                'delivery_notes' => $request->delivery_notes,
+            ]);
+
+            // Create order item
+            $order->items()->create([
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_sku' => $product->sku ?? 'N/A',
+                'product_details' => [
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'category' => $product->category->name ?? null,
+                    'image' => $product->getFirstMediaUrl('product_images')
+                ],
+                'quantity' => $quantity,
+                'unit_price' => $product->effective_price,
+                'total_price' => $product->effective_price * $quantity,
+            ]);
+
+            // Redirect to success page
+            return redirect()->route('products.order-success', ['orders' => $order->id])
+                           ->with('success', 'Order placed successfully!');
+
+        } catch (\Exception $e) {
+            \Log::error('Order creation failed: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Failed to place order. Please try again.');
+        }
+    }
+
+    /**
+     * Display a specific order for the customer
+     */
+    public function showOrder($id)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return redirect()->route('login')->with('message', 'Please login to view your orders');
+        }
+
+        // Get the order for the current user only
+        $order = Order::with(['items.product', 'items.product.category', 'store'])
+                     ->where('customer_id', $user->id)
+                     ->findOrFail($id);
+
+        $pageTitle = 'Order Details - #' . $order->order_number;
+
+        return view('landing-page.products.order-detail', compact('order', 'pageTitle'));
     }
 
     /**
@@ -254,6 +354,33 @@ class ProductController extends Controller
         $pageTitle = 'Order Success';
 
         return view('landing-page.products.order-success', compact('orders', 'pageTitle'));
+    }
+
+    /**
+     * Display payment failed page
+     */
+    public function paymentFailed(Request $request)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return redirect()->route('login')->with('message', 'Please login to view your orders');
+        }
+
+        // Get order ID from query parameter if provided
+        $orderId = $request->get('order_id');
+        $order = null;
+
+        if ($orderId) {
+            $order = Order::with(['items', 'store'])
+                          ->where('customer_id', $user->id)
+                          ->where('id', $orderId)
+                          ->first();
+        }
+
+        $pageTitle = 'Payment Failed';
+
+        return view('landing-page.products.payment-failed', compact('order', 'pageTitle'));
     }
 
     /**

@@ -157,9 +157,9 @@
                                 @if(auth()->user()->user_type == 'user')
                                     <!-- Logged in customer - can order -->
                                     <div class="d-grid gap-2">
-                                        <a href="{{ route('order.product', ['id' => $product->id]) }}" class="btn btn-primary btn-lg py-3">
+                                        <a href="{{ route('products.checkout', ['product_id' => $product->id, 'quantity' => 1]) }}" class="btn btn-primary btn-lg py-3">
                                             <i class="fas fa-shopping-bag me-2"></i>
-                                            Order Now - {{ getPriceFormat($product->effective_price) }}
+                                            Buy Now - {{ getPriceFormat($product->effective_price) }}
                                         </a>
                                         <small class="text-center text-muted">
                                             <i class="fas fa-shield-alt me-1"></i>
@@ -180,9 +180,9 @@
                             @else
                                 <!-- Not logged in - redirect to login -->
                                 <div class="d-grid gap-2">
-                                    <a href="{{ route('login') }}?redirect={{ urlencode(route('order.product', ['id' => $product->id])) }}" class="btn btn-primary btn-lg py-3">
+                                    <a href="{{ route('login') }}?redirect={{ urlencode(route('products.checkout', ['product_id' => $product->id, 'quantity' => 1])) }}" class="btn btn-primary btn-lg py-3">
                                         <i class="fas fa-sign-in-alt me-2"></i>
-                                        Login to Order - {{ getPriceFormat($product->effective_price) }}
+                                        Login to Buy Now - {{ getPriceFormat($product->effective_price) }}
                                     </a>
                                     <div class="text-center">
                                         <small class="text-muted">
@@ -404,14 +404,7 @@ $(document).ready(function() {
         }, 5000);
     }
 
-    function updateCartCount() {
-        $.get('/api/cart/count')
-            .done(function(response) {
-                if (response.status && $('.cart-count').length) {
-                    $('.cart-count').text(response.data.count);
-                }
-            });
-    }
+
 
     // Make changeMainImage function global
     window.changeMainImage = changeMainImage;
