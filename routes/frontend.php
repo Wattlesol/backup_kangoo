@@ -48,6 +48,7 @@ Route::get('/refund-policy', [FrontendController::class, 'refundPolicy'])->name(
 Route::get('/help-support', [FrontendController::class, 'helpSupport'])->name('user.help_support');
 Route::post('/contact', [FrontendController::class, 'submitForm'])->name('contact.submit');
 Route::get('/book-service', [FrontendController::class, 'bookServiceView'])->name('book.service');
+Route::get('/order-product', [FrontendController::class, 'orderProductView'])->name('order.product');
 Route::get('/book-post-job', [FrontendController::class, 'bookPostJobView'])->name('book.post_job');
 Route::get('/booking-detail/{id}', [FrontendController::class, 'bookingDetail'])->name('booking.detail');
 
@@ -63,6 +64,8 @@ Route::get('/post-job-detail/{id}', [FrontendController::class, 'postJobDetail']
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/booking-list', [FrontendController::class, 'bookingList'])->name('booking.list');
+    // Customer order management (moved from standalone route to customer dashboard)
+    Route::get('/my-orders', [FrontendController::class, 'customerOrders'])->name('customer.orders');
     Route::get('/post-job-list', [FrontendController::class, 'postJobList'])->name('post.job.list');
     Route::post('save-favourite',[ServiceController::class, 'saveFavouriteService' ])->name('save-favourite');
     Route::post('/buy_package_data', [FrontendController::class, 'buy_package_data'])->name('buy_package_data')->middleware('auth');

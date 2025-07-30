@@ -34,6 +34,8 @@ import SectionThumbnailSection from './sections/SectionThumbnailSection.vue'
 import PaginationCard from './components/PaginationCard.vue'
 import RatingCard from './components/RatingCard.vue'
 import BookingWizard from './sections/BookingWizard.vue'
+import OrderWizard from './sections/OrderWizard.vue'
+import OrderList from './sections/OrderList.vue'
 import RatingAllPage from './sections/RatingAllPage.vue'
 import BookingRating from './sections/BookingRating.vue'
 import HandymanRating from './sections/HandymanRating.vue'
@@ -74,6 +76,8 @@ app.component('section-thumbnail-section', SectionThumbnailSection)
 app.component('pagination-component', PaginationCard)
 app.component('rating-component', RatingCard)
 app.component('booking-wizard',BookingWizard)
+app.component('order-wizard',OrderWizard)
+app.component('order-list',OrderList)
 app.component('rating-all-page', RatingAllPage)
 app.component('booking-rating', BookingRating)
 app.component('handyman-rating', HandymanRating)

@@ -104,18 +104,7 @@
                             </small>
                         </div>
 
-                        <!-- Providers -->
-                        <div class="mb-4">
-                            <label class="form-label text-primary fw-semibold mb-2">{{__('landingpage.providers')}}</label>
-                            <select class="form-select border-0 bg-light" id="providerFilter">
-                                <option value="">{{__('landingpage.all_providers')}}</option>
-                                @foreach($providers as $provider)
-                                    <option value="{{ $provider->id }}" {{ $providerId == $provider->id ? 'selected' : '' }}>
-                                        {{ $provider->first_name }} {{ $provider->last_name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+
 
                         <!-- Availability -->
                         <div class="mb-4">
@@ -221,7 +210,7 @@ $(document).ready(function() {
     loadProducts();
 
     // Filter change handlers
-    $('#searchQuery, #categoryFilter, #priceMin, #priceMax, #providerFilter, #sortFilter').on('change keyup', debounce(function() {
+    $('#searchQuery, #categoryFilter, #priceMin, #priceMax, #sortFilter').on('change keyup', debounce(function() {
         currentPage = 1;
         loadProducts();
     }, 500));
@@ -256,7 +245,6 @@ $(document).ready(function() {
         $('#categoryFilter').val('');
         $('#priceMin').val('');
         $('#priceMax').val('');
-        $('#providerFilter').val('');
         $('#sortFilter').val('name');
         $('#inStockOnly').prop('checked', false);
         $('#featuredOnly').prop('checked', false);
@@ -277,7 +265,6 @@ $(document).ready(function() {
             category_id: $('#categoryFilter').val(),
             price_min: $('#priceMin').val(),
             price_max: $('#priceMax').val(),
-            provider_id: $('#providerFilter').val(),
             sort_by: getSortBy(),
             sort_order: getSortOrder(),
             in_stock_only: $('#inStockOnly').is(':checked') ? 1 : 0,
@@ -330,7 +317,6 @@ $(document).ready(function() {
 
         const price = product.effective_price || product.base_price || 0;
         const image = product.main_image || '/images/default-product.png';
-        const providerName = product.creator ? `${product.creator.first_name} ${product.creator.last_name}` : 'Unknown Provider';
 
         return `
             <div class="${cardClass}">
@@ -342,8 +328,7 @@ $(document).ready(function() {
                             <h6 class="card-title text-dark fw-semibold mb-2">${product.name}</h6>
                             <p class="card-text text-muted small mb-3">${product.short_description || ''}</p>
                             <div class="mb-3">
-                                <span class="badge bg-light text-dark border me-1">${product.category ? product.category.name : 'Uncategorized'}</span>
-                                <span class="badge bg-primary">${providerName}</span>
+                                <span class="badge bg-light text-dark border">${product.category ? product.category.name : 'Uncategorized'}</span>
                             </div>
                             <div class="d-flex ${isGridView ? 'justify-content-between' : 'justify-content-between'} align-items-center">
                                 <span class="h6 text-primary fw-bold mb-0">$${parseFloat(price).toFixed(2)}</span>

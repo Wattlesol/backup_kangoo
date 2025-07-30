@@ -117,6 +117,14 @@ $menu->add('<span>'.__('messages.QualityControl',['form' => __('messages.Quality
 ->link->attr(['class' => '']);
 
 if (auth()->user()->user_type == "user"){
+$menu->add('<span>'.__('messages.my_orders').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.my_orders').'</span></span>', ['route' => 'customer.orders'])
+->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M9 11H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M9 15H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M2.5 12C2.5 7.52166 2.5 5.28249 3.89124 3.89124C5.28249 2.5 7.52166 2.5 12 2.5C16.4783 2.5 18.7175 2.5 20.1088 3.89124C21.5 5.28249 21.5 7.52166 21.5 12C21.5 16.4783 21.5 18.7175 20.1088 20.1088C18.7175 21.5 16.4783 21.5 12 21.5C7.52166 21.5 5.28249 21.5 3.89124 20.1088C2.5 18.7175 2.5 16.4783 2.5 12Z" stroke="currentColor" stroke-width="1.5"/>
+</svg>')
+->link->attr(['class' => '']);
+
 $menu->add('<span>'.__('messages.packages').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.packages').'</span></span>', ['route' => 'booking.package_service_detail'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M2 12C2 8.22876 2 6.34315 3.17157 5.17157C4.34315 4 6.22876 4 10 4H14C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12V14C22 17.7712 22 19.6569 20.8284 20.8284C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.8284C2 19.6569 2 17.7712 2 14V12Z" stroke="currentColor" stroke-width="1.5"/>
@@ -165,15 +173,7 @@ if (auth()->user()->user_type == "provider"){
 </svg>')
 ->nickname('booking')->data('permission', 'booking list');
 
-    // Provider E-commerce Menu
-    $menu->add('<span>Product Management</span><span class="custom-tooltip"><span class="tooltip-text">Manage your products in the store</span></span>', ['route' => 'provider.store.index'])
-    ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3 21H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M5 21V7L12 3L19 7V21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M9 9H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>')
-    ->nickname('provider-store')
-    ->data('permission', 'provider_store manage');
+    // Provider Product Management Menu (Single Store Architecture)
 
     $menu->add('<span>'.__('messages.my_products').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.my_products').'</span></span>', ['route' => 'provider.product.index'])
     ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -219,9 +219,10 @@ $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-t
 ->data('permission', 'booking create');
 
 // E-commerce Menu Section (Admin Only)
-$menu->add(__('messages.sidebar_form_title',['form' => 'E-commerce']), ['class' => 'category-main'])
-->data('permission', ['product_category list','product list','store list','order list'])
-->data('role', ['admin', 'demo_admin']);
+if (auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+    $menu->add(__('messages.sidebar_form_title',['form' => 'E-commerce']), ['class' => 'category-main'])
+    ->data('permission', ['product_category list','product list','store list','order list'])
+    ->data('role', ['admin', 'demo_admin']);
 
 $menu->add('<span>Product Categories</span><span class="custom-tooltip"><span class="tooltip-text">Product Categories</span></span>', ['route' => 'productcategory.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -281,6 +282,8 @@ $menu->add('<span>Dynamic Pricing</span><span class="custom-tooltip"><span class
 ->data('permission', 'dynamic_pricing list')
 ->data('role', ['admin', 'demo_admin'])
 ->link->attr(['class' => '']);
+
+} // End of admin-only ecommerce section
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.time')]), ['class' => 'category-main'])->data('permission', 'user list');
 

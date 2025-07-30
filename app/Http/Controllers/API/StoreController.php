@@ -68,10 +68,10 @@ class StoreController extends Controller
             $perPage = $request->get('per_page', 15);
             $categoryId = $request->get('category_id');
             $search = $request->get('search');
-            $providerId = $request->get('provider_id');
 
             // In single store architecture, get all approved and available products
-            $query = Product::with(['category', 'provider', 'variants'])
+            // Provider information is hidden from customers for unified experience
+            $query = Product::with(['category', 'variants'])
                            ->where('is_available', true)
                            ->where('status', true)
                            ->where('approval_status', 'approved');
@@ -79,11 +79,6 @@ class StoreController extends Controller
             // Filter by category
             if ($categoryId) {
                 $query->where('product_category_id', $categoryId);
-            }
-
-            // Filter by provider
-            if ($providerId) {
-                $query->where('provider_id', $providerId);
             }
 
             // Search functionality

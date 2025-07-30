@@ -239,10 +239,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('orders/{id}/cancel', [API\OrderController::class, 'cancel']);
     Route::get('orders/{id}/track', [API\OrderController::class, 'track']);
 
-    // Provider Store Management
-    Route::get('my-store', [API\StoreController::class, 'myStore']);
-    Route::post('my-store', [API\StoreController::class, 'createStore']);
-    Route::put('my-store', [API\StoreController::class, 'updateStore']);
+    // Provider functionality (Single Store Architecture - no store management for providers)
 
     // E-commerce Admin API Routes (with permission checks)
     Route::group(['prefix' => 'ecommerce', 'middleware' => ['permission:product_category list|product list|store list|order list']], function () {

@@ -142,6 +142,30 @@ class HomeController extends Controller
     }
     public function userDashboard($data)
     {
+        $user = auth()->user();
+
+        // Get customer's order statistics
+        $orderStats = [
+            'total_orders' => 0,
+            'pending_orders' => 0,
+            'completed_orders' => 0,
+            'total_spent' => 0
+        ];
+
+        // Check if Order model exists (for e-commerce functionality)
+        if (class_exists('App\Models\Order')) {
+            $orders = \App\Models\Order::where('customer_id', $user->id);
+            $orderStats = [
+                'total_orders' => $orders->count(),
+                'pending_orders' => $orders->where('status', 'pending')->count(),
+                'completed_orders' => $orders->where('status', 'completed')->count(),
+                'total_spent' => $orders->where('payment_status', 'paid')->sum('total_amount')
+            ];
+        }
+
+        $data['order_stats'] = $orderStats;
+        $data['user_id'] = $user->id;
+
         return view('dashboard.user-dashboard', compact('data'));
     }
     public function changeStatus(Request $request)

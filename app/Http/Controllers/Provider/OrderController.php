@@ -6,25 +6,22 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\Store;
+use App\Models\OrderItem;
+use App\Models\Product;
 use Yajra\DataTables\DataTables;
 
 class OrderController extends Controller
 {
     /**
-     * Display provider's orders
+     * Display provider's orders (Single Store Architecture)
+     * Shows orders containing products created by this provider
      */
     public function index(Request $request)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
-        }
-
-        $store = Store::where('provider_id', $auth_user->id)->first();
-        
-        if (!$store) {
-            return redirect()->route('provider.store.create')->withErrors('Please create a store first');
         }
 
         $filter = [
@@ -33,22 +30,25 @@ class OrderController extends Controller
         ];
         $pageTitle = trans('messages.my_orders');
         $assets = ['datatable'];
-        
-        return view('provider.order.index', compact('pageTitle', 'store', 'auth_user', 'assets', 'filter'));
+
+        return view('provider.order.index', compact('pageTitle', 'auth_user', 'assets', 'filter'));
     }
 
     public function index_data(DataTables $datatable, Request $request)
     {
-        $auth_user = authSession();
-        $store = Store::where('provider_id', $auth_user->id)->firstOrFail();
-        
+        $auth_user = auth()->user();
+
+        // Get orders that contain products created by this provider (Single Store Architecture)
         $query = Order::with(['customer', 'items.product'])
-                     ->where('store_id', $store->id);
-        
+                     ->whereHas('items.product', function($q) use ($auth_user) {
+                         $q->where('created_by', $auth_user->id)
+                           ->where('created_by_type', 'provider');
+                     });
+
         $filter = $request->filter;
         if (isset($filter)) {
-            if (isset($filter['column_status'])) {
-                $query->where('status', $filter['column_status']);
+            if (isset($filter['status']) && $filter['status'] != '') {
+                $query->where('status', $filter['status']);
             }
             if (isset($filter['payment_status']) && $filter['payment_status'] != '') {
                 $query->where('payment_status', $filter['payment_status']);
@@ -61,6 +61,22 @@ class OrderController extends Controller
             })
             ->editColumn('customer', function($query) {
                 return $query->customer ? $query->customer->display_name : '-';
+            })
+            ->addColumn('provider_items', function($query) use ($auth_user) {
+                $providerItems = $query->items->filter(function($item) use ($auth_user) {
+                    return $item->product &&
+                           $item->product->created_by == $auth_user->id &&
+                           $item->product->created_by_type == 'provider';
+                });
+                return $providerItems->count() . ' of ' . $query->items->count() . ' item(s)';
+            })
+            ->addColumn('provider_total', function($query) use ($auth_user) {
+                $providerTotal = $query->items->filter(function($item) use ($auth_user) {
+                    return $item->product &&
+                           $item->product->created_by == $auth_user->id &&
+                           $item->product->created_by_type == 'provider';
+                })->sum('total_price');
+                return getPriceFormat($providerTotal);
             })
             ->editColumn('total_amount', function($query) {
                 return getPriceFormat($query->total_amount);
@@ -90,55 +106,69 @@ class OrderController extends Controller
     }
 
     /**
-     * Display the specified order
+     * Display the specified order (Single Store Architecture)
      */
     public function show($id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
 
-        $store = Store::where('provider_id', $auth_user->id)->firstOrFail();
-        
+        // Verify this order contains products from this provider
         $order = Order::with([
-            'customer', 
-            'items.product', 
+            'customer',
+            'items.product',
             'items.productVariant',
             'statusHistories.changedBy'
-        ])->where('store_id', $store->id)->findOrFail($id);
-        
+        ])->whereHas('items.product', function($q) use ($auth_user) {
+            $q->where('created_by', $auth_user->id)
+              ->where('created_by_type', 'provider');
+        })->findOrFail($id);
+
+        // Filter items to show only provider's products
+        $providerItems = $order->items->filter(function($item) use ($auth_user) {
+            return $item->product &&
+                   $item->product->created_by == $auth_user->id &&
+                   $item->product->created_by_type == 'provider';
+        });
+
         $pageTitle = trans('messages.order_details');
-        
-        return view('provider.order.view', compact('pageTitle', 'order', 'store', 'auth_user'));
+
+        return view('provider.order.view', compact('pageTitle', 'order', 'auth_user', 'providerItems'));
     }
 
     /**
-     * Update order status
+     * Update order status (Single Store Architecture)
      */
     public function updateStatus(Request $request)
     {
-        $auth_user = authSession();
-        $store = Store::where('provider_id', $auth_user->id)->firstOrFail();
+        $auth_user = auth()->user();
+
+        if ($auth_user->user_type !== 'provider') {
+            return response()->json(['status' => false, 'message' => 'Unauthorized access']);
+        }
 
         $request->validate([
             'order_id' => 'required|exists:orders,id',
-            'status' => 'required|in:confirmed,processing,shipped,delivered',
+            'status' => 'required|in:processing,shipped,delivered,cancelled',
             'notes' => 'nullable|string|max:500'
         ]);
 
-        $order = Order::where('store_id', $store->id)->findOrFail($request->order_id);
-        
-        // Providers can only update certain statuses
-        $allowedStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
-        if (!in_array($request->status, $allowedStatuses)) {
-            return comman_custom_response(['message'=> 'Invalid status update' , 'status' => false]);
-        }
+        // Verify this order contains products from this provider
+        $order = Order::whereHas('items.product', function($q) use ($auth_user) {
+            $q->where('created_by', $auth_user->id)
+              ->where('created_by_type', 'provider');
+        })->findOrFail($request->order_id);
 
+        // Update order status
         $order->updateStatus($request->status, $request->notes, $auth_user->id);
 
-        return comman_custom_response(['message'=> 'Order status updated successfully' , 'status' => true]);
+        return response()->json([
+            'status' => true,
+            'message' => __('messages.order_status_updated_successfully')
+        ]);
     }
 
     /**
@@ -146,7 +176,7 @@ class OrderController extends Controller
      */
     public function statistics()
     {
-        $auth_user = authSession();
+        $auth_user = auth()->user();
         $store = Store::where('provider_id', $auth_user->id)->first();
         
         if (!$store) {
@@ -175,29 +205,54 @@ class OrderController extends Controller
     }
 
     /**
-     * Provider dashboard
+     * Provider dashboard (Single Store Architecture)
      */
     public function dashboard()
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
 
-        $store = Store::where('provider_id', $auth_user->id)->first();
         $pageTitle = trans('messages.provider_dashboard');
-        
-        // Get recent orders
-        $recentOrders = collect();
-        if ($store) {
-            $recentOrders = Order::with(['customer', 'items'])
-                                ->where('store_id', $store->id)
-                                ->orderBy('created_at', 'desc')
-                                ->limit(5)
-                                ->get();
-        }
-        
-        return view('provider.dashboard', compact('pageTitle', 'store', 'auth_user', 'recentOrders'));
+
+        // Get provider statistics
+        $stats = [
+            'total_products' => Product::where('created_by', $auth_user->id)
+                                     ->where('created_by_type', 'provider')
+                                     ->count(),
+            'approved_products' => Product::where('created_by', $auth_user->id)
+                                         ->where('created_by_type', 'provider')
+                                         ->where('approval_status', 'approved')
+                                         ->count(),
+            'pending_products' => Product::where('created_by', $auth_user->id)
+                                        ->where('created_by_type', 'provider')
+                                        ->where('approval_status', 'pending')
+                                        ->count(),
+            'total_orders' => Order::whereHas('items.product', function($q) use ($auth_user) {
+                                $q->where('created_by', $auth_user->id)
+                                  ->where('created_by_type', 'provider');
+                            })->count(),
+            'pending_orders' => Order::whereHas('items.product', function($q) use ($auth_user) {
+                                  $q->where('created_by', $auth_user->id)
+                                    ->where('created_by_type', 'provider');
+                              })->where('status', 'pending')->count(),
+        ];
+
+        // Get recent orders containing provider's products
+        $recentOrders = Order::with(['customer', 'items.product'])
+                            ->whereHas('items.product', function($q) use ($auth_user) {
+                                $q->where('created_by', $auth_user->id)
+                                  ->where('created_by_type', 'provider');
+                            })
+                            ->orderBy('created_at', 'desc')
+                            ->limit(5)
+                            ->get();
+
+        return view('provider.dashboard', compact('pageTitle', 'auth_user', 'recentOrders', 'stats'));
     }
+
+
+
 }

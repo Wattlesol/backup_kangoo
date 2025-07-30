@@ -82,9 +82,12 @@ class ProductController extends Controller
      */
     public function show($slug, Request $request)
     {
-        $product = Product::with(['category', 'creator', 'variants', 'storeProducts.store'])
+        // Temporarily remove active() scope to debug
+        $product = Product::with(['category', 'variants'])
                          ->where('slug', $slug)
-                         ->active()
+                         ->where('status', true)
+                         ->where('is_available', true)
+                         ->where('approval_status', 'approved')
                          ->firstOrFail();
 
         $latitude = $request->get('latitude');
@@ -295,12 +298,12 @@ class ProductController extends Controller
         $sortOrder = $request->get('sort_order', 'desc');
         $priceMin = $request->get('price_min');
         $priceMax = $request->get('price_max');
-        $providerId = $request->get('provider_id');
         $inStockOnly = $request->get('in_stock_only', false);
         $featuredOnly = $request->get('featured_only', false);
 
         // Only show available and approved products
-        $query = Product::with(['category', 'creator', 'provider', 'variants'])
+        // Provider information hidden for unified customer experience
+        $query = Product::with(['category', 'variants'])
                        ->where('is_available', true)
                        ->where('status', true)
                        ->where('approval_status', 'approved');
@@ -328,10 +331,7 @@ class ProductController extends Controller
             $query->whereRaw('COALESCE(selling_price, base_price) <= ?', [$priceMax]);
         }
 
-        // Provider filtering
-        if ($providerId) {
-            $query->where('provider_id', $providerId);
-        }
+        // Provider filtering removed for unified customer experience
 
         // Stock filtering
         if ($inStockOnly) {
@@ -431,7 +431,6 @@ class ProductController extends Controller
         $sort = $request->get('sort', 'name');
         $priceMin = $request->get('price_min');
         $priceMax = $request->get('price_max');
-        $providerId = $request->get('provider');
         $inStockOnly = $request->get('in_stock_only', false);
         $featuredOnly = $request->get('featured_only', false);
 
@@ -444,12 +443,8 @@ class ProductController extends Controller
             $q->where('is_available', true)->where('status', true)->where('approval_status', 'approved')->where('is_featured', true);
         }])->active()->featured()->ordered()->get();
 
-        // Get all providers who have available and approved products
-        $providers = User::whereHas('providerProducts', function($q) {
-            $q->where('is_available', true)
-              ->where('status', true)
-              ->where('approval_status', 'approved');
-        })->where('user_type', 'provider')->where('status', 1)->get(['id', 'first_name', 'last_name']);
+        // Providers are hidden from customers for unified store experience
+        $providers = collect(); // Empty collection - no provider visibility for customers
 
         // Get price range for filtering (from available and approved products only)
         $priceRange = Product::where('is_available', true)
@@ -472,7 +467,6 @@ class ProductController extends Controller
             'sort',
             'priceMin',
             'priceMax',
-            'providerId',
             'inStockOnly',
             'featuredOnly'
         ));

@@ -10,6 +10,7 @@ use App\Http\Controllers\API\PostJobRequestController;
 use App\Models\Districts;
 use App\Models\PriceCity;
 use App\Models\PriceList;
+use App\Models\Product;
 use App\Models\Region;
 use App\Models\ServicePacakgeServiceSubscription;
 use App\Models\ServicePacakgeSubscription;
@@ -141,6 +142,47 @@ class FrontendController extends Controller
 
     public function bookingList(Request $request){
         return view('landing-page.booking');
+    }
+
+    public function customerOrders(Request $request){
+        $user = auth()->user();
+
+        // Ensure only customers can access this
+        if ($user->user_type !== 'user') {
+            abort(403, 'Access denied. Only customers can view orders.');
+        }
+
+        $user_id = $user->id;
+        $orders = [];
+        $orderStats = [
+            'total_orders' => 0,
+            'pending_orders' => 0,
+            'completed_orders' => 0,
+            'total_spent' => 0
+        ];
+
+        // Check if Order model exists
+        if (class_exists('App\Models\Order')) {
+            $orders = \App\Models\Order::where('customer_id', $user->id)
+                ->with(['product', 'product.category'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $orderStats = [
+                'total_orders' => $orders->count(),
+                'pending_orders' => $orders->where('status', 'pending')->count(),
+                'completed_orders' => $orders->where('status', 'completed')->count(),
+                'total_spent' => $orders->where('payment_status', 'paid')->sum('total_amount')
+            ];
+        }
+
+        return view('customer.orders.index', compact('user_id', 'orders', 'orderStats'));
+    }
+
+    // Keep the old method for backward compatibility (deprecated)
+    public function orderList(Request $request){
+        // Redirect to the new customer orders route
+        return redirect()->route('customer.orders');
     }
 
     public function postJobList(Request $request){
@@ -446,6 +488,52 @@ class FrontendController extends Controller
         $wallet = $user->wallet;
         $wallet_amount=  (isset($wallet->amount)) ?$wallet->amount :0;
         return view('landing-page.BookService',compact('service','coupons','taxes','user_id','availableserviceslot','serviceaddon','googlemapkey','wallet_amount'));
+    }
+
+    public function orderProductView(Request $request){
+        $product_id = $request->id;
+        $product = Product::where('id', $product_id)
+            ->where('approval_status', 'approved')
+            ->with(['category'])
+            ->first();
+
+        if (!$product) {
+            abort(404, 'Product not found or not available');
+        }
+
+        // Get product images (simplified for now)
+        $product->product_image = null; // Will be handled by the view
+        $product->gallery_images = [];
+
+        // Get category name
+        $product->category_name = optional($product->category)->name;
+
+        // Calculate ratings (simplified for now)
+        $product->total_reviews = 0;
+        $product->total_rating = 0;
+
+        // Set price for the order form (use effective_price accessor)
+        $product->price = $product->effective_price;
+
+        // Get available coupons for this product (if any)
+        $coupons = collect(); // For now, no product-specific coupons
+
+        $user_id = Auth::id();
+
+        // Get taxes (simplified for products)
+        $taxes = collect();
+
+        // Get user wallet amount
+        $user = auth()->user();
+        $wallet = $user->wallet ?? null;
+        $wallet_amount = (isset($wallet->amount)) ? $wallet->amount : 0;
+
+        // Get Google Maps key for delivery address
+        $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
+        $sitesetupdata = json_decode($sitesetup->value);
+        $googlemapkey = $sitesetupdata->google_map_keys ?? '';
+
+        return view('landing-page.OrderProduct', compact('product','coupons','taxes','user_id','googlemapkey','wallet_amount'));
     }
 
     public function bookPostJobView(Request $request){

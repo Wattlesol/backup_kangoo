@@ -19,9 +19,20 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
+        // Debug logging
+        \Log::info('Provider Product Controller - Index called', [
+            'user_id' => $auth_user ? $auth_user->id : 'null',
+            'user_type' => $auth_user ? $auth_user->user_type : 'null',
+            'email' => $auth_user ? $auth_user->email : 'null'
+        ]);
+
         if ($auth_user->user_type !== 'provider') {
+            \Log::error('Provider Product Controller - Unauthorized access', [
+                'user_type' => $auth_user->user_type,
+                'expected' => 'provider'
+            ]);
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
 
@@ -32,13 +43,13 @@ class ProductController extends Controller
         $pageTitle = trans('messages.my_products');
         $assets = ['datatable'];
         $categories = ProductCategory::active()->get();
-        
+
         return view('provider.product.index', compact('pageTitle', 'auth_user', 'assets', 'filter', 'categories'));
     }
 
     public function index_data(DataTables $datatable, Request $request)
     {
-        $auth_user = authSession();
+        $auth_user = auth()->user();
         
         $query = Product::with(['category'])
                        ->where('created_by', $auth_user->id)
@@ -46,11 +57,14 @@ class ProductController extends Controller
         
         $filter = $request->filter;
         if (isset($filter)) {
-            if (isset($filter['column_status'])) {
-                $query->where('status', $filter['column_status']);
+            if (isset($filter['status']) && $filter['status'] !== '') {
+                $query->where('status', $filter['status']);
             }
-            if (isset($filter['category_id']) && $filter['category_id'] != '') {
+            if (isset($filter['category_id']) && $filter['category_id'] !== '') {
                 $query->where('product_category_id', $filter['category_id']);
+            }
+            if (isset($filter['approval_status']) && $filter['approval_status'] !== '') {
+                $query->where('approval_status', $filter['approval_status']);
             }
         }
 
@@ -61,15 +75,23 @@ class ProductController extends Controller
             ->editColumn('category', function($query) {
                 return $query->category ? $query->category->name : '-';
             })
-            ->editColumn('base_price', function($query) {
+            ->editColumn('sku', function($query) {
+                return $query->sku;
+            })
+            ->editColumn('price', function($query) {
                 return getPriceFormat($query->base_price);
             })
-            ->editColumn('effective_price', function($query) {
-                return getPriceFormat($query->effective_price);
-            })
-            ->editColumn('stock_quantity', function($query) {
-                $stockClass = $query->is_low_stock ? 'text-warning' : ($query->is_in_stock ? 'text-success' : 'text-danger');
+            ->editColumn('stock', function($query) {
+                $stockClass = $query->stock_quantity <= 0 ? 'text-danger' : ($query->stock_quantity <= ($query->low_stock_threshold ?? 5) ? 'text-warning' : 'text-success');
                 return '<span class="'.$stockClass.'">'.$query->stock_quantity.'</span>';
+            })
+            ->editColumn('approval_status', function($query) {
+                $status = $query->approval_status ?? 'pending';
+                $badgeClass = $status == 'approved' ? 'success' : ($status == 'rejected' ? 'danger' : 'warning');
+                return '<span class="badge badge-'.$badgeClass.'">'.ucfirst($status).'</span>';
+            })
+            ->editColumn('created_at', function($query) {
+                return $query->created_at->format('M d, Y');
             })
             ->editColumn('status' , function ($query){
                 return '<div class="custom-control custom-switch custom-switch-text custom-switch-color custom-control-inline">
@@ -83,7 +105,7 @@ class ProductController extends Controller
                 return view('provider.product.action',compact('product'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['action','status','name','stock_quantity'])
+            ->rawColumns(['action','status','name','stock','approval_status'])
             ->toJson();
     }
 
@@ -92,8 +114,8 @@ class ProductController extends Controller
      */
     public function create()
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -109,8 +131,8 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -157,8 +179,8 @@ class ProductController extends Controller
      */
     public function show($id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -178,8 +200,8 @@ class ProductController extends Controller
      */
     public function edit($id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -200,8 +222,8 @@ class ProductController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -241,8 +263,8 @@ class ProductController extends Controller
      */
     public function destroy($id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
