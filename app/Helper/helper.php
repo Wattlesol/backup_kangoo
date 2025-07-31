@@ -1359,6 +1359,68 @@ function get_user_name($user_id){
     return $name;
 }
 
+function getUserRoleTheme(){
+    if (!\Auth::check()) {
+        return [
+            'role' => 'guest',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_light', '#4A75FB'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_dark', '#004CB2'),
+            'theme_class' => 'theme-customer'
+        ];
+    }
+
+    $user = \Auth::user();
+
+    // Determine user role and return appropriate theme colors from database
+    if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
+        return [
+            'role' => 'admin',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'admin_light', '#5F60B9'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'admin_dark', '#4153b3'),
+            'theme_class' => 'theme-admin'
+        ];
+    } elseif ($user->hasRole('provider')) {
+        return [
+            'role' => 'provider',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'provider_light', '#EF5535'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'provider_dark', '#9B1F0B'),
+            'theme_class' => 'theme-provider'
+        ];
+    } elseif ($user->hasRole('handyman')) {
+        return [
+            'role' => 'handyman',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'handyman_light', '#2DB665'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'handyman_dark', '#005F2D'),
+            'theme_class' => 'theme-handyman'
+        ];
+    } else {
+        // Default to customer theme for 'user' role and any other roles
+        return [
+            'role' => 'customer',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_light', '#4A75FB'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_dark', '#004CB2'),
+            'theme_class' => 'theme-customer'
+        ];
+    }
+}
+
+function getBrandColors(){
+    // Get brand colors from database, fallback to defaults if not found
+    return \App\Models\ThemeSetting::getBrandColors() ?: [
+        'yellow' => ['light' => '#F0B521', 'dark' => '#8D6710'],
+        'red' => ['light' => '#EF5535', 'dark' => '#9B1F0B'],
+        'green' => ['light' => '#2DB665', 'dark' => '#005F2D'],
+        'blue' => ['light' => '#4A75FB', 'dark' => '#004CB2'],
+    ];
+}
+
+function getRotatingCardColor($index){
+    $colors = getBrandColors();
+    $colorKeys = array_keys($colors);
+    $selectedColor = $colorKeys[$index % count($colorKeys)];
+    return $colors[$selectedColor];
+}
+
 function set_admin_approved_cash($payment_id){
     $payment_status_check =  \App\Models\PaymentHistory::where('payment_id',$payment_id)
     ->where('action','provider_send_admin')->where('status','pending_by_admin')->first();

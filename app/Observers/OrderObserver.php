@@ -14,8 +14,13 @@ class OrderObserver
      */
     public function created(Order $order)
     {
+        // Log that observer is triggered
+        \Log::info('OrderObserver::created triggered for order: ' . $order->id);
+
         // Send order created notification
         $order->sendOrderCreatedNotification($order);
+
+        \Log::info('OrderObserver::created notification sent for order: ' . $order->id);
     }
 
     /**

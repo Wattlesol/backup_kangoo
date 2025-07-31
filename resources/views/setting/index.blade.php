@@ -42,6 +42,9 @@
                                                 <a href="javascript:void(0)" data-href="{{ route('layout_page') }}?page=theme-setup" data-target=".paste_here" class="nav-link {{$page=='theme-setup'?'active':''}}"  data-toggle="tabajax" rel="tooltip"> {{ __('messages.theme_setup') }}</a>
                                             </li>
                                             <li class="nav-item">
+                                                <a href="javascript:void(0)" data-href="{{ route('layout_page') }}?page=theme-colors" data-target=".paste_here" class="nav-link {{$page=='theme-colors'?'active':''}}"  data-toggle="tabajax" rel="tooltip"> {{ __('messages.theme_colors') }}</a>
+                                            </li>
+                                            <li class="nav-item">
                                                 <a href="javascript:void(0)" data-href="{{ route('layout_page') }}?page=site-setup" data-target=".paste_here" class="nav-link {{$page=='site-setup'?'active':''}}"  data-toggle="tabajax" rel="tooltip"> {{ __('messages.site_setup') }}</a>
                                             </li>
                                             <li class="nav-item">

@@ -88,6 +88,9 @@ Route::group(['prefix' => 'auth'], function() {
 Route::get('lang/{locale}', [HomeController::class,'lang'])->name('switch-language');
 Route::get('/verify/{id}', [VerificationController::class, 'verify'])->name('verify');
 
+// Dynamic CSS for theme colors (public route)
+Route::get('css/theme-colors.css', [\App\Http\Controllers\ThemeController::class, 'generateCSS'])->name('theme.css');
+
 Route::group(['middleware' => ['auth', 'verified']], function()
 {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
@@ -286,6 +289,22 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('/landing-page-settings-updates', [FrontendSettingController::class, 'landingpagesettingsUpdates'])->name('landing_page_settings_updates');
         Route::post('/landing-layout-page', [FrontendSettingController::class, 'landingLayoutPage'])->name('landing_layout_page');
         Route::post('/get-landing-layout-page-config', [FrontendSettingController::class , 'getLandingLayoutPageConfig'])->name('getLandingLayoutPageConfig');
+
+        // Theme Management Routes
+        Route::get('theme-colors', [\App\Http\Controllers\ThemeController::class, 'index'])->name('theme.colors');
+        Route::get('theme-colors/brand-colors', [\App\Http\Controllers\ThemeController::class, 'brandColors'])->name('theme.brand-colors');
+        Route::get('theme-colors/role-colors', [\App\Http\Controllers\ThemeController::class, 'roleColors'])->name('theme.role-colors');
+        Route::get('theme-colors/preview', [\App\Http\Controllers\ThemeController::class, 'previewTab'])->name('theme.preview');
+        Route::post('theme-colors/update', [\App\Http\Controllers\ThemeController::class, 'updateColors'])->name('theme.update-colors');
+        Route::post('theme-colors/add-brand-color', [\App\Http\Controllers\ThemeController::class, 'addBrandColor'])->name('theme.add-brand-color');
+        Route::post('theme-colors/delete-brand-color', [\App\Http\Controllers\ThemeController::class, 'deleteBrandColor'])->name('theme.delete-brand-color');
+        Route::post('theme-colors/create-defaults', [\App\Http\Controllers\ThemeController::class, 'createDefaults'])->name('theme.create-defaults');
+        Route::post('theme-colors/reset-defaults', [\App\Http\Controllers\ThemeController::class, 'resetToDefaults'])->name('theme.reset-colors');
+
+        // Dynamic CSS Routes for theme system
+        Route::get('css/theme-colors.css', [\App\Http\Controllers\DynamicCssController::class, 'generateThemeCss'])->name('dynamic.theme.css');
+        Route::get('css/landing-theme.css', [\App\Http\Controllers\DynamicCssController::class, 'generateLandingCss'])->name('dynamic.landing.css');
+
         Route::post('/header-page-settings', [FrontendSettingController::class, 'headingpagesettings'])->name('heading_page_settings');
         Route::post('/footer-page-settings', [FrontendSettingController::class, 'footerpagesettings'])->name('footer_page_settings');
         Route::post('/login-register-page-settings', [FrontendSettingController::class, 'loginregisterpagesettings'])->name('login_register_page_settings');
@@ -695,9 +714,15 @@ Route::middleware('auth')->group(function () {
     Route::get('my-order/{id}', [FrontendProductController::class, 'showOrder'])->name('customer.order.show');
 });
 
+// Role-based Theming Demo Route
+Route::get('/theme-demo', function () {
+    return view('examples.role-theming-demo');
+})->name('theme.demo');
 
-
-
+// Simple Theme Test Route
+Route::get('/test-theme', function () {
+    return view('test-theme');
+})->name('test.theme');
 
 
 

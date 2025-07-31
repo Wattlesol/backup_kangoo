@@ -30,5 +30,8 @@ class AppServiceProvider extends ServiceProvider
         // Register model observers
         Order::observe(OrderObserver::class);
         Store::observe(StoreObserver::class);
+
+        // Register view composers
+        view()->composer('*', \App\View\Composers\ThemeComposer::class);
     }
 }

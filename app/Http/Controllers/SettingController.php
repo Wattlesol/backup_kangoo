@@ -263,12 +263,91 @@ class SettingController extends Controller
 
                 $data  = view('setting.' . $page, compact('earningsetting', 'page'))->render();
                 break;
+            case 'theme-colors':
+                // Get brand colors
+                $brandColors = \App\Models\ThemeSetting::getByGroup('brand_colors');
+                if ($brandColors->isEmpty()) {
+                    // Create default brand colors if they don't exist
+                    \Artisan::call('db:seed', ['--class' => 'ThemeSettingsSeeder']);
+                    $brandColors = \App\Models\ThemeSetting::getByGroup('brand_colors');
+                }
+
+                // Get role colors
+                $roleColors = \App\Models\ThemeSetting::getByGroup('role_colors');
+                if ($roleColors->isEmpty()) {
+                    // Create default role colors if they don't exist
+                    \Artisan::call('db:seed', ['--class' => 'ThemeSettingsSeeder']);
+                    $roleColors = \App\Models\ThemeSetting::getByGroup('role_colors');
+                }
+
+                // Format colors for display
+                $brandColorsFormatted = $this->formatColorsForDisplay($brandColors);
+                $roleColorsFormatted = $this->formatColorsForDisplay($roleColors);
+
+                // Create a dummy model for form binding
+                $themeColors = new \stdClass();
+
+                $data = view('setting.' . $page, compact('page', 'brandColorsFormatted', 'roleColorsFormatted', 'themeColors'))->render();
+                break;
             default:
                 $data  = view('setting.' . $page, compact('settings', 'page', 'envSettting'))->render();
                 break;
         }
 
         return response()->json($data);
+    }
+
+    /**
+     * Format colors for display in admin interface
+     */
+    private function formatColorsForDisplay($colors)
+    {
+        $formatted = [];
+
+        // Role metadata for display
+        $roleMetadata = [
+            'admin' => [
+                'display_name' => 'Admin',
+                'icon' => 'fa-user-shield'
+            ],
+            'provider' => [
+                'display_name' => 'Provider',
+                'icon' => 'fa-store'
+            ],
+            'handyman' => [
+                'display_name' => 'Handyman',
+                'icon' => 'fa-tools'
+            ],
+            'customer' => [
+                'display_name' => 'Customer',
+                'icon' => 'fa-user'
+            ]
+        ];
+
+        foreach ($colors as $setting) {
+            $parts = explode('_', $setting->setting_key);
+            $colorName = $parts[0];
+            $theme = $parts[1] ?? 'light';
+
+            if (!isset($formatted[$colorName])) {
+                $baseData = [
+                    'name' => ucfirst($colorName),
+                    'light' => '',
+                    'dark' => ''
+                ];
+
+                // Add role metadata if this is a role color
+                if (isset($roleMetadata[$colorName])) {
+                    $baseData = array_merge($baseData, $roleMetadata[$colorName]);
+                }
+
+                $formatted[$colorName] = $baseData;
+            }
+
+            $formatted[$colorName][$theme] = $setting->setting_value;
+        }
+
+        return $formatted;
     }
 
 

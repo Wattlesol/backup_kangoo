@@ -56,6 +56,13 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+// Theme API routes for mobile apps
+Route::prefix('v1/theme')->group(function () {
+    Route::get('/colors', [App\Http\Controllers\Api\ThemeController::class, 'getThemeColors']);
+    Route::get('/colors/{role}', [App\Http\Controllers\Api\ThemeController::class, 'getRoleTheme']);
+    Route::post('/check-update', [App\Http\Controllers\Api\ThemeController::class, 'checkThemeUpdate']);
+});
+
 // Test route for customer store APIs
 Route::get('/test-store', function() {
     try {
