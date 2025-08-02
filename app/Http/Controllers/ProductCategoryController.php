@@ -17,6 +17,11 @@ class ProductCategoryController extends Controller
      */
     public function index(Request $request)
     {
+        // If it's an API request, return API response
+        if($request->is('api/*')) {
+            return $this->getAllCategories($request);
+        }
+
         $filter = [
             'status' => $request->status,
             'is_featured' => $request->is_featured,
@@ -253,22 +258,56 @@ class ProductCategoryController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
-        $productcategory = ProductCategory::find($id);
-        $msg= __('messages.msg_fail_to_delete',['item' => __('messages.product_category')] );
+        try {
+            if(demoUserPermission()){
+                $message = trans('messages.demo_permission_denied');
+                if($request->is('api/*')) {
+                    return comman_message_response($message);
+                }
+                return redirect()->back()->withErrors($message);
+            }
 
-        if($productcategory != '') {
-            $productcategory->delete();
-            $msg= __('messages.msg_deleted',['name' => __('messages.product_category')] );
+            $productCategory = ProductCategory::findOrFail($id);
+
+            // Check if category has products
+            $productsCount = $productCategory->products()->count();
+            if ($productsCount > 0) {
+                $message = "Cannot delete category. It has {$productsCount} products associated with it.";
+
+                if($request->is('api/*')) {
+                    return comman_message_response($message);
+                }
+                return comman_custom_response(['message'=> $message , 'status' => false]);
+            }
+
+            $productCategory->delete();
+            $message = __('messages.msg_deleted',['name' => __('messages.product_category')] );
+
+            if($request->is('api/*')) {
+                return comman_custom_response([
+                    'message' => $message,
+                    'status' => true
+                ]);
+            }
+
+            return comman_custom_response(['message'=> $message , 'status' => true]);
+
+        } catch (\Exception $e) {
+            \Log::error('Delete category error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'category_id' => $id
+            ]);
+
+            $message = __('messages.msg_fail_to_delete',['item' => __('messages.product_category')] );
+
+            if($request->is('api/*')) {
+                return comman_message_response($message);
+            }
+            return comman_custom_response(['message'=> $message , 'status' => false]);
         }
-        if(request()->is('api/*')) {
-            return comman_message_response($msg);
-        }
-        return comman_custom_response(['message'=> $msg , 'status' => true]);
     }
 
     public function action(Request $request){
@@ -284,5 +323,191 @@ class ProductCategoryController extends Controller
             $msg = __('messages.msg_forcedelete',['name' => __('messages.product_category')] );
         }
         return comman_custom_response(['message'=> $msg , 'status' => true]);
+    }
+
+    /**
+     * Get all categories for API
+     */
+    public function getAllCategories(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $status = $request->get('status');
+            $featured = $request->get('featured');
+            $search = $request->get('search');
+
+            $query = ProductCategory::query();
+
+            // Apply filters
+            if ($status !== null) {
+                $query->where('status', $status);
+            }
+
+            if ($featured !== null) {
+                $query->where('is_featured', $featured);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+
+            // Order by sort_order and name
+            $query->orderBy('sort_order')->orderBy('name');
+
+            $categories = $query->paginate($perPage);
+
+            // Transform data for API response
+            $transformedCategories = $categories->getCollection()->map(function($category) {
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'description' => $category->description,
+                    'slug' => $category->slug,
+                    'status' => $category->status,
+                    'is_featured' => $category->is_featured,
+                    'sort_order' => $category->sort_order,
+                    'color' => $category->color,
+                    'products_count' => $category->products()->count(),
+                    'image' => $category->image,
+                    'created_at' => $category->created_at,
+                    'updated_at' => $category->updated_at
+                ];
+            });
+
+            $response = [
+                'data' => $transformedCategories,
+                'current_page' => $categories->currentPage(),
+                'last_page' => $categories->lastPage(),
+                'per_page' => $categories->perPage(),
+                'total' => $categories->total(),
+                'from' => $categories->firstItem(),
+                'to' => $categories->lastItem()
+            ];
+
+            if($request->is('api/*')) {
+                return comman_custom_response([
+                    'message' => 'Categories fetched successfully',
+                    'data' => $response,
+                    'status' => true
+                ]);
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => $response,
+                'message' => 'Categories fetched successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get categories error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            if($request->is('api/*')) {
+                return comman_message_response('Failed to fetch categories: ' . $e->getMessage());
+            }
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to fetch categories: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+
+
+    /**
+     * Bulk action for categories
+     */
+    public function bulkAction(Request $request)
+    {
+        try {
+            $request->validate([
+                'action' => 'required|in:delete,activate,deactivate,feature,unfeature',
+                'category_ids' => 'required|array',
+                'category_ids.*' => 'exists:product_categories,id'
+            ]);
+
+            $action = $request->action;
+            $categoryIds = $request->category_ids;
+            $affectedCount = 0;
+
+            switch ($action) {
+                case 'delete':
+                    // Check for categories with products
+                    $categoriesWithProducts = ProductCategory::whereIn('id', $categoryIds)
+                        ->whereHas('products')
+                        ->pluck('name')
+                        ->toArray();
+
+                    if (!empty($categoriesWithProducts)) {
+                        $message = 'Cannot delete categories with products: ' . implode(', ', $categoriesWithProducts);
+
+                        if($request->is('api/*')) {
+                            return comman_message_response($message);
+                        }
+                        return response()->json(['status' => false, 'message' => $message]);
+                    }
+
+                    $affectedCount = ProductCategory::whereIn('id', $categoryIds)->delete();
+                    $message = "Successfully deleted {$affectedCount} categories";
+                    break;
+
+                case 'activate':
+                    $affectedCount = ProductCategory::whereIn('id', $categoryIds)->update(['status' => true]);
+                    $message = "Successfully activated {$affectedCount} categories";
+                    break;
+
+                case 'deactivate':
+                    $affectedCount = ProductCategory::whereIn('id', $categoryIds)->update(['status' => false]);
+                    $message = "Successfully deactivated {$affectedCount} categories";
+                    break;
+
+                case 'feature':
+                    $affectedCount = ProductCategory::whereIn('id', $categoryIds)->update(['is_featured' => true]);
+                    $message = "Successfully featured {$affectedCount} categories";
+                    break;
+
+                case 'unfeature':
+                    $affectedCount = ProductCategory::whereIn('id', $categoryIds)->update(['is_featured' => false]);
+                    $message = "Successfully unfeatured {$affectedCount} categories";
+                    break;
+            }
+
+            if($request->is('api/*')) {
+                return comman_custom_response([
+                    'message' => $message,
+                    'affected_count' => $affectedCount,
+                    'status' => true
+                ]);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => $message,
+                'affected_count' => $affectedCount
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Bulk action error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            $message = 'Failed to perform bulk action: ' . $e->getMessage();
+
+            if($request->is('api/*')) {
+                return comman_message_response($message);
+            }
+            return response()->json([
+                'status' => false,
+                'message' => $message
+            ]);
+        }
     }
 }

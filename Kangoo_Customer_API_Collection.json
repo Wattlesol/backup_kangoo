@@ -1,0 +1,468 @@
+{
+	"info": {
+		"_postman_id": "kangoo-customer-api-collection",
+		"name": "Kangoo Customer API Collection",
+		"description": "Customer-specific API endpoints for Kangoo Service Platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000",
+			"type": "string"
+		},
+		{
+			"key": "customer_token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{customer_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "🔐 Customer Authentication",
+			"item": [
+				{
+					"name": "Register Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"email\": \"customer@example.com\",\n    \"password\": \"password123\",\n    \"password_confirmation\": \"password123\",\n    \"user_type\": \"user\",\n    \"phone\": \"+1234567890\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "register"]
+						}
+					}
+				},
+				{
+					"name": "Customer Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.data && response.data.api_token) {",
+									"        pm.collectionVariables.set('customer_token', response.data.api_token);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"customer@example.com\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "login"]
+						}
+					}
+				},
+				{
+					"name": "Get User Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user-detail",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user-detail"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🏪 Store Browsing",
+			"item": [
+				{
+					"name": "Get Main Store",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/stores",
+							"host": ["{{base_url}}"],
+							"path": ["api", "stores"]
+						}
+					}
+				},
+				{
+					"name": "Test Store API",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/test-store",
+							"host": ["{{base_url}}"],
+							"path": ["api", "test-store"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🛍️ Product Browsing",
+			"item": [
+				{
+					"name": "Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products?category_id=1&featured=1&search=product&per_page=15",
+							"host": ["{{base_url}}"],
+							"path": ["api", "products"],
+							"query": [
+								{
+									"key": "category_id",
+									"value": "1"
+								},
+								{
+									"key": "featured",
+									"value": "1"
+								},
+								{
+									"key": "search",
+									"value": "product"
+								},
+								{
+									"key": "per_page",
+									"value": "15"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Product Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/1",
+							"host": ["{{base_url}}"],
+							"path": ["api", "products", "1"]
+						}
+					}
+				},
+				{
+					"name": "Search Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products-search?q=search_term&category_id=1&min_price=10&max_price=100",
+							"host": ["{{base_url}}"],
+							"path": ["api", "products-search"],
+							"query": [
+								{
+									"key": "q",
+									"value": "search_term"
+								},
+								{
+									"key": "category_id",
+									"value": "1"
+								},
+								{
+									"key": "min_price",
+									"value": "10"
+								},
+								{
+									"key": "max_price",
+									"value": "100"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Featured Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/featured-products?per_page=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "featured-products"],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Product Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/product-categories",
+							"host": ["{{base_url}}"],
+							"path": ["api", "product-categories"]
+						}
+					}
+				},
+				{
+					"name": "Get Product Final Price",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/1/final-price",
+							"host": ["{{base_url}}"],
+							"path": ["api", "products", "1", "final-price"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🛒 Direct Purchase & Orders",
+			"item": [
+				{
+					"name": "Create Direct Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": 1,\n    \"quantity\": 2,\n    \"variant_id\": null,\n    \"delivery_address\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"New York\",\n        \"state\": \"NY\",\n        \"zip_code\": \"10001\",\n        \"country\": \"USA\"\n    },\n    \"payment_method\": \"stripe\",\n    \"notes\": \"Please deliver in the evening\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders",
+							"host": ["{{base_url}}"],
+							"path": ["api", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Get My Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/orders?status=pending&per_page=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "orders"],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending"
+								},
+								{
+									"key": "per_page",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Order Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/orders/1",
+							"host": ["{{base_url}}"],
+							"path": ["api", "orders", "1"]
+						}
+					}
+				},
+				{
+					"name": "Cancel Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"reason\": \"Changed my mind\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/1/cancel",
+							"host": ["{{base_url}}"],
+							"path": ["api", "orders", "1", "cancel"]
+						}
+					}
+				},
+				{
+					"name": "Track Order",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/orders/1/track",
+							"host": ["{{base_url}}"],
+							"path": ["api", "orders", "1", "track"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "💳 Payment",
+			"item": [
+				{
+					"name": "Get Payment Methods",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/product-payment-methods",
+							"host": ["{{base_url}}"],
+							"path": ["api", "product-payment-methods"]
+						}
+					}
+				},
+				{
+					"name": "Create Stripe Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": 1,\n    \"payment_method\": \"stripe\",\n    \"amount\": 99.99\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/create-product-stripe-payment",
+							"host": ["{{base_url}}"],
+							"path": ["api", "create-product-stripe-payment"]
+						}
+					}
+				},
+				{
+					"name": "Process Wallet Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": 1,\n    \"amount\": 99.99\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/process-product-wallet-payment",
+							"host": ["{{base_url}}"],
+							"path": ["api", "process-product-wallet-payment"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🎨 Theme & Appearance",
+			"item": [
+				{
+					"name": "Get Theme Colors",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/theme/colors",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "theme", "colors"]
+						}
+					}
+				},
+				{
+					"name": "Get Customer Theme",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/theme/colors/customer",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "theme", "colors", "customer"]
+						}
+					}
+				},
+				{
+					"name": "Check Theme Update",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"version\": \"current_theme_version\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/theme/check-update",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "theme", "check-update"]
+						}
+					}
+				},
+				{
+					"name": "Get Dynamic CSS",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/css/theme-colors.css",
+							"host": ["{{base_url}}"],
+							"path": ["css", "theme-colors.css"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

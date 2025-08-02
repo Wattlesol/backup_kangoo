@@ -185,27 +185,17 @@ class Product extends BaseModel implements HasMedia
         return $this->stock_quantity <= $this->low_stock_threshold;
     }
 
-    // Methods
+    // Methods for single-store architecture
     public function getLowestStorePrice($storeId = null)
     {
-        $query = $this->storeProducts()->where('is_available', true);
-
-        if ($storeId) {
-            $query->where('store_id', $storeId);
-        }
-
-        return $query->min('store_price') ?? $this->effective_price;
+        // In single-store architecture, return the selling price or base price
+        return $this->selling_price ?? $this->base_price;
     }
 
     public function getHighestStorePrice($storeId = null)
     {
-        $query = $this->storeProducts()->where('is_available', true);
-
-        if ($storeId) {
-            $query->where('store_id', $storeId);
-        }
-
-        return $query->max('store_price') ?? $this->effective_price;
+        // In single-store architecture, return the selling price or base price
+        return $this->selling_price ?? $this->base_price;
     }
 
     public function getFinalPrice($storeId = null)

@@ -42,7 +42,7 @@ class StoreController extends Controller
     public function show($id, Request $request)
     {
         try {
-            $store = Store::with(['provider', 'country', 'state', 'city'])
+            $store = Store::with(['createdBy', 'country', 'state', 'city'])
                          ->approved()
                          ->active()
                          ->findOrFail($id);
@@ -60,10 +60,10 @@ class StoreController extends Controller
         }
     }
 
-    public function products($storeId, Request $request)
+    public function products(Request $request)
     {
         try {
-            $store = Store::where('store_type', 'main')->active()->findOrFail($storeId);
+            $store = Store::where('store_type', 'main')->active()->firstOrFail();
 
             $perPage = $request->get('per_page', 15);
             $categoryId = $request->get('category_id');
@@ -111,6 +111,11 @@ class StoreController extends Controller
             return comman_custom_response($response);
 
         } catch (\Exception $e) {
+            \Log::error('Store products API error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return comman_message_response(__('messages.failed'));
         }
     }

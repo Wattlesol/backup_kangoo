@@ -54,14 +54,12 @@ class StoreResource extends JsonResource
                 ];
             }),
             
-            // Provider details
-            'provider' => $this->whenLoaded('provider', function() {
+            // Created by details (admin user who created the store)
+            'created_by' => $this->whenLoaded('createdBy', function() {
                 return [
-                    'id' => $this->provider->id,
-                    'name' => $this->provider->display_name,
-                    'email' => $this->provider->email,
-                    'phone' => $this->provider->contact_number,
-                    'profile_image' => getSingleMedia($this->provider, 'profile_image', null)
+                    'id' => $this->createdBy->id,
+                    'name' => $this->createdBy->display_name ?? $this->createdBy->first_name . ' ' . $this->createdBy->last_name,
+                    'email' => $this->createdBy->email,
                 ];
             }),
             

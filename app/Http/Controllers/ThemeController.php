@@ -462,4 +462,45 @@ class ThemeController extends Controller
             ]);
         }
     }
+
+    /**
+     * Get theme colors for API
+     */
+    public function getThemeColors(Request $request)
+    {
+        try {
+            $brandColors = ThemeSetting::getByGroup('brand_colors');
+            $roleColors = ThemeSetting::getByGroup('role_colors');
+
+            $data = [
+                'brand_colors' => $this->formatColorsForDisplay($brandColors),
+                'role_colors' => $this->formatColorsForDisplay($roleColors)
+            ];
+
+            if($request->is('api/*')) {
+                return comman_custom_response([
+                    'message' => 'Theme colors fetched successfully',
+                    'data' => $data,
+                    'status' => true
+                ]);
+            }
+
+            return response()->json([
+                'status' => true,
+                'data' => $data,
+                'message' => 'Theme colors fetched successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get theme colors error: ' . $e->getMessage());
+
+            if($request->is('api/*')) {
+                return comman_message_response('Failed to fetch theme colors: ' . $e->getMessage());
+            }
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to fetch theme colors: ' . $e->getMessage()
+            ]);
+        }
+    }
 }

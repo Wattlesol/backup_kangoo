@@ -216,11 +216,34 @@ class ProductApprovalController extends Controller
             }
 
             DB::commit();
+
+            if ($request->is('api/*')) {
+                return comman_custom_response([
+                    'message' => $message,
+                    'affected_count' => count($productIds),
+                    'action' => $action,
+                    'status' => true
+                ]);
+            }
+
             return response()->json(['status' => true, 'message' => $message]);
 
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['status' => false, 'message' => 'An error occurred: ' . $e->getMessage()]);
+
+            \Log::error('Bulk product action error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            $errorMessage = 'An error occurred: ' . $e->getMessage();
+
+            if ($request->is('api/*')) {
+                return comman_message_response($errorMessage);
+            }
+
+            return response()->json(['status' => false, 'message' => $errorMessage]);
         }
     }
 
@@ -241,9 +264,26 @@ class ProductApprovalController extends Controller
     public function approve(Request $request, $id)
     {
         try {
+            $request->validate([
+                'admin_notes' => 'nullable|string|max:1000'
+            ]);
+
             DB::beginTransaction();
 
             $product = Product::findOrFail($id);
+
+            // Check if product is eligible for approval
+            if ($product->approval_status === 'approved') {
+                $message = 'Product is already approved.';
+
+                if ($request->is('api/*') || $request->ajax()) {
+                    return comman_custom_response([
+                        'message' => $message,
+                        'status' => false
+                    ]);
+                }
+                return redirect()->back()->with('warning', $message);
+            }
 
             // Update product approval status
             $product->update([
@@ -253,6 +293,7 @@ class ProductApprovalController extends Controller
                 'rejected_at' => null,
                 'rejected_by' => null,
                 'rejection_reason' => null,
+                'admin_notes' => $request->admin_notes,
                 'is_available' => true, // Make available in store
                 'status' => true // Activate product
             ]);
@@ -266,6 +307,21 @@ class ProductApprovalController extends Controller
 
             $message = 'Product approved successfully and is now available in the store.';
 
+            if ($request->is('api/*')) {
+                return comman_custom_response([
+                    'message' => $message,
+                    'data' => [
+                        'product_id' => $product->id,
+                        'approval_status' => $product->approval_status,
+                        'approved_at' => $product->approved_at,
+                        'approved_by' => $product->approved_by,
+                        'is_available' => $product->is_available,
+                        'status' => $product->status
+                    ],
+                    'status' => true
+                ]);
+            }
+
             if ($request->ajax()) {
                 return response()->json([
                     'status' => true,
@@ -278,9 +334,20 @@ class ProductApprovalController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
-            
-            $errorMessage = 'Failed to approve product. Please try again.';
-            
+
+            \Log::error('Product approval error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'product_id' => $id,
+                'request_data' => $request->all()
+            ]);
+
+            $errorMessage = 'Failed to approve product: ' . $e->getMessage();
+
+            if ($request->is('api/*')) {
+                return comman_message_response($errorMessage);
+            }
+
             if ($request->ajax()) {
                 return response()->json([
                     'status' => false,
@@ -297,14 +364,28 @@ class ProductApprovalController extends Controller
      */
     public function reject(Request $request, $id)
     {
-        $request->validate([
-            'rejection_reason' => 'required|string|max:1000'
-        ]);
-
         try {
+            $request->validate([
+                'rejection_reason' => 'required|string|max:1000',
+                'admin_notes' => 'nullable|string|max:1000'
+            ]);
+
             DB::beginTransaction();
 
             $product = Product::findOrFail($id);
+
+            // Check if product is eligible for rejection
+            if ($product->approval_status === 'rejected') {
+                $message = 'Product is already rejected.';
+
+                if ($request->is('api/*') || $request->ajax()) {
+                    return comman_custom_response([
+                        'message' => $message,
+                        'status' => false
+                    ]);
+                }
+                return redirect()->back()->with('warning', $message);
+            }
 
             // Update product rejection status
             $product->update([
@@ -312,6 +393,7 @@ class ProductApprovalController extends Controller
                 'rejected_at' => now(),
                 'rejected_by' => Auth::id(),
                 'rejection_reason' => $request->rejection_reason,
+                'admin_notes' => $request->admin_notes,
                 'approved_at' => null,
                 'approved_by' => null,
                 'is_available' => false, // Remove from store
@@ -327,6 +409,22 @@ class ProductApprovalController extends Controller
 
             $message = 'Product rejected successfully.';
 
+            if ($request->is('api/*')) {
+                return comman_custom_response([
+                    'message' => $message,
+                    'data' => [
+                        'product_id' => $product->id,
+                        'approval_status' => $product->approval_status,
+                        'rejected_at' => $product->rejected_at,
+                        'rejected_by' => $product->rejected_by,
+                        'rejection_reason' => $product->rejection_reason,
+                        'is_available' => $product->is_available,
+                        'status' => $product->status
+                    ],
+                    'status' => true
+                ]);
+            }
+
             if ($request->ajax()) {
                 return response()->json([
                     'status' => true,
@@ -339,9 +437,20 @@ class ProductApprovalController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
-            
-            $errorMessage = 'Failed to reject product. Please try again.';
-            
+
+            \Log::error('Product rejection error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'product_id' => $id,
+                'request_data' => $request->all()
+            ]);
+
+            $errorMessage = 'Failed to reject product: ' . $e->getMessage();
+
+            if ($request->is('api/*')) {
+                return comman_message_response($errorMessage);
+            }
+
             if ($request->ajax()) {
                 return response()->json([
                     'status' => false,
@@ -473,5 +582,209 @@ class ProductApprovalController extends Controller
             'provider_id' => $product->provider_id,
             'status' => $status
         ]);
+    }
+
+    /**
+     * Get pending products for API
+     */
+    public function getPendingProducts(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $categoryId = $request->get('category_id');
+            $providerId = $request->get('provider_id');
+            $search = $request->get('search');
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+
+            $query = Product::with(['category', 'provider', 'approvedBy', 'rejectedBy'])
+                           ->where('approval_status', 'pending');
+
+            // Apply filters
+            if ($categoryId) {
+                $query->where('product_category_id', $categoryId);
+            }
+
+            if ($providerId) {
+                $query->where('provider_id', $providerId);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
+
+            // Apply sorting
+            $query->orderBy($sortBy, $sortOrder);
+
+            $products = $query->paginate($perPage);
+
+            // Transform data for API response
+            $transformedProducts = $products->getCollection()->map(function($product) {
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'short_description' => $product->short_description,
+                    'sku' => $product->sku,
+                    'slug' => $product->slug,
+                    'category' => $product->category ? [
+                        'id' => $product->category->id,
+                        'name' => $product->category->name
+                    ] : null,
+                    'provider' => $product->provider ? [
+                        'id' => $product->provider->id,
+                        'name' => $product->provider->display_name,
+                        'email' => $product->provider->email
+                    ] : null,
+                    'base_price' => $product->base_price,
+                    'selling_price' => $product->selling_price,
+                    'stock_quantity' => $product->stock_quantity,
+                    'is_featured' => $product->is_featured,
+                    'approval_status' => $product->approval_status,
+                    'provider_notes' => $product->provider_notes,
+                    'created_at' => $product->created_at,
+                    'updated_at' => $product->updated_at,
+                    'days_pending' => $product->created_at->diffInDays(now())
+                ];
+            });
+
+            $response = [
+                'data' => $transformedProducts,
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+                'from' => $products->firstItem(),
+                'to' => $products->lastItem()
+            ];
+
+            return comman_custom_response([
+                'message' => 'Pending products fetched successfully',
+                'data' => $response,
+                'status' => true
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get pending products error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            return comman_message_response('Failed to fetch pending products: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get rejected products for API
+     */
+    public function getRejectedProducts(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $categoryId = $request->get('category_id');
+            $providerId = $request->get('provider_id');
+            $rejectedBy = $request->get('rejected_by');
+            $search = $request->get('search');
+            $sortBy = $request->get('sort_by', 'rejected_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+
+            $query = Product::with(['category', 'provider', 'approvedBy', 'rejectedBy'])
+                           ->where('approval_status', 'rejected');
+
+            // Apply filters
+            if ($categoryId) {
+                $query->where('product_category_id', $categoryId);
+            }
+
+            if ($providerId) {
+                $query->where('provider_id', $providerId);
+            }
+
+            if ($rejectedBy) {
+                $query->where('rejected_by', $rejectedBy);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%")
+                      ->orWhere('rejection_reason', 'like', "%{$search}%");
+                });
+            }
+
+            // Apply sorting
+            $query->orderBy($sortBy, $sortOrder);
+
+            $products = $query->paginate($perPage);
+
+            // Transform data for API response
+            $transformedProducts = $products->getCollection()->map(function($product) {
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'short_description' => $product->short_description,
+                    'sku' => $product->sku,
+                    'slug' => $product->slug,
+                    'category' => $product->category ? [
+                        'id' => $product->category->id,
+                        'name' => $product->category->name
+                    ] : null,
+                    'provider' => $product->provider ? [
+                        'id' => $product->provider->id,
+                        'name' => $product->provider->display_name,
+                        'email' => $product->provider->email
+                    ] : null,
+                    'base_price' => $product->base_price,
+                    'selling_price' => $product->selling_price,
+                    'stock_quantity' => $product->stock_quantity,
+                    'is_featured' => $product->is_featured,
+                    'approval_status' => $product->approval_status,
+                    'rejection_reason' => $product->rejection_reason,
+                    'rejected_at' => $product->rejected_at,
+                    'rejected_by' => $product->rejectedBy ? [
+                        'id' => $product->rejectedBy->id,
+                        'name' => $product->rejectedBy->first_name . ' ' . $product->rejectedBy->last_name,
+                        'email' => $product->rejectedBy->email
+                    ] : null,
+                    'admin_notes' => $product->admin_notes,
+                    'provider_notes' => $product->provider_notes,
+                    'created_at' => $product->created_at,
+                    'updated_at' => $product->updated_at,
+                    'days_since_rejection' => $product->rejected_at ? $product->rejected_at->diffInDays(now()) : null
+                ];
+            });
+
+            $response = [
+                'data' => $transformedProducts,
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+                'from' => $products->firstItem(),
+                'to' => $products->lastItem()
+            ];
+
+            return comman_custom_response([
+                'message' => 'Rejected products fetched successfully',
+                'data' => $response,
+                'status' => true
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get rejected products error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            return comman_message_response('Failed to fetch rejected products: ' . $e->getMessage());
+        }
     }
 }

@@ -153,21 +153,54 @@ class OrderController extends Controller
     /**
      * Update payment status
      */
-    public function updatePaymentStatus(Request $request)
+    public function updatePaymentStatus(Request $request, $id = null)
     {
+        // Handle both URL parameter and request body for order_id
+        $orderId = $id ?? $request->order_id;
+
         $data = $request->validate([
-            'order_id' => 'required|exists:orders,id',
             'payment_status' => 'required|in:pending,paid,failed,refunded',
-            'payment_transaction_id' => 'nullable|string'
+            'payment_method' => 'nullable|string',
+            'transaction_id' => 'nullable|string'
         ]);
 
-        $order = Order::findOrFail($data['order_id']);
-        $order->update([
-            'payment_status' => $data['payment_status'],
-            'payment_transaction_id' => $data['payment_transaction_id'] ?? $order->payment_transaction_id
-        ]);
+        if (!$orderId) {
+            $data['order_id'] = 'required|exists:orders,id';
+            $request->validate($data);
+            $orderId = $request->order_id;
+        }
+
+        $order = Order::findOrFail($orderId);
+
+        $updateData = [
+            'payment_status' => $data['payment_status']
+        ];
+
+        if (isset($data['payment_method'])) {
+            $updateData['payment_method'] = $data['payment_method'];
+        }
+
+        if (isset($data['transaction_id'])) {
+            $updateData['payment_transaction_id'] = $data['transaction_id'];
+        }
+
+        $order->update($updateData);
 
         $message = trans('messages.payment_status_updated_successfully');
+
+        if($request->is('api/*')) {
+            return comman_custom_response([
+                'message' => $message,
+                'data' => [
+                    'order_id' => $order->id,
+                    'payment_status' => $order->payment_status,
+                    'payment_method' => $order->payment_method,
+                    'transaction_id' => $order->payment_transaction_id
+                ],
+                'status' => true
+            ]);
+        }
+
         return comman_custom_response(['message'=> $message , 'status' => true]);
     }
 

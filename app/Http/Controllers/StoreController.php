@@ -76,13 +76,14 @@ class StoreController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->all();
+        try {
+            $data = $request->all();
 
         // Validate required fields
         $request->validate([
             'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'address' => 'required|string',
+            'description' => 'nullable|string',
+            'address' => 'nullable|string',
         ]);
 
         // Set admin as creator
@@ -117,6 +118,16 @@ class StoreController extends Controller
             $result = Store::updateOrCreate(['id' => $data['id']], $data);
             $message = 'Store updated successfully';
         } else {
+            // Check if main store already exists (prevent multiple main stores)
+            $existingMainStore = Store::where('store_type', 'main')->first();
+            if ($existingMainStore) {
+                if($request->is('api/*')) {
+                    return comman_message_response('Main store already exists. Only one main store is allowed in single-store architecture.');
+                }
+                return redirect()->route('store.edit', $existingMainStore->id)
+                    ->withError('Main store already exists. Only one main store is allowed.');
+            }
+
             // Create new store (should only happen once)
             unset($data['id']);
             $result = Store::create($data);
@@ -127,7 +138,20 @@ class StoreController extends Controller
             return comman_message_response($message);
 		}
 
-        return redirect(route('store.index'))->withSuccess($message);
+            return redirect(route('store.index'))->withSuccess($message);
+
+        } catch (\Exception $e) {
+            \Log::error('Store save error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            if($request->is('api/*')) {
+                return comman_message_response('Store operation failed: ' . $e->getMessage());
+            }
+            return redirect()->back()->withError('Store operation failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -197,6 +221,90 @@ class StoreController extends Controller
             $msg = __('messages.msg_forcedelete',['name' => __('messages.store')] );
         }
         return comman_custom_response(['message'=> $msg , 'status' => true]);
+    }
+
+    public function updateStatus(Request $request)
+    {
+        try {
+            $request->validate([
+                'id' => 'required|exists:stores,id',
+                'is_active' => 'sometimes|boolean',
+                'status' => 'sometimes|in:pending,approved,rejected,suspended'
+            ]);
+
+            $store = Store::findOrFail($request->id);
+
+            $updateData = [];
+            if ($request->has('is_active')) {
+                $updateData['is_active'] = $request->is_active;
+            }
+            if ($request->has('status')) {
+                $updateData['status'] = $request->status;
+            }
+
+            $store->update($updateData);
+
+            $message = 'Store status updated successfully';
+
+            if($request->is('api/*')) {
+                return comman_message_response($message);
+            }
+            return redirect()->back()->withSuccess($message);
+
+        } catch (\Exception $e) {
+            \Log::error('Store status update error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            if($request->is('api/*')) {
+                return comman_message_response('Store status update failed: ' . $e->getMessage());
+            }
+            return redirect()->back()->withError('Store status update failed: ' . $e->getMessage());
+        }
+    }
+
+    public function uploadLogo(Request $request)
+    {
+        try {
+            $request->validate([
+                'store_id' => 'required|exists:stores,id',
+                'logo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+            ]);
+
+            $store = Store::findOrFail($request->store_id);
+
+            if ($request->hasFile('logo')) {
+                // Delete existing logo if any
+                $store->clearMediaCollection('logo');
+
+                // Upload new logo
+                $store->addMediaFromRequest('logo')
+                    ->toMediaCollection('logo');
+
+                $message = 'Store logo uploaded successfully';
+            } else {
+                $message = 'No logo file provided';
+            }
+
+            if($request->is('api/*')) {
+                return comman_message_response($message);
+            }
+            return redirect()->back()->withSuccess($message);
+
+        } catch (\Exception $e) {
+            \Log::error('Store logo upload error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            if($request->is('api/*')) {
+                return comman_message_response('Store logo upload failed: ' . $e->getMessage());
+            }
+            return redirect()->back()->withError('Store logo upload failed: ' . $e->getMessage());
+        }
     }
 
     // Removed approval methods - not needed for single store architecture

@@ -45,10 +45,8 @@ Route::get('products', [API\ProductController::class, 'index']);
 Route::get('products/{id}', [API\ProductController::class, 'show']);
 Route::get('products-search', [API\ProductController::class, 'search']);
 Route::get('featured-products', [API\ProductController::class, 'featured']);
-Route::get('stores', [API\StoreController::class, 'index']);
-Route::get('stores/{id}', [API\StoreController::class, 'show']);
-Route::get('stores/{id}/products', [API\StoreController::class, 'products']);
-Route::get('nearby-stores', [API\StoreController::class, 'nearby']);
+Route::get('store', [API\StoreController::class, 'index']);
+Route::get('store/products', [API\StoreController::class, 'products']);
 
 
 
@@ -246,7 +244,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
         // Product Categories (Admin & Provider can view, Admin can manage)
         Route::group(['middleware' => ['permission:product_category list']], function () {
-            Route::get('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'index_data']);
+            Route::get('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'getAllCategories']);
             Route::post('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'store'])->middleware('permission:product_category add');
             Route::get('product-categories/{id}', [App\Http\Controllers\ProductCategoryController::class, 'show']);
             Route::put('product-categories/{id}', [App\Http\Controllers\ProductCategoryController::class, 'update'])->middleware('permission:product_category edit');

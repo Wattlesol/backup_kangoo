@@ -119,6 +119,18 @@ class Store extends BaseModel implements HasMedia
         return $query->where('status', 'rejected');
     }
 
+    public function scopeNearby($query, $latitude, $longitude, $radius = 50)
+    {
+        return $query->selectRaw("*,
+            (6371 * acos(cos(radians(?))
+            * cos(radians(latitude))
+            * cos(radians(longitude) - radians(?))
+            + sin(radians(?))
+            * sin(radians(latitude)))) AS distance", [$latitude, $longitude, $latitude])
+            ->having('distance', '<', $radius)
+            ->orderBy('distance');
+    }
+
     // Accessors
     public function getLogoAttribute()
     {
@@ -145,6 +157,24 @@ class Store extends BaseModel implements HasMedia
     }
 
     // Methods
+    /**
+     * Boot method to add model events
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Prevent creating multiple main stores
+        static::creating(function ($store) {
+            if ($store->store_type === 'main') {
+                $existingMainStore = static::where('store_type', 'main')->first();
+                if ($existingMainStore) {
+                    throw new \Exception('Only one main store is allowed in single-store architecture.');
+                }
+            }
+        });
+    }
+
     /**
      * Approve the store
      */

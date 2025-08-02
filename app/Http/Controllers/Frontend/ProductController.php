@@ -24,7 +24,7 @@ class ProductController extends Controller
         $location = $request->get('location');
         $sort = $request->get('sort', 'name');
 
-        $categories = ProductCategory::withCount('products')->active()->ordered()->get();
+        $categories = ProductCategory::withCount('products')->active()->ordered()->paginate(12);
         $featuredCategories = ProductCategory::withCount('products')->active()->featured()->ordered()->get();
 
         // Get unique locations from stores
@@ -514,26 +514,25 @@ class ProductController extends Controller
      */
     public function getStores(Request $request)
     {
-        $perPage = $request->get('per_page', 12);
-        $latitude = $request->get('latitude');
-        $longitude = $request->get('longitude');
-        $radius = $request->get('radius', 50);
+        // In single-store architecture, return the main store only
+        $mainStore = Store::with(['country', 'state', 'city'])
+                         ->where('store_type', 'main')
+                         ->approved()
+                         ->active()
+                         ->first();
 
-        $query = Store::with(['provider'])
-                     ->approved()
-                     ->active();
-
-        // Location-based filtering
-        if ($latitude && $longitude) {
-            $query = $query->nearby($latitude, $longitude, $radius);
+        if (!$mainStore) {
+            return response()->json([
+                'status' => false,
+                'data' => null,
+                'message' => 'Main store not found'
+            ], 404);
         }
-
-        $stores = $query->paginate($perPage);
 
         return response()->json([
             'status' => true,
-            'data' => $stores,
-            'message' => 'Stores fetched successfully'
+            'data' => $mainStore,
+            'message' => 'Store fetched successfully'
         ]);
     }
 

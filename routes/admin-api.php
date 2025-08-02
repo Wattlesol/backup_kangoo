@@ -129,6 +129,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // E-commerce Admin API Routes
     Route::prefix('ecommerce')->group(function () {
         // Product Categories
+        Route::get('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'getAllCategories']);
         Route::post('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'store']);
         Route::put('product-categories/{id}', [App\Http\Controllers\ProductCategoryController::class, 'update']);
         Route::delete('product-categories/{id}', [App\Http\Controllers\ProductCategoryController::class, 'destroy']);
@@ -139,12 +140,18 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::put('products/{id}', [App\Http\Controllers\ProductController::class, 'update']);
         Route::delete('products/{id}', [App\Http\Controllers\ProductController::class, 'destroy']);
         Route::post('products/bulk-action', [App\Http\Controllers\ProductController::class, 'bulkAction']);
+        Route::get('product-analytics', [App\Http\Controllers\ProductController::class, 'analytics']);
+        Route::post('product-stock-update', [App\Http\Controllers\ProductController::class, 'updateStock']);
+        Route::post('product-images-upload', [App\Http\Controllers\ProductController::class, 'uploadImages']);
 
         // Stores
         Route::post('stores', [App\Http\Controllers\StoreController::class, 'store']);
         Route::put('stores/{id}', [App\Http\Controllers\StoreController::class, 'update']);
         Route::delete('stores/{id}', [App\Http\Controllers\StoreController::class, 'destroy']);
         Route::post('stores/bulk-action', [App\Http\Controllers\StoreController::class, 'bulkAction']);
+        Route::post('store-action', [App\Http\Controllers\StoreController::class, 'action']);
+        Route::post('store-status-update', [App\Http\Controllers\StoreController::class, 'updateStatus']);
+        Route::post('store-logo-upload', [App\Http\Controllers\StoreController::class, 'uploadLogo']);
 
         // Orders
         Route::post('orders/bulk-action', [App\Http\Controllers\OrderController::class, 'bulkAction']);
@@ -153,8 +160,36 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::delete('orders/{id}', [App\Http\Controllers\OrderController::class, 'destroy']);
 
         // Dynamic Pricing
-        Route::post('dynamic-pricing/bulk-update', [App\Http\Controllers\DynamicPricingController::class, 'bulkUpdate']);
-        Route::post('dynamic-pricing/{id}/update', [App\Http\Controllers\DynamicPricingController::class, 'updatePricing']);
+        Route::get('dynamic-pricing', [App\Http\Controllers\DynamicPricingController::class, 'index_data']);
+        Route::get('dynamic-pricing/analytics', [App\Http\Controllers\DynamicPricingController::class, 'analytics']);
+        Route::post('dynamic-pricing/update', [App\Http\Controllers\DynamicPricingController::class, 'updatePricing']);
+        Route::post('dynamic-pricing/bulk-update', [App\Http\Controllers\DynamicPricingController::class, 'bulkUpdatePricing']);
+        Route::post('dynamic-pricing/price-comparison', [App\Http\Controllers\DynamicPricingController::class, 'priceComparison']);
+        Route::get('dynamic-pricing/{id}', [App\Http\Controllers\DynamicPricingController::class, 'show']);
+
+        // Theme Management
+        Route::get('theme-colors', [App\Http\Controllers\ThemeController::class, 'getThemeColors']);
+        Route::post('theme-colors', [App\Http\Controllers\ThemeController::class, 'updateColors']);
+        Route::get('theme-colors/preview', [App\Http\Controllers\ThemeController::class, 'preview']);
+        Route::post('theme-colors/reset', [App\Http\Controllers\ThemeController::class, 'createDefaults']);
+        Route::get('theme-colors/generate-css', [App\Http\Controllers\ThemeController::class, 'generateCSS']);
+
+        // Product Approval APIs
+        Route::prefix('product-approval')->group(function () {
+            Route::get('pending', [App\Http\Controllers\Admin\ProductApprovalController::class, 'getPendingProducts']);
+            Route::get('rejected', [App\Http\Controllers\Admin\ProductApprovalController::class, 'getRejectedProducts']);
+            Route::post('{id}/approve', [App\Http\Controllers\Admin\ProductApprovalController::class, 'approve']);
+            Route::post('{id}/reject', [App\Http\Controllers\Admin\ProductApprovalController::class, 'reject']);
+            Route::post('{id}/reconsider', [App\Http\Controllers\Admin\ProductApprovalController::class, 'reconsider']);
+            Route::post('bulk-action', [App\Http\Controllers\Admin\ProductApprovalController::class, 'bulkAction']);
+        });
+
+        // Store Configuration APIs
+        Route::get('store-settings', [App\Http\Controllers\StoreConfigurationController::class, 'getStoreSettings']);
+        Route::post('store-settings', [App\Http\Controllers\StoreConfigurationController::class, 'updateStoreSettings']);
+        Route::post('payment-settings', [App\Http\Controllers\StoreConfigurationController::class, 'updatePaymentSettings']);
+        Route::post('shipping-settings', [App\Http\Controllers\StoreConfigurationController::class, 'updateShippingSettings']);
+        Route::post('email-templates', [App\Http\Controllers\StoreConfigurationController::class, 'updateEmailTemplates']);
     });
 
 });

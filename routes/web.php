@@ -690,7 +690,7 @@ Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores
 
 // AJAX endpoints for frontend
 Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
-Route::get('api/stores', [FrontendProductController::class, 'getStores'])->name('api.stores');
+Route::get('api/store', [FrontendProductController::class, 'getStores'])->name('api.store');
 
 // Cart routes (works for both authenticated and guest users)
 Route::prefix('cart')->name('cart.')->group(function () {

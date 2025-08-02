@@ -24,7 +24,7 @@ class ProductCategoryResource extends JsonResource
             'color' => $this->color,
             'sort_order' => $this->sort_order,
             'image' => $this->image,
-            'products_count' => $this->whenCounted('products'),
+            'products_count' => $this->products_count ?? 0,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
