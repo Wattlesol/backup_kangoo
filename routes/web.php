@@ -724,5 +724,12 @@ Route::get('/test-theme', function () {
     return view('test-theme');
 })->name('test.theme');
 
+// Test Dynamic CSS Generation
+Route::get('/test-css', function () {
+    $controller = new \App\Http\Controllers\DynamicCssController();
+    $request = new \Illuminate\Http\Request(['role' => 'customer', 'theme' => 'light']);
+    return $controller->generateThemeCss($request);
+})->name('test.css');
+
 
 

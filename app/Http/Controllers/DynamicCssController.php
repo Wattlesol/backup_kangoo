@@ -11,7 +11,7 @@ class DynamicCssController extends Controller
 {
     /**
      * Generate and serve dynamic theme CSS
-     * 
+     *
      * @param Request $request
      * @return \Illuminate\Http\Response
      */
@@ -39,14 +39,14 @@ class DynamicCssController extends Controller
 
     /**
      * Generate CSS for landing pages
-     * 
+     *
      * @param Request $request
      * @return \Illuminate\Http\Response
      */
     public function generateLandingCss(Request $request)
     {
         $theme = $request->get('theme', 'light');
-        
+
         try {
             $css = Cache::remember("landing_css_{$theme}", 3600, function () use ($theme) {
                 return $this->buildLandingPageCss($theme);
@@ -64,7 +64,7 @@ class DynamicCssController extends Controller
 
     /**
      * Build complete theme CSS
-     * 
+     *
      * @param string $role
      * @param string $theme
      * @return string
@@ -75,7 +75,7 @@ class DynamicCssController extends Controller
         $roleColors = ThemeSetting::getByGroup('role_colors');
 
         $css = "/* Dynamic Theme CSS - Generated at " . now() . " */\n\n";
-        
+
         // Root variables for brand colors
         $css .= ":root {\n";
         $css .= $this->generateBrandColorVariables($brandColors, $theme);
@@ -98,7 +98,7 @@ class DynamicCssController extends Controller
 
     /**
      * Build landing page CSS
-     * 
+     *
      * @param string $theme
      * @return string
      */
@@ -107,7 +107,7 @@ class DynamicCssController extends Controller
         $brandColors = ThemeSetting::getByGroup('brand_colors');
 
         $css = "/* Landing Page Theme CSS - Generated at " . now() . " */\n\n";
-        
+
         $css .= ":root {\n";
         $css .= $this->generateBrandColorVariables($brandColors, $theme);
         $css .= "}\n\n";
@@ -119,7 +119,7 @@ class DynamicCssController extends Controller
 
     /**
      * Generate brand color CSS variables
-     * 
+     *
      * @param \Illuminate\Database\Eloquent\Collection $brandColors
      * @param string $theme
      * @return string
@@ -133,7 +133,7 @@ class DynamicCssController extends Controller
             $color = $colors[$theme] ?? $colors['light'] ?? '#000000';
             $css .= "  --brand-{$colorName}: {$color};\n";
             $css .= "  --brand-{$colorName}-rgb: " . $this->hexToRgb($color) . ";\n";
-            
+
             // Generate lighter and darker variants
             $css .= "  --brand-{$colorName}-light: " . $this->lightenColor($color, 20) . ";\n";
             $css .= "  --brand-{$colorName}-dark: " . $this->darkenColor($color, 20) . ";\n";
@@ -144,7 +144,7 @@ class DynamicCssController extends Controller
 
     /**
      * Generate role color CSS variables
-     * 
+     *
      * @param \Illuminate\Database\Eloquent\Collection $roleColors
      * @param string $role
      * @param string $theme
@@ -159,7 +159,7 @@ class DynamicCssController extends Controller
             $color = $colors[$theme] ?? $colors['light'] ?? '#000000';
             $css .= "  --role-{$roleName}: {$color};\n";
             $css .= "  --role-{$roleName}-rgb: " . $this->hexToRgb($color) . ";\n";
-            
+
             // Set primary role color
             if ($roleName === $role) {
                 $css .= "  --primary-color: {$color};\n";
@@ -174,7 +174,7 @@ class DynamicCssController extends Controller
 
     /**
      * Generate role-specific CSS
-     * 
+     *
      * @param string $role
      * @param string $theme
      * @return string
@@ -209,7 +209,7 @@ class DynamicCssController extends Controller
 
     /**
      * Generate theme-specific overrides
-     * 
+     *
      * @param string $theme
      * @return string
      */
@@ -232,7 +232,7 @@ class DynamicCssController extends Controller
 
     /**
      * Generate component-specific CSS
-     * 
+     *
      * @return string
      */
     private function generateComponentCss()
@@ -254,7 +254,7 @@ class DynamicCssController extends Controller
 
     /**
      * Generate landing page component CSS
-     * 
+     *
      * @param string $theme
      * @return string
      */
@@ -270,58 +270,78 @@ class DynamicCssController extends Controller
                "}\n\n" .
                ".feature-card:hover {\n" .
                "  border-color: var(--brand-blue);\n" .
-               "}\n\n";
+               "}\n\n" .
+               "/* Override hardcoded primary colors */\n" .
+               ".bg-primary {\n" .
+               "  background-color: var(--primary-color) !important;\n" .
+               "}\n\n" .
+               ".text-primary {\n" .
+               "  color: var(--primary-color) !important;\n" .
+               "}\n\n" .
+               ".btn-primary {\n" .
+               "  background-color: var(--primary-color) !important;\n" .
+               "  border-color: var(--primary-color) !important;\n" .
+               "}\n\n" .
+               ".btn-primary:hover {\n" .
+               "  background-color: var(--primary-color-dark) !important;\n" .
+               "  border-color: var(--primary-color-dark) !important;\n" .
+               "}\n\n" .
+               "/* Brand color rotating cards */\n" .
+               ".rotating-card-1 { background-color: var(--brand-yellow) !important; }\n" .
+               ".rotating-card-2 { background-color: var(--brand-red) !important; }\n" .
+               ".rotating-card-3 { background-color: var(--brand-green) !important; }\n" .
+               ".rotating-card-4 { background-color: var(--brand-blue) !important; }\n\n";
     }
 
     /**
      * Format colors for CSS generation
-     * 
+     *
      * @param \Illuminate\Database\Eloquent\Collection $colors
      * @return array
      */
     private function formatColorsForCss($colors)
     {
         $formatted = [];
-        
+
         foreach ($colors as $setting) {
             $parts = explode('_', $setting->setting_key);
             $colorName = $parts[0];
             $theme = $parts[1] ?? 'light';
-            
+
             if (!isset($formatted[$colorName])) {
                 $formatted[$colorName] = [];
             }
-            
+
             $formatted[$colorName][$theme] = $setting->setting_value;
         }
-        
+
         return $formatted;
     }
 
     /**
      * Convert hex color to RGB values
-     * 
+     *
      * @param string $hex
      * @return string
      */
     private function hexToRgb($hex)
     {
         $hex = ltrim($hex, '#');
-        
+
         if (strlen($hex) === 3) {
             $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
         }
-        
+
         $r = hexdec(substr($hex, 0, 2));
         $g = hexdec(substr($hex, 2, 2));
         $b = hexdec(substr($hex, 4, 2));
-        
+
         return "{$r}, {$g}, {$b}";
     }
 
     /**
      * Lighten a hex color
-     * 
+     *
      * @param string $hex
      * @param int $percent
      * @return string
@@ -329,25 +349,25 @@ class DynamicCssController extends Controller
     private function lightenColor($hex, $percent)
     {
         $hex = ltrim($hex, '#');
-        
+
         if (strlen($hex) === 3) {
             $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
         }
-        
+
         $r = hexdec(substr($hex, 0, 2));
         $g = hexdec(substr($hex, 2, 2));
         $b = hexdec(substr($hex, 4, 2));
-        
+
         $r = min(255, $r + ($percent * 255 / 100));
         $g = min(255, $g + ($percent * 255 / 100));
         $b = min(255, $b + ($percent * 255 / 100));
-        
+
         return sprintf('#%02x%02x%02x', $r, $g, $b);
     }
 
     /**
      * Darken a hex color
-     * 
+     *
      * @param string $hex
      * @param int $percent
      * @return string
@@ -355,39 +375,72 @@ class DynamicCssController extends Controller
     private function darkenColor($hex, $percent)
     {
         $hex = ltrim($hex, '#');
-        
+
         if (strlen($hex) === 3) {
             $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
         }
-        
+
         $r = hexdec(substr($hex, 0, 2));
         $g = hexdec(substr($hex, 2, 2));
         $b = hexdec(substr($hex, 4, 2));
-        
+
         $r = max(0, $r - ($percent * 255 / 100));
         $g = max(0, $g - ($percent * 255 / 100));
         $b = max(0, $b - ($percent * 255 / 100));
-        
+
         return sprintf('#%02x%02x%02x', $r, $g, $b);
     }
 
     /**
      * Clear theme CSS cache
-     * 
+     *
      * @return bool
      */
     public static function clearThemeCache()
     {
-        $keys = [
-            'theme_css_*',
-            'landing_css_*',
-            'mobile_theme_colors',
-            'mobile_theme_role_*'
-        ];
+        // Clear specific cache patterns
+        $roles = ['admin', 'provider', 'handyman', 'customer', 'default'];
+        $themes = ['light', 'dark'];
 
-        foreach ($keys as $pattern) {
-            Cache::forget($pattern);
+        // Clear theme CSS cache for all role/theme combinations
+        foreach ($roles as $role) {
+            foreach ($themes as $theme) {
+                $cacheKeys = [
+                    "theme_css_{$role}_{$theme}_latest",
+                    "theme_css_{$role}_{$theme}_*"
+                ];
+
+                foreach ($cacheKeys as $key) {
+                    if (str_contains($key, '*')) {
+                        // For wildcard patterns, we need to clear all versions
+                        for ($i = 1; $i <= 100; $i++) {
+                            Cache::forget(str_replace('*', $i, $key));
+                        }
+                    } else {
+                        Cache::forget($key);
+                    }
+                }
+            }
         }
+
+        // Clear landing page CSS cache
+        foreach ($themes as $theme) {
+            Cache::forget("landing_css_{$theme}");
+        }
+
+        // Clear other theme-related caches
+        Cache::forget('mobile_theme_colors');
+        foreach ($roles as $role) {
+            Cache::forget("mobile_theme_role_{$role}");
+        }
+
+        // Clear theme variables cache
+        foreach ($roles as $role) {
+            Cache::forget("theme_variables_{$role}");
+        }
+
+        // Clear theme version cache to force regeneration
+        Cache::forget('theme_version');
 
         return true;
     }

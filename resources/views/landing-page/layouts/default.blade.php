@@ -1,13 +1,26 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+@php
+    // Determine theme mode from various sources
+    $themeMode = 'light'; // default
+    if (request()->cookie('data-bs-theme')) {
+        $themeMode = request()->cookie('data-bs-theme');
+    } elseif (request()->cookie('theme_mode')) {
+        $themeMode = request()->cookie('theme_mode');
+    } elseif (session('theme_mode')) {
+        $themeMode = session('theme_mode');
+    }
+
+    $userRole = auth()->check() ? auth()->user()->user_type : 'customer';
+@endphp
+<html lang="en" data-bs-theme="{{ $themeMode }}">
 <head>
     @yield('before_head')
-    @include('landing-page.partials._head') 
-      @include('landing-page.partials._currencyscripts') 
+    @include('landing-page.partials._head')
+      @include('landing-page.partials._currencyscripts')
 
     @yield('after_head')
 </head>
-<body class="body-bg">
+<body class="body-bg {{ $themeMode === 'dark' ? 'dark' : '' }} theme-{{ $userRole }} {{ $themeMode }}-theme">
 
 
     <span class="screen-darken"></span>
@@ -37,6 +50,6 @@
     @include('landing-page.partials._scripts')
     @yield('after_script')
 
-   
+
 </body>
 </html>

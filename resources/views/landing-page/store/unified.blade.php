@@ -4,37 +4,159 @@
 
 @section('after_style')
 <style>
-/* Ensure store page uses exact app primary color */
+/* Store Page Dark Mode Support */
+.store-page {
+    /* Light mode colors */
+    --store-bg-color: #f8f9fa;
+    --store-card-bg: #ffffff;
+    --store-text-color: #212529;
+    --store-text-muted: #6c757d;
+    --store-border-color: #dee2e6;
+    --store-input-bg: #f8f9fa;
+    --store-primary-color: #5F60B9;
+    --store-shadow: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode colors */
+[data-bs-theme="dark"] .store-page,
+.dark .store-page {
+    --store-bg-color: #171928;
+    --store-card-bg: #1C1F34;
+    --store-text-color: #ffffff;
+    --store-text-muted: #6c757d;
+    --store-border-color: #303346;
+    --store-input-bg: #2a2d42;
+    --store-primary-color: #8283c9;
+    --store-shadow: rgba(255, 255, 255, 0.05);
+}
+
+/* Apply theme colors */
+.store-page {
+    background-color: var(--store-bg-color) !important;
+    color: var(--store-text-color) !important;
+}
+
+.store-page .bg-white {
+    background-color: var(--store-card-bg) !important;
+    color: var(--store-text-color) !important;
+}
+
 .store-page .text-primary {
-    color: #5F60B9 !important;
+    color: var(--store-primary-color) !important;
 }
+
 .store-page .btn-primary {
-    background-color: #5F60B9 !important;
-    border-color: #5F60B9 !important;
+    background-color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+    color: #ffffff !important;
 }
+
 .store-page .btn-outline-primary {
-    color: #5F60B9 !important;
-    border-color: #5F60B9 !important;
+    color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+    background-color: transparent !important;
 }
+
 .store-page .btn-outline-primary:hover {
-    background-color: #5F60B9 !important;
-    border-color: #5F60B9 !important;
+    background-color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+    color: #ffffff !important;
 }
+
 .store-page .bg-primary {
-    background-color: #5F60B9 !important;
+    background-color: var(--store-primary-color) !important;
 }
+
 .store-page .spinner-border.text-primary {
-    color: #5F60B9 !important;
+    color: var(--store-primary-color) !important;
 }
+
 .store-page .form-check-input:checked {
-    background-color: #5F60B9 !important;
-    border-color: #5F60B9 !important;
+    background-color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+}
+
+.store-page .text-muted {
+    color: var(--store-text-muted) !important;
+}
+
+.store-page .border,
+.store-page .border-bottom {
+    border-color: var(--store-border-color) !important;
+}
+
+.store-page .form-control,
+.store-page .form-select {
+    background-color: var(--store-input-bg) !important;
+    border-color: var(--store-border-color) !important;
+    color: var(--store-text-color) !important;
+}
+
+.store-page .form-control:focus,
+.store-page .form-select:focus {
+    background-color: var(--store-input-bg) !important;
+    border-color: var(--store-primary-color) !important;
+    color: var(--store-text-color) !important;
+    box-shadow: 0 0 0 0.2rem rgba(95, 96, 185, 0.25) !important;
+}
+
+.store-page .shadow-sm {
+    box-shadow: 0 0.125rem 0.25rem var(--store-shadow) !important;
+}
+
+/* Fixed sidebar positioning */
+.store-sidebar {
+    position: sticky;
+    top: 120px; /* Account for navbar height + some padding */
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    z-index: 10;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991.98px) {
+    .store-sidebar {
+        position: static;
+        top: auto;
+        max-height: none;
+        margin-bottom: 2rem;
+    }
+}
+
+/* Ensure proper text contrast in dark mode */
+[data-bs-theme="dark"] .store-page h1,
+[data-bs-theme="dark"] .store-page h2,
+[data-bs-theme="dark"] .store-page h3,
+[data-bs-theme="dark"] .store-page h4,
+[data-bs-theme="dark"] .store-page h5,
+[data-bs-theme="dark"] .store-page h6,
+.dark .store-page h1,
+.dark .store-page h2,
+.dark .store-page h3,
+.dark .store-page h4,
+.dark .store-page h5,
+.dark .store-page h6 {
+    color: var(--store-text-color) !important;
+}
+
+/* Form labels in dark mode */
+[data-bs-theme="dark"] .store-page .form-label,
+.dark .store-page .form-label {
+    color: var(--store-primary-color) !important;
+}
+
+/* Card styling for dark mode */
+[data-bs-theme="dark"] .store-page .card,
+.dark .store-page .card {
+    background-color: var(--store-card-bg) !important;
+    border-color: var(--store-border-color) !important;
+    color: var(--store-text-color) !important;
 }
 </style>
 @endsection
 
 @section('content')
-<div class="store-page py-5" style="background-color: #f8f9fa;">
+<div class="store-page py-5">
     <div class="container-fluid">
         <!-- Page Header -->
         <div class="row mb-5">
@@ -56,7 +178,7 @@
         <div class="row g-4">
             <!-- Filter Sidebar -->
             <div class="col-lg-3">
-                <div class="bg-white rounded-3 shadow-sm border-0 sticky-top" style="top: 20px;">
+                <div class="bg-white rounded-3 shadow-sm border-0 store-sidebar">
                     <div class="p-4 border-bottom">
                         <h6 class="fw-bold text-primary mb-0">{{__('landingpage.filters')}}</h6>
                     </div>
@@ -256,7 +378,7 @@ $(document).ready(function() {
 
     function loadProducts() {
         if (isLoading) return;
-        
+
         isLoading = true;
         showLoading();
 
@@ -277,7 +399,7 @@ $(document).ready(function() {
             .done(function(response) {
                 isLoading = false;
                 hideLoading();
-                
+
                 if (response.status && response.data && response.data.data.length > 0) {
                     currentProducts = response.data.data;
                     renderCurrentProducts();
@@ -388,7 +510,7 @@ $(document).ready(function() {
 
         if (data.last_page > 1) {
             let pagination = '<nav><ul class="pagination justify-content-center">';
-            
+
             // Previous
             if (data.current_page > 1) {
                 pagination += `<li class="page-item"><a class="page-link" href="#" data-page="${data.current_page - 1}">{{__('landingpage.previous')}}</a></li>`;

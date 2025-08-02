@@ -27,25 +27,25 @@ class ThemeInjectionMiddleware
         // Get user role for theme application
         $userRole = $this->getUserRole($request);
         $isDarkMode = $this->isDarkMode($request);
-        
+
         // Inject theme variables into all views
         $this->injectThemeVariables($userRole, $isDarkMode);
-        
+
         $response = $next($request);
-        
+
         // Inject theme CSS into HTML responses
         if ($this->shouldInjectCss($response)) {
             $content = $response->getContent();
             $content = $this->injectThemeCss($content, $userRole, $isDarkMode);
             $response->setContent($content);
         }
-        
+
         return $response;
     }
 
     /**
      * Get user role from authenticated user or session
-     * 
+     *
      * @param Request $request
      * @return string
      */
@@ -67,13 +67,13 @@ class ThemeInjectionMiddleware
 
     /**
      * Check if dark mode is enabled
-     * 
+     *
      * @param Request $request
      * @return bool
      */
     private function isDarkMode(Request $request)
     {
-        // Check user preference
+        // Check user preference first
         if (auth()->check() && auth()->user()->theme_preference) {
             return auth()->user()->theme_preference === 'dark';
         }
@@ -83,17 +83,23 @@ class ThemeInjectionMiddleware
             return $request->session()->get('theme_mode') === 'dark';
         }
 
-        // Check cookie
+        // Check cookie (this is where localStorage data should be synced)
         if ($request->cookie('theme_mode')) {
             return $request->cookie('theme_mode') === 'dark';
         }
 
+        // Check for Bootstrap theme cookie (data-bs-theme)
+        if ($request->cookie('data-bs-theme')) {
+            return $request->cookie('data-bs-theme') === 'dark';
+        }
+
+        // Default to light mode
         return false;
     }
 
     /**
      * Inject theme variables into views
-     * 
+     *
      * @param string $userRole
      * @param bool $isDarkMode
      * @return void
@@ -119,7 +125,7 @@ class ThemeInjectionMiddleware
 
     /**
      * Build theme variables for views
-     * 
+     *
      * @param string $userRole
      * @return array
      */
@@ -142,32 +148,32 @@ class ThemeInjectionMiddleware
 
     /**
      * Format colors for view usage
-     * 
+     *
      * @param \Illuminate\Database\Eloquent\Collection $colors
      * @return array
      */
     private function formatColorsForView($colors)
     {
         $formatted = [];
-        
+
         foreach ($colors as $setting) {
             $parts = explode('_', $setting->setting_key);
             $colorName = $parts[0];
             $theme = $parts[1] ?? 'light';
-            
+
             if (!isset($formatted[$colorName])) {
                 $formatted[$colorName] = ['light' => '#000000', 'dark' => '#000000'];
             }
-            
+
             $formatted[$colorName][$theme] = $setting->setting_value;
         }
-        
+
         return $formatted;
     }
 
     /**
      * Generate CSS variables string
-     * 
+     *
      * @param array $brandColors
      * @param array $roleColors
      * @param string $userRole
@@ -200,7 +206,7 @@ class ThemeInjectionMiddleware
 
     /**
      * Check if CSS should be injected into response
-     * 
+     *
      * @param \Illuminate\Http\Response $response
      * @return bool
      */
@@ -212,7 +218,7 @@ class ThemeInjectionMiddleware
 
     /**
      * Inject theme CSS into HTML content
-     * 
+     *
      * @param string $content
      * @param string $userRole
      * @param bool $isDarkMode
@@ -222,7 +228,7 @@ class ThemeInjectionMiddleware
     {
         $themeMode = $isDarkMode ? 'dark' : 'light';
         $version = $this->getThemeVersion();
-        
+
         // Generate CSS URLs
         $themeCssUrl = route('dynamic.theme.css', [
             'role' => $userRole,
@@ -271,7 +277,7 @@ class ThemeInjectionMiddleware
 
     /**
      * Get theme version for cache busting
-     * 
+     *
      * @return string
      */
     private function getThemeVersion()
@@ -284,7 +290,7 @@ class ThemeInjectionMiddleware
 
     /**
      * Get theme CSS URL
-     * 
+     *
      * @param string $userRole
      * @param string $themeMode
      * @return string

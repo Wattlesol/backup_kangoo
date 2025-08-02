@@ -7,7 +7,34 @@
 <link rel="stylesheet" href="{{ asset('css/landing-page.min.css') }}">
 <link rel="stylesheet" href="{{ asset('css/landing-page-rtl.min.css') }}">
 <link rel="stylesheet" href="{{ asset('css/landing-page-custom.min.css') }}">
+<link rel="stylesheet" href="{{ asset('css/store-dark-mode.css?v=' . time()) }}">
 <link rel="stylesheet" href="{{ asset('vendor/@fortawesome/fontawesome-free/css/all.min.css')}}">
+
+<!-- Dynamic Theme CSS Integration -->
+@php
+    $userRole = auth()->check() ? auth()->user()->user_type : 'customer';
+    // Check for theme mode from various sources
+    $themeMode = 'light'; // default
+    if (request()->cookie('data-bs-theme')) {
+        $themeMode = request()->cookie('data-bs-theme');
+    } elseif (request()->cookie('theme_mode')) {
+        $themeMode = request()->cookie('theme_mode');
+    } elseif (session('theme_mode')) {
+        $themeMode = session('theme_mode');
+    }
+@endphp
+<link rel="stylesheet" href="{{ route('dynamic.theme.css', ['role' => $userRole, 'theme' => $themeMode]) }}?v={{ time() }}" id="dynamic-theme-css">
+<link rel="stylesheet" href="{{ route('dynamic.landing.css', ['theme' => $themeMode]) }}?v={{ time() }}" id="dynamic-landing-css">
+
+<!-- Theme Configuration Script -->
+<script>
+window.themeConfig = {
+    role: '{{ $userRole }}',
+    mode: '{{ $themeMode }}',
+    version: '{{ time() }}'
+};
+</script>
+
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
 <meta name="assert_url" content="{{ URL::to('') }}" />

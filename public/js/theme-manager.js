@@ -7,9 +7,13 @@ class ThemeManager {
     constructor() {
         this.config = window.themeConfig || {};
         this.currentRole = this.config.role || 'customer';
-        this.currentMode = this.config.mode || 'light';
+
+        // Initialize theme mode from localStorage first, then fallback to config
+        const savedTheme = localStorage.getItem('data-bs-theme');
+        this.currentMode = savedTheme || this.config.mode || 'light';
+
         this.version = this.config.version || 'latest';
-        
+
         this.init();
     }
 
@@ -17,12 +21,26 @@ class ThemeManager {
      * Initialize theme manager
      */
     init() {
+        // Apply initial theme state
+        document.documentElement.setAttribute('data-bs-theme', this.currentMode);
+        document.body.classList.toggle('dark', this.currentMode === 'dark');
+
         this.loadThemeCSS();
         this.setupEventListeners();
         this.applyThemeClasses();
-        
+
+        // Sync with cookies
+        this.setCookie('data-bs-theme', this.currentMode, 365);
+        this.setCookie('theme_mode', this.currentMode, 365);
+
         // Check for theme updates periodically (every 5 minutes)
         setInterval(() => this.checkForUpdates(), 300000);
+
+        console.log('🎨 Theme Manager initialized:', {
+            role: this.currentRole,
+            mode: this.currentMode,
+            version: this.version
+        });
     }
 
     /**
@@ -30,7 +48,7 @@ class ThemeManager {
      */
     loadThemeCSS() {
         const existingLink = document.getElementById('dynamic-theme-css');
-        
+
         if (existingLink) {
             // Update existing link
             const newUrl = this.buildCssUrl();
@@ -51,13 +69,14 @@ class ThemeManager {
      * Build CSS URL with current parameters
      */
     buildCssUrl() {
-        const baseUrl = '/css/theme-colors.css';
+        // Use the correct dynamic theme CSS route
+        const baseUrl = '/css/dynamic-theme';
         const params = new URLSearchParams({
             role: this.currentRole,
             theme: this.currentMode,
             v: this.version
         });
-        
+
         return `${baseUrl}?${params.toString()}`;
     }
 
@@ -71,12 +90,25 @@ class ThemeManager {
         }
 
         this.currentMode = mode;
+
+        // Update HTML data attribute
+        document.documentElement.setAttribute('data-bs-theme', mode);
+
+        // Update body class for compatibility
+        document.body.classList.toggle('dark', mode === 'dark');
+
+        // Save to localStorage and cookie
+        localStorage.setItem('data-bs-theme', mode);
+        this.setCookie('data-bs-theme', mode, 365);
+        this.setCookie('theme_mode', mode, 365);
+
         this.loadThemeCSS();
         this.applyThemeClasses();
-        this.saveThemePreference();
-        
+
         // Trigger custom event
         this.dispatchThemeEvent('theme-mode-changed', { mode });
+
+        console.log('🎨 Theme switched to:', mode);
     }
 
     /**
@@ -84,7 +116,7 @@ class ThemeManager {
      */
     switchRoleTheme(role) {
         const validRoles = ['admin', 'provider', 'handyman', 'customer'];
-        
+
         if (!validRoles.includes(role)) {
             console.warn('Invalid role:', role);
             return;
@@ -93,7 +125,7 @@ class ThemeManager {
         this.currentRole = role;
         this.loadThemeCSS();
         this.applyThemeClasses();
-        
+
         // Trigger custom event
         this.dispatchThemeEvent('theme-role-changed', { role });
     }
@@ -103,11 +135,11 @@ class ThemeManager {
      */
     applyThemeClasses() {
         const body = document.body;
-        
+
         // Remove existing theme classes
         body.classList.remove('light-theme', 'dark-theme');
         body.classList.remove('theme-admin', 'theme-provider', 'theme-handyman', 'theme-customer');
-        
+
         // Add current theme classes
         body.classList.add(`${this.currentMode}-theme`);
         body.classList.add(`theme-${this.currentRole}`);
@@ -123,7 +155,7 @@ class ThemeManager {
                 const mode = e.target.dataset.themeToggle;
                 this.switchThemeMode(mode);
             }
-            
+
             if (e.target.matches('[data-role-toggle]')) {
                 const role = e.target.dataset.roleToggle;
                 this.switchRoleTheme(role);
@@ -153,12 +185,12 @@ class ThemeManager {
             });
 
             const data = await response.json();
-            
+
             if (data.success && data.has_update) {
                 this.version = data.current_version;
-                this.dispatchThemeEvent('theme-update-available', { 
+                this.dispatchThemeEvent('theme-update-available', {
                     oldVersion: data.client_version,
-                    newVersion: data.current_version 
+                    newVersion: data.current_version
                 });
             }
         } catch (error) {
@@ -172,7 +204,7 @@ class ThemeManager {
     handleThemeUpdate() {
         // Reload theme CSS with new version
         this.loadThemeCSS();
-        
+
         // Show notification (optional)
         this.showUpdateNotification();
     }
@@ -191,10 +223,10 @@ class ThemeManager {
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `;
-        
+
         // Insert at top of page
         document.body.insertBefore(notification, document.body.firstChild);
-        
+
         // Auto-remove after 5 seconds
         setTimeout(() => {
             notification.remove();
@@ -208,7 +240,7 @@ class ThemeManager {
         // Save to localStorage
         localStorage.setItem('theme_mode', this.currentMode);
         localStorage.setItem('theme_role', this.currentRole);
-        
+
         // Save to server (if user is authenticated)
         if (window.Laravel && window.Laravel.user) {
             this.saveThemeToServer();
@@ -248,7 +280,7 @@ class ThemeManager {
                 version: this.version
             }
         });
-        
+
         document.dispatchEvent(event);
     }
 
@@ -268,7 +300,7 @@ class ThemeManager {
      */
     applyCSSVariables(variables) {
         const root = document.documentElement;
-        
+
         Object.entries(variables).forEach(([property, value]) => {
             root.style.setProperty(property, value);
         });
@@ -281,15 +313,24 @@ class ThemeManager {
         try {
             const response = await fetch(`/api/v1/theme/colors/${this.currentRole}`);
             const data = await response.json();
-            
+
             if (data.success) {
                 return data.data;
             }
         } catch (error) {
             console.warn('Failed to fetch theme colors:', error);
         }
-        
+
         return null;
+    }
+
+    /**
+     * Set cookie helper method
+     */
+    setCookie(name, value, days) {
+        const expires = new Date();
+        expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
     }
 }
 
