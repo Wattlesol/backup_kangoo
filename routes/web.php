@@ -88,8 +88,9 @@ Route::group(['prefix' => 'auth'], function() {
 Route::get('lang/{locale}', [HomeController::class,'lang'])->name('switch-language');
 Route::get('/verify/{id}', [VerificationController::class, 'verify'])->name('verify');
 
-// Dynamic CSS for theme colors (public route)
-Route::get('css/theme-colors.css', [\App\Http\Controllers\ThemeController::class, 'generateCSS'])->name('theme.css');
+// Dynamic CSS for theme colors (public routes)
+Route::get('css/theme-colors.css', [\App\Http\Controllers\DynamicCssController::class, 'generateThemeCss'])->name('theme.css');
+Route::get('css/landing-theme.css', [\App\Http\Controllers\DynamicCssController::class, 'generateLandingCss'])->name('landing.theme.css');
 
 Route::group(['middleware' => ['auth', 'verified']], function()
 {
@@ -301,9 +302,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('theme-colors/create-defaults', [\App\Http\Controllers\ThemeController::class, 'createDefaults'])->name('theme.create-defaults');
         Route::post('theme-colors/reset-defaults', [\App\Http\Controllers\ThemeController::class, 'resetToDefaults'])->name('theme.reset-colors');
 
-        // Dynamic CSS Routes for theme system
-        Route::get('css/theme-colors.css', [\App\Http\Controllers\DynamicCssController::class, 'generateThemeCss'])->name('dynamic.theme.css');
-        Route::get('css/landing-theme.css', [\App\Http\Controllers\DynamicCssController::class, 'generateLandingCss'])->name('dynamic.landing.css');
+
 
         Route::post('/header-page-settings', [FrontendSettingController::class, 'headingpagesettings'])->name('heading_page_settings');
         Route::post('/footer-page-settings', [FrontendSettingController::class, 'footerpagesettings'])->name('footer_page_settings');

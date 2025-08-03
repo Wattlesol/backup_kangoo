@@ -230,7 +230,7 @@ class ThemeInjectionMiddleware
         $version = $this->getThemeVersion();
 
         // Generate CSS URLs
-        $themeCssUrl = route('dynamic.theme.css', [
+        $themeCssUrl = route('theme.css', [
             'role' => $userRole,
             'theme' => $themeMode,
             'v' => $version
@@ -297,7 +297,7 @@ class ThemeInjectionMiddleware
      */
     private function getThemeCssUrl($userRole, $themeMode)
     {
-        return route('dynamic.theme.css', [
+        return route('theme.css', [
             'role' => $userRole,
             'theme' => $themeMode,
             'v' => $this->getThemeVersion()

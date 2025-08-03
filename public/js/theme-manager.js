@@ -70,7 +70,7 @@ class ThemeManager {
      */
     buildCssUrl() {
         // Use the correct dynamic theme CSS route
-        const baseUrl = '/css/dynamic-theme';
+        const baseUrl = '/css/theme-colors.css';
         const params = new URLSearchParams({
             role: this.currentRole,
             theme: this.currentMode,
