@@ -304,4 +304,254 @@ class OrderController extends Controller
 
         return comman_custom_response(['message'=> trans('messages.invalid_action') , 'status' => false]);
     }
+
+    /**
+     * Get orders for API (JSON format)
+     */
+    public function getOrdersAPI(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $status = $request->get('status');
+            $paymentStatus = $request->get('payment_status');
+            $storeId = $request->get('store_id');
+            $search = $request->get('search');
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+
+            $query = Order::with(['customer', 'store', 'items.product']);
+
+            // Apply filters
+            if ($status) {
+                $query->where('status', $status);
+            }
+
+            if ($paymentStatus) {
+                $query->where('payment_status', $paymentStatus);
+            }
+
+            if ($storeId) {
+                $query->where('store_id', $storeId);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('order_number', 'like', "%{$search}%")
+                      ->orWhereHas('customer', function($customerQuery) use ($search) {
+                          $customerQuery->where('first_name', 'like', "%{$search}%")
+                                       ->orWhere('last_name', 'like', "%{$search}%")
+                                       ->orWhere('email', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            // Apply sorting
+            $query->orderBy($sortBy, $sortOrder);
+
+            $orders = $query->paginate($perPage);
+
+            // Transform data for API response
+            $transformedOrders = $orders->getCollection()->map(function($order) {
+                return [
+                    'id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer' => $order->customer ? [
+                        'id' => $order->customer->id,
+                        'name' => $order->customer->display_name,
+                        'email' => $order->customer->email
+                    ] : null,
+                    'store' => $order->store ? [
+                        'id' => $order->store->id,
+                        'name' => $order->store->name
+                    ] : null,
+                    'status' => $order->status,
+                    'payment_status' => $order->payment_status,
+                    'payment_method' => $order->payment_method,
+                    'subtotal' => $order->subtotal,
+                    'tax_amount' => $order->tax_amount,
+                    'delivery_fee' => $order->delivery_fee,
+                    'discount_amount' => $order->discount_amount,
+                    'total_amount' => $order->total_amount,
+                    'currency' => $order->currency ?? 'USD',
+                    'items_count' => $order->items->count(),
+                    'delivery_address' => $this->formatDeliveryAddress($order->delivery_address),
+                    'delivery_phone' => $order->delivery_phone,
+                    'created_at' => $order->created_at,
+                    'updated_at' => $order->updated_at
+                ];
+            });
+
+            $response = [
+                'data' => $transformedOrders,
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+                'from' => $orders->firstItem(),
+                'to' => $orders->lastItem()
+            ];
+
+            return comman_custom_response([
+                'message' => 'Orders retrieved successfully',
+                'data' => $response,
+                'status' => true
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get orders API error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            return comman_message_response('Failed to retrieve orders: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get single order for API (JSON format)
+     */
+    public function getOrderAPI($id)
+    {
+        try {
+            $order = Order::with([
+                'customer',
+                'store.provider',
+                'items.product',
+                'items.productVariant',
+                'statusHistories.changedBy'
+            ])->findOrFail($id);
+
+            $orderData = [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'customer' => $order->customer ? [
+                    'id' => $order->customer->id,
+                    'name' => $order->customer->display_name,
+                    'email' => $order->customer->email,
+                    'phone' => $order->customer->mobile
+                ] : null,
+                'store' => $order->store ? [
+                    'id' => $order->store->id,
+                    'name' => $order->store->name,
+                    'provider' => $order->store->provider ? [
+                        'id' => $order->store->provider->id,
+                        'name' => $order->store->provider->display_name,
+                        'email' => $order->store->provider->email
+                    ] : null
+                ] : null,
+                'status' => $order->status,
+                'payment_status' => $order->payment_status,
+                'payment_method' => $order->payment_method,
+                'payment_transaction_id' => $order->payment_transaction_id,
+                'subtotal' => $order->subtotal,
+                'tax_amount' => $order->tax_amount,
+                'delivery_fee' => $order->delivery_fee,
+                'discount_amount' => $order->discount_amount,
+                'total_amount' => $order->total_amount,
+                'currency' => $order->currency ?? 'USD',
+                'delivery_address' => $this->formatDeliveryAddress($order->delivery_address),
+                'delivery_phone' => $order->delivery_phone,
+                'delivery_notes' => $order->delivery_notes,
+                'items' => $order->items->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'product' => $item->product ? [
+                            'id' => $item->product->id,
+                            'name' => $item->product->name,
+                            'sku' => $item->product->sku,
+                            'image' => $item->product->featured_image
+                        ] : [
+                            'name' => $item->product_name
+                        ],
+                        'quantity' => $item->quantity,
+                        'unit_price' => $item->unit_price,
+                        'total_price' => $item->total_price
+                    ];
+                }),
+                'status_history' => $order->statusHistories->map(function($history) {
+                    return [
+                        'status' => $history->status,
+                        'notes' => $history->notes,
+                        'changed_by' => $history->changedBy ? $history->changedBy->display_name : 'System',
+                        'created_at' => $history->created_at
+                    ];
+                }),
+                'created_at' => $order->created_at,
+                'updated_at' => $order->updated_at
+            ];
+
+            return comman_custom_response([
+                'message' => 'Order details retrieved successfully',
+                'data' => $orderData,
+                'status' => true
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get order API error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'order_id' => $id
+            ]);
+
+            return comman_message_response('Failed to retrieve order: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Format delivery address to ensure consistent JSON object format
+     */
+    private function formatDeliveryAddress($deliveryAddress)
+    {
+        if (is_null($deliveryAddress)) {
+            return null;
+        }
+
+        // If it's already an array (properly cast), check for double-encoded data
+        if (is_array($deliveryAddress)) {
+            // Check if it's a migrated format with double-encoded JSON
+            if (isset($deliveryAddress['address']) && isset($deliveryAddress['note']) &&
+                $deliveryAddress['note'] === 'Migrated from legacy format') {
+
+                // Try to decode the double-encoded JSON
+                $doubleDecoded = json_decode($deliveryAddress['address'], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($doubleDecoded)) {
+                    return $doubleDecoded;
+                }
+            }
+            return $deliveryAddress;
+        }
+
+        // If it's a JSON string, decode it
+        if (is_string($deliveryAddress)) {
+            $decoded = json_decode($deliveryAddress, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                // Check if the decoded result contains double-encoded JSON
+                if (isset($decoded['address']) && is_string($decoded['address'])) {
+                    $doubleDecoded = json_decode($decoded['address'], true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($doubleDecoded)) {
+                        return $doubleDecoded;
+                    }
+                }
+                return $decoded;
+            }
+
+            // If JSON decode failed, treat as plain text address
+            return [
+                'address' => $deliveryAddress,
+                'note' => 'Legacy address format'
+            ];
+        }
+
+        // If it's an object, convert to array
+        if (is_object($deliveryAddress)) {
+            return (array) $deliveryAddress;
+        }
+
+        // Fallback for any other type
+        return [
+            'address' => (string) $deliveryAddress,
+            'note' => 'Unknown address format'
+        ];
+    }
 }

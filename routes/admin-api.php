@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('admin-dashboard',[ API\DashboardController::class, 'adminDashboard' ]);
+    Route::get('store-analytics', [App\Http\Controllers\StoreAnalyticsController::class, 'getStoreAnalytics']);
     Route::post('category-save', [ App\Http\Controllers\CategoryController::class, 'store' ] );
     Route::post('category-delete/{id}', [ App\Http\Controllers\CategoryController::class, 'destroy' ] );
     Route::post('category-action',[ App\Http\Controllers\CategoryController::class, 'action' ]);
@@ -154,6 +155,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('store-logo-upload', [App\Http\Controllers\StoreController::class, 'uploadLogo']);
 
         // Orders
+        Route::get('orders', [App\Http\Controllers\OrderController::class, 'getOrdersAPI']);
+        Route::get('orders/{id}', [App\Http\Controllers\OrderController::class, 'getOrderAPI']);
         Route::post('orders/bulk-action', [App\Http\Controllers\OrderController::class, 'bulkAction']);
         Route::post('orders/{id}/update-status', [App\Http\Controllers\OrderController::class, 'updateStatus']);
         Route::post('orders/{id}/update-payment-status', [App\Http\Controllers\OrderController::class, 'updatePaymentStatus']);

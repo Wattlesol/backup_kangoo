@@ -272,8 +272,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
         // Orders (Admin can manage all, Provider can manage own)
         Route::group(['middleware' => ['permission:order list']], function () {
-            Route::get('orders', [App\Http\Controllers\OrderController::class, 'index_data']);
-            Route::get('orders/{id}', [App\Http\Controllers\OrderController::class, 'show']);
+            Route::get('orders', [App\Http\Controllers\OrderController::class, 'getOrdersAPI']);
+            Route::get('orders/{id}', [App\Http\Controllers\OrderController::class, 'getOrderAPI']);
             Route::put('orders/{id}/status', [App\Http\Controllers\OrderController::class, 'updateStatus'])->middleware('permission:order status update');
             Route::put('orders/{id}/payment-status', [App\Http\Controllers\OrderController::class, 'updatePaymentStatus'])->middleware('permission:order edit');
         });
