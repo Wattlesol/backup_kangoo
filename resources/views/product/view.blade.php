@@ -11,7 +11,7 @@
                                     <i class="fa fa-angle-double-left"></i> {{ trans('messages.back') }}
                                 </a>
                                 @if(auth()->user()->can('product edit'))
-                                    <a href="{{ route('product.create', ['id' => $product->id]) }}" class="btn btn-sm btn-primary">
+                                    <a href="{{ route('product.edit', $product->id) }}" class="btn btn-sm btn-primary">
                                         <i class="fas fa-edit"></i> {{ trans('messages.edit') }}
                                     </a>
                                 @endif

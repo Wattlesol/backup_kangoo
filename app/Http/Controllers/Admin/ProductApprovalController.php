@@ -329,7 +329,7 @@ class ProductApprovalController extends Controller
                 ]);
             }
 
-            return redirect()->route('admin.product-approval.pending')
+            return redirect()->route('product-approval.pending')
                            ->with('success', $message);
 
         } catch (\Exception $e) {
@@ -432,7 +432,7 @@ class ProductApprovalController extends Controller
                 ]);
             }
 
-            return redirect()->route('admin.product-approval.pending')
+            return redirect()->route('product-approval.pending')
                            ->with('success', $message);
 
         } catch (\Exception $e) {
@@ -504,7 +504,7 @@ class ProductApprovalController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
-            
+
             return response()->json([
                 'status' => false,
                 'message' => 'Failed to revoke approval. Please try again.'
@@ -546,7 +546,7 @@ class ProductApprovalController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
-            
+
             return response()->json([
                 'status' => false,
                 'message' => 'Failed to reconsider product. Please try again.'

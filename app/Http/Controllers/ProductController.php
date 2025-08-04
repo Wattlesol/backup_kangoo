@@ -154,16 +154,9 @@ class ProductController extends Controller
      */
     public function create(Request $request)
     {
-        $id = $request->id;
         $auth_user = authSession();
-
-        $productdata = Product::with(['category', 'variants'])->find($id);
-        $pageTitle = trans('messages.update_form_title',['form'=>trans('messages.product')]);
-
-        if($productdata == null){
-            $pageTitle = trans('messages.add_form_title',['form' => trans('messages.product')]);
-            $productdata = new Product;
-        }
+        $pageTitle = trans('messages.add_form_title',['form' => trans('messages.product')]);
+        $productdata = new Product;
 
         $categories = ProductCategory::active()->pluck('name', 'id');
         $providers = User::where('user_type', 'provider')->get();
@@ -231,15 +224,9 @@ class ProductController extends Controller
             $data['approved_by'] = auth()->id();
         }
 
-        // Create or update product
-        if (isset($data['id']) && $data['id']) {
-            // Update existing product
-            $result = Product::updateOrCreate(['id' => $data['id']], $data);
-        } else {
-            // Create new product
-            unset($data['id']); // Remove id if it exists but is null/empty
-            $result = Product::create($data);
-        }
+        // Create new product
+        unset($data['id']); // Remove id if it exists but is null/empty
+        $result = Product::create($data);
 
         // Handle variants if provided
         if (isset($data['variants']) && is_array($data['variants'])) {
@@ -258,10 +245,7 @@ class ProductController extends Controller
             }
         }
 
-        $message = trans('messages.update_form',['form' => trans('messages.product')]);
-        if($result->wasRecentlyCreated){
-            $message = trans('messages.save_form',['form' => trans('messages.product')]);
-        }
+        $message = trans('messages.save_form',['form' => trans('messages.product')]);
 
         if($request->is('api/*')) {
             return comman_message_response($message);

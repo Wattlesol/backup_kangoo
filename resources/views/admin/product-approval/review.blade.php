@@ -9,7 +9,7 @@
                         <div>
                             <h4 class="mb-1">Review Product: {{ $product->name ?? 'Product' }}</h4>
                             <p class="text-muted mb-0">
-                                Submitted by: 
+                                Submitted by:
                                 @if($product->provider)
                                     <strong>{{ $product->provider->display_name }}</strong>
                                 @else
@@ -45,18 +45,18 @@
                             @if($product->featured_image)
                             <div class="col-md-6 mb-3">
                                 <div class="border rounded p-2">
-                                    <img src="{{ $product->featured_image }}" alt="Featured Image" 
+                                    <img src="{{ $product->featured_image }}" alt="Featured Image"
                                          class="img-fluid rounded" style="max-height: 200px; width: 100%; object-fit: cover;">
                                     <small class="text-muted d-block mt-1">Featured Image</small>
                                 </div>
                             </div>
                             @endif
-                            
+
                             @if($product->gallery_images)
                                 @foreach(json_decode($product->gallery_images, true) ?? [] as $image)
                                 <div class="col-md-6 mb-3">
                                     <div class="border rounded p-2">
-                                        <img src="{{ $image }}" alt="Gallery Image" 
+                                        <img src="{{ $image }}" alt="Gallery Image"
                                              class="img-fluid rounded" style="max-height: 200px; width: 100%; object-fit: cover;">
                                         <small class="text-muted d-block mt-1">Gallery Image</small>
                                     </div>
@@ -176,7 +176,7 @@
                         @csrf
                         <div class="form-group">
                             <label for="rejection_reason">Rejection Reason</label>
-                            <textarea class="form-control" id="rejection_reason" name="rejection_reason" 
+                            <textarea class="form-control" id="rejection_reason" name="rejection_reason"
                                       rows="4" required placeholder="Please provide a detailed reason for rejection..."></textarea>
                         </div>
                         <button type="submit" class="btn btn-danger btn-block btn-lg">
@@ -187,7 +187,7 @@
                     <div class="alert alert-info">
                         <h6>Product Already Reviewed</h6>
                         <p class="mb-0">
-                            This product has been 
+                            This product has been
                             @if($product->approval_status === 'approved')
                                 <strong class="text-success">approved</strong>
                             @else
@@ -195,7 +195,7 @@
                             @endif
                             on {{ $product->approved_at ? $product->approved_at->format('M d, Y') : 'N/A' }}.
                         </p>
-                        
+
                         @if($product->approval_status === 'rejected' && $product->rejection_reason)
                         <hr>
                         <small><strong>Rejection Reason:</strong></small>
@@ -215,10 +215,10 @@
                 <div class="card-body">
                     <div class="text-center mb-3">
                         @if($product->provider->profile_image)
-                            <img src="{{ $product->provider->profile_image }}" alt="Provider" 
+                            <img src="{{ $product->provider->profile_image }}" alt="Provider"
                                  class="rounded-circle" style="width: 60px; height: 60px; object-fit: cover;">
                         @else
-                            <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
+                            <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white"
                                  style="width: 60px; height: 60px;">
                                 <i class="fas fa-user fa-lg"></i>
                             </div>
@@ -242,7 +242,7 @@
                             <td>{{ $product->provider->created_at->format('M Y') }}</td>
                         </tr>
                     </table>
-                    <a href="{{ route('provider.view', $product->provider->id) }}" class="btn btn-sm btn-outline-primary btn-block">
+                    <a href="{{ route('provider.show', $product->provider->id) }}" class="btn btn-sm btn-outline-primary btn-block">
                         View Provider Profile
                     </a>
                 </div>

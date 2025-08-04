@@ -40,7 +40,15 @@ class Product extends BaseModel implements HasMedia
         'is_available',
         'provider_notes',
         'meta_data',
-        'sort_order'
+        'sort_order',
+        // Approval fields
+        'approval_status',
+        'approved_at',
+        'approved_by',
+        'rejected_at',
+        'rejected_by',
+        'rejection_reason',
+        'admin_notes'
     ];
 
     protected $casts = [

@@ -11,6 +11,7 @@ use App\Models\State;
 use App\Models\City;
 use Yajra\DataTables\DataTables;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class StoreController extends Controller
 {
@@ -260,6 +261,70 @@ class StoreController extends Controller
         $pageTitle = 'Edit Store';
 
         return view('store.edit', compact('pageTitle', 'store', 'auth_user'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        try {
+            // Validate required fields
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'address' => 'nullable|string',
+                'phone' => 'nullable|string|max:20',
+                'email' => 'nullable|email|max:255',
+                'delivery_radius' => 'nullable|numeric|min:0',
+                'minimum_order_amount' => 'nullable|numeric|min:0',
+                'delivery_fee' => 'nullable|numeric|min:0',
+            ]);
+
+            $store = Store::findOrFail($id);
+            $data = $request->all();
+
+            // Update slug if name changed
+            if (isset($data['name'])) {
+                $data['slug'] = Str::slug($data['name']);
+            }
+
+            // Handle business_hours as JSON
+            if (isset($data['business_hours'])) {
+                $data['business_hours'] = json_encode($data['business_hours']);
+            }
+
+            // Handle store_settings as JSON
+            if (isset($data['store_settings'])) {
+                $data['store_settings'] = json_encode($data['store_settings']);
+            }
+
+            $store->update($data);
+
+            $message = 'Store updated successfully';
+
+            if($request->is('api/*')) {
+                return comman_message_response($message);
+            }
+
+            return redirect(route('store.index'))->withSuccess($message);
+
+        } catch (\Exception $e) {
+            Log::error('Store update error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            if($request->is('api/*')) {
+                return comman_message_response('Store update failed: ' . $e->getMessage());
+            }
+            return redirect()->back()->withError('Store update failed: ' . $e->getMessage())->withInput();
+        }
     }
 
     /**

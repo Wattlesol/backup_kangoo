@@ -1166,5 +1166,19 @@
     'statistics' => 'Statistics',
     'created' => 'Created',
     'multiple_images_allowed' => 'You can select multiple images for the gallery',
+
+    // Additional product form translations
+    'product_images' => 'Product Images',
+    'gallery_images' => 'Gallery Images',
+    'choose_files' => 'Choose Files',
+    'seo_settings' => 'SEO Settings',
+    'pricing_inventory' => 'Pricing & Inventory',
+    'compare_price' => 'Compare Price',
+    'cost_price' => 'Cost Price',
+    'low_stock_threshold' => 'Low Stock Threshold',
+    'track_stock' => 'Track Stock',
+    'edit_form_title' => 'Edit :form',
+    'add_form_title' => 'Add :form',
+    'update_form_title' => 'Update :form',
 )
     ?>

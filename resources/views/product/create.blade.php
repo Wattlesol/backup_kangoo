@@ -19,7 +19,6 @@
                 <div class="card">
                     <div class="card-body">
                         {{ Form::model($productdata,['method' => 'POST','route'=>'product.store', 'enctype'=>'multipart/form-data', 'data-toggle'=>"validator" ,'id'=>'product'] ) }}
-                        {{ Form::hidden('id') }}
 
                         <div class="row">
                             <!-- Basic Information -->
