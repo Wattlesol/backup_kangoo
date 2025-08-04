@@ -370,12 +370,13 @@ function addBrandColor() {
         if (response.success) {
             $('#addBrandColorModal').modal('hide');
             form.reset();
-            location.reload();
+            showMessage(response.message || 'Brand color added successfully');
+            setTimeout(() => location.reload(), 1500);
         } else {
-            alert(response.message || '{{ __("messages.error_adding_color") }}');
+            showErrorMessage(response.message || '{{ __("messages.error_adding_color") }}');
         }
     }).fail(function() {
-        alert('{{ __("messages.error_adding_color") }}');
+        showErrorMessage('{{ __("messages.error_adding_color") }}');
     });
 }
 
@@ -386,12 +387,13 @@ function deleteBrandColor(colorName) {
             color_name: colorName
         }).done(function(response) {
             if (response.success) {
-                location.reload();
+                showMessage(response.message || 'Brand color deleted successfully');
+                setTimeout(() => location.reload(), 1500);
             } else {
-                alert(response.message || '{{ __("messages.error_deleting_color") }}');
+                showErrorMessage(response.message || '{{ __("messages.error_deleting_color") }}');
             }
         }).fail(function() {
-            alert('{{ __("messages.error_deleting_color") }}');
+            showErrorMessage('{{ __("messages.error_deleting_color") }}');
         });
     }
 }
