@@ -5,7 +5,7 @@
     :slides-per-view="3"
     :space-between="30"
     :pagination="{ clickable: true  }"
-    :loop="true"
+    :loop="testimonial_data.length >= 6"
     :autoplay="{ delay: 3000, disableOnInteraction: false }"
     :breakpoints="{
           320: { slidesPerView: 1 },
@@ -78,7 +78,7 @@ const loading = ref(1);
 const store = useSection()
 const testimonial_data = computed(() => store.testimonial_list_data)
 const [testimonialsection] = useObserveSection(async () => {
-    
+
     try {
         await store.get_testimonial_list();
     } catch (error) {

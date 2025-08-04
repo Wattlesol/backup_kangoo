@@ -615,6 +615,9 @@ Route::group(['middleware' => ['auth', 'verified']], function()
             'update' => 'store.update',
             'destroy' => 'store.destroy'
         ]);
+        Route::get('admin/stores-data', [StoreController::class, 'index_data'])->name('store.index_data');
+        Route::get('admin/stores-list', [StoreController::class, 'list'])->name('store.list');
+        Route::post('admin/store-action', [StoreController::class, 'action'])->name('store.action');
         // Product Approval System Routes
         Route::group(['prefix' => 'admin/product-approval', 'as' => 'product-approval.'], function () {
             Route::get('pending', [App\Http\Controllers\Admin\ProductApprovalController::class, 'pending'])->name('pending');

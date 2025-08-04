@@ -16,8 +16,11 @@ class Store extends BaseModel implements HasMedia
     protected $table = 'stores';
 
     protected $fillable = [
+        'provider_id',
         'created_by',
+        'created_by_type',
         'store_type',
+        'email',
         'name',
         'description',
         'slug',

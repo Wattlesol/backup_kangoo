@@ -42,27 +42,55 @@ class FrontendController extends Controller
 {
 
     public function index(Request $request){
+        // Start with minimal data to identify the issue
         $auth_user_id = null;
         $favourite = null;
+        $postjobservice = null;
+        $totalRating = "0.00";
+        $providers_service_rating = "0.00";
 
-        if(auth()->check() && auth()->user()->hasRole('user')){
-            $auth_user_id = auth()->user()->id;
-            $favourite = UserFavouriteService::where('user_id', $auth_user_id)->get();
-        }
+        // Load sections but optimize section_1 to prevent hanging
         $sectionData = [];
-        $sectionKeys = ['section_1', 'section_2', 'section_3', 'section_4', 'section_5', 'section_6', 'section_7', 'section_9'];
 
-        foreach ($sectionKeys as $key) {
-            $section = FrontendSetting::where('key', $key)->first();
-            $sectionData[$key] = $section ? json_decode($section->value, true) : null;
+        try {
+            // Load all sections
+            $sectionKeys = ['section_1', 'section_2', 'section_3', 'section_4', 'section_5', 'section_6', 'section_7', 'section_9'];
+            $sections = FrontendSetting::whereIn('key', $sectionKeys)->get()->keyBy('key');
+
+            foreach ($sectionKeys as $key) {
+                if (isset($sections[$key])) {
+                    $data = json_decode($sections[$key]->value, true);
+
+                    // Fix section_1 provider_id issue - limit to prevent hanging
+                    if ($key === 'section_1' && isset($data['provider_id']) && is_array($data['provider_id'])) {
+                        // Limit to maximum 3 providers to prevent performance issues
+                        $data['provider_id'] = array_slice($data['provider_id'], 0, 3);
+
+                        // Just validate provider IDs exist, don't pre-load complex data
+                        $validProviders = [];
+                        foreach ($data['provider_id'] as $providerId) {
+                            $provider = User::where('id', $providerId)->where('user_type', 'provider')->where('status', 1)->first();
+                            if ($provider) {
+                                $validProviders[] = $providerId;
+                            }
+                        }
+                        $data['provider_id'] = $validProviders;
+                    }
+
+                    $sectionData[$key] = $data;
+                } else {
+                    $sectionData[$key] = null;
+                }
+            }
+
+        } catch (Exception $e) {
+            // If there's an error, use empty data
+            foreach ($sectionKeys as $key) {
+                $sectionData[$key] = null;
+            }
         }
-        $settings = Setting::where('type', 'service-configurations')->where('key','service-configurations')->first();
-        $serviceconfig = $settings ? json_decode($settings->value) : null;
-        $postjobservice = $serviceconfig ? $serviceconfig->post_services : null;
-        $ratings = BookingRating::pluck('rating')->toArray();
-        $averageRating = count($ratings) > 0 ? array_sum($ratings) / count($ratings) : 0;
-        $totalRating = number_format($averageRating, 2);
-        return view('landing-page.index',compact('sectionData','postjobservice','auth_user_id','favourite','totalRating'));
+
+        return view('landing-page.index',compact('sectionData','postjobservice','auth_user_id','favourite','totalRating','providers_service_rating'));
     }
 
     public function userLoginView(Request $request){

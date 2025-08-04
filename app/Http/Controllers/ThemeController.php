@@ -175,7 +175,7 @@ class ThemeController extends Controller
 
         try {
             $colorName = strtolower($request->color_name);
-            
+
             // Check if color already exists
             $existingLight = ThemeSetting::where('setting_group', 'brand_colors')
                 ->where('setting_key', $colorName . '_light')
@@ -183,7 +183,7 @@ class ThemeController extends Controller
 
             if ($existingLight) {
                 return response()->json([
-                    'success' => false, 
+                    'success' => false,
                     'message' => 'Color with this name already exists'
                 ]);
             }
@@ -222,7 +222,7 @@ class ThemeController extends Controller
 
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Failed to add brand color: ' . $e->getMessage()
             ]);
         }
@@ -239,7 +239,7 @@ class ThemeController extends Controller
 
         try {
             $colorName = $request->color_name;
-            
+
             ThemeSetting::where('setting_group', 'brand_colors')
                 ->whereIn('setting_key', [$colorName . '_light', $colorName . '_dark'])
                 ->delete();
@@ -254,7 +254,7 @@ class ThemeController extends Controller
 
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Failed to delete brand color: ' . $e->getMessage()
             ]);
         }
@@ -266,7 +266,7 @@ class ThemeController extends Controller
     public function generateCSS()
     {
         $css = ThemeSetting::generateCSSVariables();
-        
+
         return response($css)
             ->header('Content-Type', 'text/css')
             ->header('Cache-Control', 'public, max-age=3600');
@@ -278,14 +278,14 @@ class ThemeController extends Controller
     public function preview(Request $request)
     {
         $colors = $request->input('colors', []);
-        
+
         // Generate preview CSS
         $css = ":root {\n";
         foreach ($colors as $colorData) {
             $group = $colorData['group'];
             $key = $colorData['key'];
             $value = $colorData['value'];
-            
+
             if ($group === 'brand_colors') {
                 $css .= "  --brand-{$key}: {$value};\n";
             } elseif ($group === 'role_colors') {
@@ -293,7 +293,7 @@ class ThemeController extends Controller
             }
         }
         $css .= "}\n";
-        
+
         return response()->json(['css' => $css]);
     }
 
@@ -422,15 +422,19 @@ class ThemeController extends Controller
         ];
 
         foreach ($defaultBrandColors as $color) {
-            ThemeSetting::create([
-                'setting_group' => 'brand_colors',
-                'setting_key' => $color['key'],
-                'setting_value' => $color['value'],
-                'setting_name' => $color['name'],
-                'description' => 'Default brand color',
-                'sort_order' => $color['order'],
-                'is_active' => true
-            ]);
+            ThemeSetting::updateOrCreate(
+                [
+                    'setting_group' => 'brand_colors',
+                    'setting_key' => $color['key']
+                ],
+                [
+                    'setting_value' => $color['value'],
+                    'setting_name' => $color['name'],
+                    'description' => 'Default brand color',
+                    'sort_order' => $color['order'],
+                    'is_active' => true
+                ]
+            );
         }
     }
 
@@ -451,15 +455,19 @@ class ThemeController extends Controller
         ];
 
         foreach ($defaultRoleColors as $color) {
-            ThemeSetting::create([
-                'setting_group' => 'role_colors',
-                'setting_key' => $color['key'],
-                'setting_value' => $color['value'],
-                'setting_name' => $color['name'],
-                'description' => 'Default role color',
-                'sort_order' => $color['order'],
-                'is_active' => true
-            ]);
+            ThemeSetting::updateOrCreate(
+                [
+                    'setting_group' => 'role_colors',
+                    'setting_key' => $color['key']
+                ],
+                [
+                    'setting_value' => $color['value'],
+                    'setting_name' => $color['name'],
+                    'description' => 'Default role color',
+                    'sort_order' => $color['order'],
+                    'is_active' => true
+                ]
+            );
         }
     }
 

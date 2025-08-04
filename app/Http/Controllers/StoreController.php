@@ -35,14 +35,106 @@ class StoreController extends Controller
 
         // Get store statistics
         $totalProducts = Product::count();
-        $activeProducts = Product::where('status', true)->where('is_available', true)->count();
+        $activeProducts = Product::where('status', true)->count();
         $pendingProducts = Product::where('approval_status', 'pending')->count();
         $totalOrders = \App\Models\Order::count();
 
         return view('store.index', compact('pageTitle', 'auth_user', 'store', 'totalProducts', 'activeProducts', 'pendingProducts', 'totalOrders'));
     }
 
-    // Removed index_data method - not needed for single store architecture
+    /**
+     * Display a listing of stores in DataTables format
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function list()
+    {
+        $pageTitle = __('messages.list_form_title', ['form' => __('messages.store')]);
+        $auth_user = authSession();
+
+        return view('store.list', compact('pageTitle', 'auth_user'));
+    }
+
+    /**
+     * Get stores data for DataTables
+     * Returns data for the stores listing table
+     *
+     * @param DataTables $datatable
+     * @param Request $request
+     * @return mixed
+     */
+    public function index_data(DataTables $datatable, Request $request)
+    {
+        $query = Store::query()->with(['createdBy', 'country', 'state', 'city']);
+
+        $filter = $request->filter;
+
+        if (isset($filter)) {
+            if (isset($filter['column_status'])) {
+                $query->where('status', $filter['column_status']);
+            }
+            if (isset($filter['store_type'])) {
+                $query->where('store_type', $filter['store_type']);
+            }
+        }
+
+        if (auth()->user()->hasAnyRole(['admin'])) {
+            $query->withTrashed();
+        }
+
+        return $datatable->eloquent($query)
+            ->addColumn('check', function ($row) {
+                return '<input type="checkbox" class="form-check-input select-table-row" id="datatable-row-'.$row->id.'" name="datatable_ids[]" value="'.$row->id.'" onclick="dataTableRowCheck('.$row->id.')">';
+            })
+            ->addColumn('action', function ($row) {
+                return view('store.action', compact('row'))->render();
+            })
+            ->addColumn('products_count', function ($row) {
+                // In single-store architecture, all products belong to the main store
+                if ($row->store_type === 'main') {
+                    return Product::count();
+                }
+                return 0;
+            })
+            ->addColumn('store_type', function ($row) {
+                $badgeClass = $row->store_type == 'main' ? 'badge-primary' : 'badge-secondary';
+                return '<span class="badge ' . $badgeClass . '">' . ucfirst($row->store_type) . '</span>';
+            })
+            ->editColumn('name', function ($row) {
+                return '<div class="d-flex align-items-center">
+                    <div class="avatar-40 rounded mr-3">
+                        <i class="fa fa-store text-primary"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0">' . $row->name . '</h6>
+                        <small class="text-muted">' . ($row->description ? Str::limit($row->description, 50) : '-') . '</small>
+                    </div>
+                </div>';
+            })
+            ->editColumn('email', function ($row) {
+                return $row->email ?? '-';
+            })
+            ->editColumn('status', function ($row) {
+                $disabled = $row->trashed() ? 'disabled' : '';
+                return '<div class="custom-control custom-switch custom-switch-text custom-switch-color custom-control-inline">
+                    <div class="custom-switch-inner">
+                        <input type="checkbox" class="custom-control-input bg-success change_status" data-type="store_status" ' . ($row->status ? "checked" : "") . ' ' . $disabled . ' value="' . $row->id . '" id="' . $row->id . '" data-id="' . $row->id . '">
+                        <label class="custom-control-label" for="' . $row->id . '" data-on-label="" data-off-label=""></label>
+                    </div>
+                </div>';
+            })
+            ->editColumn('created_at', function ($row) {
+                return date('Y-m-d H:i:s', strtotime($row->created_at));
+            })
+            ->editColumn('updated_at', function ($row) {
+                return date('Y-m-d H:i:s', strtotime($row->updated_at));
+            })
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->where('name', 'like', '%' . $keyword . '%');
+            })
+            ->rawColumns(['action', 'status', 'check', 'store_type', 'name'])
+            ->toJson();
+    }
 
     /**
      * Show the form for creating/editing the main store.

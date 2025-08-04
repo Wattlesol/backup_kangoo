@@ -196,7 +196,9 @@
                             <div class="col-lg-12">
                                 <div class="form-group">
                                     <div class="col-md-offset-3 col-sm-12">
-                                        {{ Form::submit(__('messages.save'), ['class'=>"btn btn-md btn-primary float-md-right"]) }}
+                                        <button type="submit" class="btn btn-md btn-primary float-md-right">
+                                            <i class="fas fa-save me-2"></i>{{ __('messages.save') }}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -250,6 +252,56 @@ $(document).ready(function() {
 
     // Initialize color previews
     updateAllPreviews();
+
+    // Handle form submission with AJAX
+    $('#theme-colors-form').on('submit', function(e) {
+        e.preventDefault();
+
+        const form = $(this);
+        const submitBtn = form.find('button[type="submit"]');
+        const originalText = submitBtn.html();
+
+        // Show loading state
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
+
+        $.ajax({
+            url: form.attr('action'),
+            method: 'POST',
+            data: form.serialize(),
+            success: function(response) {
+                if (response.success) {
+                    // Show success notification
+                    Snackbar.show({
+                        text: response.message,
+                        pos: 'bottom-center',
+                        backgroundColor: '#28a745'
+                    });
+                } else {
+                    // Show error notification
+                    Snackbar.show({
+                        text: response.message || 'An error occurred',
+                        pos: 'bottom-center',
+                        backgroundColor: '#dc3545',
+                        actionTextColor: 'white'
+                    });
+                }
+            },
+            error: function(xhr) {
+                // Show error notification
+                const errorMessage = xhr.responseJSON?.message || 'An error occurred while saving';
+                Snackbar.show({
+                    text: errorMessage,
+                    pos: 'bottom-center',
+                    backgroundColor: '#dc3545',
+                    actionTextColor: 'white'
+                });
+            },
+            complete: function() {
+                // Restore button state
+                submitBtn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
 });
 
 // Global functions for color management
@@ -350,13 +402,32 @@ function createDefaultColors() {
             _token: '{{ csrf_token() }}'
         }).done(function(response) {
             if (response.success) {
-                location.reload();
+                showMessage(response.message || 'Default colors created successfully');
+                setTimeout(() => location.reload(), 1500);
             } else {
-                alert(response.message || '{{ __("messages.error_creating_defaults") }}');
+                showErrorMessage(response.message || '{{ __("messages.error_creating_defaults") }}');
             }
         }).fail(function() {
-            alert('{{ __("messages.error_creating_defaults") }}');
+            showErrorMessage('{{ __("messages.error_creating_defaults") }}');
         });
     }
+}
+
+// Helper functions for consistent messaging
+function showMessage(message) {
+    Snackbar.show({
+        text: message,
+        pos: 'bottom-center',
+        backgroundColor: '#28a745'
+    });
+}
+
+function showErrorMessage(message) {
+    Snackbar.show({
+        text: message,
+        pos: 'bottom-center',
+        backgroundColor: '#dc3545',
+        actionTextColor: 'white'
+    });
 }
 </script>

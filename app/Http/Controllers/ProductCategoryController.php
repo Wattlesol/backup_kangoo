@@ -34,7 +34,7 @@ class ProductCategoryController extends Controller
 
     public function index_data(DataTables $datatable, Request $request)
     {
-        $query = ProductCategory::query();
+        $query = ProductCategory::query()->withCount('products');
         $filter = $request->filter;
 
         if (isset($filter)) {
@@ -49,6 +49,9 @@ class ProductCategoryController extends Controller
         return $datatable->eloquent($query)
             ->addColumn('check', function ($row) {
                 return '<input type="checkbox" class="form-check-input select-table-row"  id="datatable-row-'.$row->id.'"  name="datatable_ids[]" value="'.$row->id.'" onclick="dataTableRowCheck('.$row->id.')">';
+            })
+            ->addColumn('products_count', function ($row) {
+                return $row->products_count ?? 0;
             })
             ->editColumn('name', function($query) {
                 return '<a class="btn-link btn-link-hover" href='.route('productcategory.create', ['id' => $query->id]).'>'.$query->name.'</a>';
@@ -66,7 +69,7 @@ class ProductCategoryController extends Controller
                 return view('productcategory.action',compact('productCategory'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['action','status','check','name'])
+            ->rawColumns(['action','status','check','name','products_count'])
             ->filterColumn('name', function($query, $keyword) {
                 $query->where('name', 'like', "%{$keyword}%");
             })

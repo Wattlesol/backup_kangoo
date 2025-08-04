@@ -33,7 +33,8 @@
                         </p>
                     </div>
                 </div>
-                <location-search :user_id="{{json_encode($auth_user_id)}}" :postjobservice="{{$postjobservice}}"></location-search>
+                {{-- <location-search :user_id="{{json_encode($auth_user_id)}}" :postjobservice="{{json_encode($postjobservice)}}"></location-search> --}}
+                <div class="text-center p-4 bg-light rounded">Search functionality temporarily disabled</div>
                @endif
 
              </div>
@@ -44,8 +45,8 @@
                <div class="swiper-wrapper">
                      @foreach(($sectionData['section_1']['provider_id'] ?? []) as $providerId)
                      @php
-                        $user = App\Models\User::with('getServiceRating')->where('user_type', 'provider')->where('id',$providerId)->where('status',1)->first();
-                        $providers_service_rating = (isset($user->getServiceRating) && count($user->getServiceRating) > 0 ) ? (float) number_format(max($user->getServiceRating->avg('rating'),0), 2) : 0;
+                        $user = App\Models\User::where('user_type', 'provider')->where('id',$providerId)->where('status',1)->first();
+                        $providers_service_rating = 0; // Simplified to avoid complex queries
                      @endphp
                      @if($user)
                      <div class="swiper-slide">
@@ -60,7 +61,8 @@
                                                 <span class="desc text-white d-flex align-items-center justify-content-center mt-2">
                                                    <div class="d-flex align-items-center gap-1 flex-wrap">
                                                          <div class="star-rating">
-                                                            <rating-component :readonly="true" :showrating="false" :ratingvalue="{{ $providers_service_rating }}" />
+                                                            {{-- <rating-component :readonly="true" :showrating="false" :ratingvalue="{{json_encode($providers_service_rating)}}" /> --}}
+                                                            <span>Rating: {{ round($providers_service_rating,1) }}</span>
                                                          </div>
                                                          <h6 class="m-0 font-size-12 rating-text lh-1">({{ round($providers_service_rating,1) }})</h6>
                                                    </div>
@@ -133,7 +135,8 @@
                 <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{__('messages.view_all')}}</a>
             </div>
 
-            <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'ac'"/>
+            {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'ac'"/> --}}
+            <div class="text-center p-4">Top Rated Services Section</div>
             </div>
         @endif
 
@@ -205,7 +208,8 @@
                     </div>
                     <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{__('messages.view_all')}}</a>
                 </div>
-                <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'cleaning'"/>
+                {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'cleaning'"/> --}}
+                <div class="text-center p-4">Featured Services Section</div>
             </div>
         @endif
     </div>
@@ -246,7 +250,8 @@
 
                     <div class="row">
                         <div class="col-12">
-                        <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'recently_view'"/>
+                        {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'recently_view'"/> --}}
+                        <div class="text-center p-4">Recently Viewed Services Section</div>
                         </div>
                     </div>
                 </div>
@@ -340,7 +345,8 @@
                 <div class="text-center mb-5">
                     <div class="d-inline-flex align-items-center flex-sm-row flex-column bg-body py-3 px-5 rounded-5 gap-2">
                         <div class="vertical-center lh-1">
-                            <rating-component :readonly="true" :showrating="false" :ratingvalue="{{$totalRating}}" />
+                            {{-- <rating-component :readonly="true" :showrating="false" :ratingvalue="{{json_encode($totalRating)}}" /> --}}
+                            <span>Rating: {{ round($totalRating,1) }}</span>
                             {{-- {{>components/widgets/filter-rating rating="4"}} --}}
                         </div>
                         @if (isset($sectionData['section_9']['overall_rating']) && $sectionData['section_9']['overall_rating'] == 'on')
@@ -533,14 +539,18 @@
                spaceBetween: swSpace["1500"],
             },
             };
+            // Check if we have enough slides for loop mode (need at least 6 slides for 3 visible)
+            var slideCount = slider.find('.swiper-slide').length;
+            var enableLoop = slideCount >= 6;
+
             var sw_config = {
-            loop: true,
+            loop: enableLoop,
             speed: 1000,
-            loopedSlides: 3,
+            loopedSlides: enableLoop ? 3 : 0,
             spaceBetween: 30,
             slidesPerView: 3,
             centeredSlides: false,
-            autoplay: true,
+            autoplay: slideCount > 1,
             virtualTranslate: false,
             navigation: {
                nextEl: navNext,

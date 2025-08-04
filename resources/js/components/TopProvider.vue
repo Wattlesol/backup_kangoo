@@ -4,6 +4,7 @@
       :slides-per-view="auto"
       :space-between="30"
       :pagination="{ clickable: true  }"
+      :loop="false"
       :autoplay="{ delay: 3000, disableOnInteraction: false }"
       >
       <SwiperSlide v-for="provider in providerDetails" :key="provider.id">
@@ -41,17 +42,17 @@
           </div>
         </div> -->
       </Swiper>
-    
-    
+
+
 </template>
-  
+
   <script setup>
   import { ref, onMounted } from 'vue';
   import { PROVIDER_API } from '../data/api';
   import {useSection} from '../store/index'
   import { Swiper, SwiperSlide } from 'swiper/vue';
   const store = useSection()
-  
+
   const providers = ref([]);
   const providerDetails = ref([]);
   const setting = ref([]);
@@ -97,7 +98,7 @@
     console.error('Error fetching category details:', error);
   }
 };
-  
+
   onMounted(() => {
     fetchTopProviders();
     getProviderDetails();
@@ -113,4 +114,3 @@
   }
 }
   </script>
-  
