@@ -9,6 +9,7 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use Yajra\DataTables\DataTables;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
@@ -164,10 +165,28 @@ class ProductController extends Controller
             $productdata = new Product;
         }
 
-        $categories = ProductCategory::active()->get();
+        $categories = ProductCategory::active()->pluck('name', 'id');
         $providers = User::where('user_type', 'provider')->get();
 
         return view('product.create', compact('pageTitle' ,'productdata','auth_user','categories','providers'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        $auth_user = authSession();
+        $productdata = Product::with(['category', 'variants'])->findOrFail($id);
+        $pageTitle = trans('messages.edit_form_title',['form' => trans('messages.product')]);
+
+        $categories = ProductCategory::active()->pluck('name', 'id');
+        $providers = User::where('user_type', 'provider')->get();
+
+        return view('product.edit', compact('pageTitle' ,'productdata','auth_user','categories','providers'));
     }
 
     /**
@@ -178,6 +197,18 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
+        // Validate the request
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'sku' => 'required|string|max:255|unique:products,sku',
+            'description' => 'nullable|string',
+            'product_category_id' => 'required|exists:product_categories,id',
+            'base_price' => 'nullable|numeric|min:0',
+            'stock_quantity' => 'required|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'status' => 'required|boolean',
+        ]);
+
         $data = $request->all();
         $data['slug'] = Str::slug($data['name']);
         $data['created_by'] = $data['created_by'] ?? auth()->id();
@@ -234,7 +265,7 @@ class ProductController extends Controller
 
         if($request->is('api/*')) {
             return comman_message_response($message);
-		}
+        }
 
         return redirect(route('product.index'))->withSuccess($message);
     }
@@ -251,6 +282,52 @@ class ProductController extends Controller
         $pageTitle = trans('messages.view_form_title',['form'=>trans('messages.product')]);
         $auth_user = authSession();
         return view('product.view', compact('pageTitle','product','auth_user'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        // Validate the request
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'sku' => 'required|string|max:255|unique:products,sku,' . $id,
+            'description' => 'nullable|string',
+            'product_category_id' => 'required|exists:product_categories,id',
+            'base_price' => 'nullable|numeric|min:0',
+            'stock_quantity' => 'required|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'status' => 'required|boolean',
+        ]);
+
+        $product = Product::findOrFail($id);
+        $data = $request->all();
+        $data['slug'] = Str::slug($data['name']);
+
+        // Handle dimensions as JSON
+        if (isset($data['dimensions'])) {
+            $data['dimensions'] = json_encode($data['dimensions']);
+        }
+
+        // Handle meta_data as JSON
+        if (isset($data['meta_data'])) {
+            $data['meta_data'] = json_encode($data['meta_data']);
+        }
+
+        $product->update($data);
+
+        $message = trans('messages.update_form',['form' => trans('messages.product')]);
+
+        if($request->is('api/*')) {
+            return comman_message_response($message);
+        }
+
+        return redirect(route('product.index'))->withSuccess($message);
     }
 
     /**
