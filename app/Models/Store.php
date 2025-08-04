@@ -68,6 +68,11 @@ class Store extends BaseModel implements HasMedia
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function provider()
+    {
+        return $this->belongsTo(User::class, 'provider_id');
+    }
+
     public function products()
     {
         return $this->hasMany(Product::class);

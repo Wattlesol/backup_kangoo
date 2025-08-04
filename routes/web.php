@@ -633,14 +633,27 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::group(['middleware' => ['permission:order list']], function () {
         Route::resource('order', OrderController::class);
         Route::get('order-index-data',[OrderController::class,'index_data'])->name('order.index_data');
-        Route::post('order-update-status', [OrderController::class, 'updateStatus'])->name('order.update-status');
-        Route::post('order-update-payment-status', [OrderController::class, 'updatePaymentStatus'])->name('order.update-payment-status');
-        Route::post('order-cancel', [OrderController::class, 'cancel'])->name('order.cancel');
         Route::get('order-statistics', [OrderController::class, 'statistics'])->name('order.statistics');
-        Route::post('order-bulk-action', [OrderController::class, 'bulkAction'])->name('order.bulk-action');
         Route::get('order-export', [OrderController::class, 'export'])->name('order.export');
         Route::get('order/{id}/print', [OrderController::class, 'print'])->name('order.print');
     });
+
+    // Order status and payment management routes with specific permissions
+    Route::post('order-update-status', [OrderController::class, 'updateStatus'])
+        ->name('order.update-status')
+        ->middleware('permission:order status update');
+
+    Route::post('order-update-payment-status', [OrderController::class, 'updatePaymentStatus'])
+        ->name('order.update-payment-status')
+        ->middleware('permission:order edit');
+
+    Route::post('order-cancel', [OrderController::class, 'cancel'])
+        ->name('order.cancel')
+        ->middleware('permission:order edit');
+
+    Route::post('order-bulk-action', [OrderController::class, 'bulkAction'])
+        ->name('order.bulk-action')
+        ->middleware('permission:order edit');
 
     // Dynamic Pricing Routes (Admin only)
     Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
@@ -675,6 +688,25 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     });
 Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list');
 Route::post('/service-list',[HomeController::class, 'getAjaxServiceList'])->name('service-list');
+
+// Test route for order status update (remove after testing)
+Route::get('/test-order-status', function() {
+    $user = auth()->user();
+    if (!$user) {
+        return response()->json(['error' => 'Not authenticated']);
+    }
+
+    try {
+        return response()->json([
+            'user_id' => $user->id,
+            'user_type' => $user->user_type,
+            'route_exists' => route('order.update-status'),
+            'authenticated' => true
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()]);
+    }
+})->middleware('auth');
 
 // Frontend E-commerce Routes
 // Main Store Route (Unified Store)

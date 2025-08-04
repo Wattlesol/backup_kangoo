@@ -103,7 +103,7 @@
                                     <td>
                                         <div class="d-flex align-items-center">
                                             @if($item->product && $item->product->featured_image)
-                                                <img src="{{ $item->product->featured_image }}" alt="{{ $item->product_name }}" 
+                                                <img src="{{ $item->product->featured_image }}" alt="{{ $item->product_name }}"
                                                      class="avatar-40 rounded me-3" style="object-fit: cover;">
                                             @else
                                                 <div class="avatar-40 bg-soft-primary rounded me-3 d-flex align-items-center justify-content-center">
@@ -162,6 +162,7 @@
         <!-- Order Actions & Info -->
         <div class="col-lg-4">
             <!-- Status Management -->
+            @can('order status update')
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Status Management</h5>
@@ -173,24 +174,40 @@
                         <div class="form-group">
                             <label class="form-label">Update Status</label>
                             <select name="status" class="form-control" id="order-status">
-                                <option value="pending" {{ $order->status == 'pending' ? 'selected' : '' }}>Pending</option>
-                                <option value="confirmed" {{ $order->status == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
-                                <option value="processing" {{ $order->status == 'processing' ? 'selected' : '' }}>Processing</option>
-                                <option value="shipped" {{ $order->status == 'shipped' ? 'selected' : '' }}>Shipped</option>
-                                <option value="delivered" {{ $order->status == 'delivered' ? 'selected' : '' }}>Delivered</option>
-                                <option value="cancelled" {{ $order->status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                                <option value="pending" {{ $order->status == 'pending' ? 'selected' : '' }}>{{ __('messages.pending') }}</option>
+                                <option value="confirmed" {{ $order->status == 'confirmed' ? 'selected' : '' }}>{{ __('messages.confirmed') }}</option>
+                                <option value="processing" {{ $order->status == 'processing' ? 'selected' : '' }}>{{ __('messages.processing') }}</option>
+                                <option value="shipped" {{ $order->status == 'shipped' ? 'selected' : '' }}>{{ __('messages.shipped') }}</option>
+                                <option value="delivered" {{ $order->status == 'delivered' ? 'selected' : '' }}>{{ __('messages.delivered') }}</option>
+                                <option value="cancelled" {{ $order->status == 'cancelled' ? 'selected' : '' }}>{{ __('messages.cancelled') }}</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Notes (Optional)</label>
-                            <textarea name="notes" class="form-control" rows="3" placeholder="Add notes about this status change..."></textarea>
+                            <label class="form-label">{{ __('messages.status_update_notes') }} ({{ __('messages.optional') }})</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="{{ __('messages.add_notes_about_this_status_change') }}..."></textarea>
                         </div>
                         <button type="submit" class="btn btn-xs btn-primary">
-                            <i class="fa fa-save"></i> Update Status
+                            <i class="fa fa-save"></i> {{ __('messages.update_status') }}
                         </button>
                     </form>
                 </div>
             </div>
+            @else
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Order Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label">Current Status</label>
+                        <div class="status-display">
+                            <span class="badge badge-{{ $order->status_color }}">{{ ucfirst($order->status) }}</span>
+                        </div>
+                    </div>
+                    <small class="text-muted">You don't have permission to update order status.</small>
+                </div>
+            </div>
+            @endcan
 
             <!-- Order Totals -->
             <div class="card">
@@ -451,16 +468,51 @@
 .btn-xs i {
     font-size: 0.7rem;
 }
+
+.status-display {
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.status-display .badge {
+    font-size: 14px;
+    padding: 8px 16px;
+}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Status update form
-    document.getElementById('status-update-form').addEventListener('submit', function(e) {
+    const statusForm = document.getElementById('status-update-form');
+
+    if (!statusForm) {
+        console.log('Status update form not found - user may not have permission');
+        return;
+    }
+
+    const updateButton = statusForm.querySelector('button[type="submit"]');
+    const originalButtonText = updateButton.innerHTML;
+
+    console.log('Status update form initialized');
+
+    statusForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
+        console.log('Status update form submitted');
+
+        // Disable button and show loading state
+        updateButton.disabled = true;
+        updateButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Updating...';
+
         const formData = new FormData(this);
-        
+
+        // Log form data for debugging
+        for (let [key, value] of formData.entries()) {
+            console.log(`${key}: ${value}`);
+        }
+
         fetch('{{ route("order.update-status") }}', {
             method: 'POST',
             body: formData,
@@ -468,17 +520,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('Response data:', data);
             if (data.status) {
-                toastr.success(data.message);
-                setTimeout(() => location.reload(), 1000);
+                toastr.success(data.message || 'Order status updated successfully');
+                setTimeout(() => location.reload(), 1500);
             } else {
-                toastr.error(data.message);
+                toastr.error(data.message || 'Failed to update order status');
+                // Re-enable button
+                updateButton.disabled = false;
+                updateButton.innerHTML = originalButtonText;
             }
         })
         .catch(error => {
-            toastr.error('An error occurred. Please try again.');
+            console.error('Error updating order status:', error);
+            toastr.error('An error occurred while updating the order status. Please try again.');
+            // Re-enable button
+            updateButton.disabled = false;
+            updateButton.innerHTML = originalButtonText;
         });
     });
 });
@@ -493,7 +559,7 @@ function cancelOrder(orderId) {
         formData.append('order_id', orderId);
         formData.append('status', 'cancelled');
         formData.append('notes', 'Order cancelled by admin');
-        
+
         fetch('{{ route("order.update-status") }}', {
             method: 'POST',
             body: formData,

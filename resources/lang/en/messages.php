@@ -1144,6 +1144,8 @@
     'print' => 'Print',
     'export' => 'Export',
     'admin_store' => 'Admin Store',
+    'optional' => 'Optional',
+    'add_notes_about_this_status_change' => 'Add notes about this status change',
 
     // Stock status
     'in_stock' => 'In Stock',
