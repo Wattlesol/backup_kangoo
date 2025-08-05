@@ -729,25 +729,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list');
 Route::post('/service-list',[HomeController::class, 'getAjaxServiceList'])->name('service-list');
 
-// Test route for order status update (remove after testing)
-Route::get('/test-order-status', function() {
-    $user = auth()->user();
-    if (!$user) {
-        return response()->json(['error' => 'Not authenticated']);
-    }
-
-    try {
-        return response()->json([
-            'user_id' => $user->id,
-            'user_type' => $user->user_type,
-            'route_exists' => route('order.update-status'),
-            'authenticated' => true
-        ]);
-    } catch (\Exception $e) {
-        return response()->json(['error' => $e->getMessage()]);
-    }
-})->middleware('auth');
-
 // Role-based Theming Demo Route
 Route::get('/theme-demo', function () {
     return view('examples.role-theming-demo');
