@@ -102,6 +102,12 @@ class ProductController extends Controller
             // In single store architecture, get the main store
             $mainStore = Store::where('store_type', 'main')->active()->first();
 
+            // Get available stores for this product
+            $availableStores = [];
+            if ($mainStore) {
+                $availableStores = [$mainStore];
+            }
+
             $response = [
                 'status' => true,
                 'data' => new ProductResource($product),

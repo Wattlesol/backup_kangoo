@@ -94,9 +94,13 @@ class SettingController extends Controller
 
                 if(!empty($generalsetting['value'])){
                     $decodedata = json_decode($generalsetting['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['site_name','site_description','inquriy_email', 'helpline_number', 'website', 'country_id','state_id','city_id','zipcode','address'];
                     foreach ($keys as $key) {
-                        $generalsetting[$key] = $decodedata->$key;
+                        $generalsetting[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact('page', 'generalsetting'))->render();
@@ -109,9 +113,13 @@ class SettingController extends Controller
                 $site   = Setting::where('type','=','site-setup')->first();
                 if(!empty($site['value'])){
                     $decodedata = json_decode($site['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['date_format', 'time_format', 'time_zone', 'language_option', 'default_currency','currency_position','google_map_keys','latitude','longitude','distance_type','radious','digitafter_decimal_point','android_app_links','playstore_url','provider_playstore_url','ios_app_links','appstore_url','provider_appstore_url','site_copyright'];
                     foreach ($keys as $key) {
-                        $site[$key] = $decodedata->$key;
+                        $site[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
 
                 }
@@ -122,9 +130,13 @@ class SettingController extends Controller
 
                 if(!empty($serviceconfig['value'])){
                     $decodedata = json_decode($serviceconfig['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['advance_payment', 'slot_service', 'digital_services', 'service_packages', 'service_addons','post_services'];
                     foreach ($keys as $key) {
-                        $serviceconfig[$key] = $decodedata->$key;
+                        $serviceconfig[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact('page','serviceconfig'))->render();
@@ -133,9 +145,13 @@ class SettingController extends Controller
                 $socialmedia   = Setting::where('type','=','social-media')->first();
                 if(!empty($socialmedia['value'])){
                     $decodedata = json_decode($socialmedia['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['facebook_url', 'linkedin_url', 'instagram_url', 'youtube_url', 'twitter_url'];
                     foreach ($keys as $key) {
-                        $socialmedia[$key] = $decodedata->$key;
+                        $socialmedia[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact( 'page','socialmedia'))->render();
@@ -145,9 +161,13 @@ class SettingController extends Controller
 
                 if(!empty($cookiesetup['value'])){
                     $decodedata = json_decode($cookiesetup['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['title','description'];
                     foreach ($keys as $key) {
-                        $cookiesetup[$key] = $decodedata->$key;
+                        $cookiesetup[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact( 'page', 'cookiesetup'))->render();
@@ -224,6 +244,10 @@ class SettingController extends Controller
 
                 if(!empty($othersetting['value'])){
                     $decodedata = json_decode($othersetting['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
 
                     if(!empty($decodedata->auto_assign_provider)){
                         $keys = ['social_login', 'google_login', 'apple_login', 'otp_login', 'online_payment','blog','maintenance_mode',
@@ -238,7 +262,7 @@ class SettingController extends Controller
                     }
 
                     foreach ($keys as $key) {
-                            $othersetting[$key] = $decodedata->$key;
+                            $othersetting[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
 
 
@@ -574,6 +598,10 @@ class SettingController extends Controller
     $othersetting = \App\Models\Setting::where('type','OTHER_SETTING')->first();
 
     $decodedata = json_decode($othersetting['value']);
+    // Ensure we have an object for consistent property access
+    if (is_array($decodedata)) {
+        $decodedata = (object) $decodedata;
+    }
 
     $notification_type = isset($decodedata->firebase_notification) ? 1 : 0;
 

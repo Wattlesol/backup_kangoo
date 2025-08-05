@@ -296,7 +296,7 @@ class FrontendController extends Controller
         $total_handyman_rating = $handyman_rating->count();
 
         $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-        $datetime = json_decode($sitesetup->value);
+        $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
 
         $completed_services = BookingHandymanMapping::whereHas('bookings', function($query){
             $query->where('status', 'completed');

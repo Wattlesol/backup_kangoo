@@ -92,6 +92,46 @@ Route::get('/verify/{id}', [VerificationController::class, 'verify'])->name('ver
 Route::get('css/theme-colors.css', [\App\Http\Controllers\DynamicCssController::class, 'generateThemeCss'])->name('theme.css');
 Route::get('css/landing-theme.css', [\App\Http\Controllers\DynamicCssController::class, 'generateLandingCss'])->name('landing.theme.css');
 
+// Frontend E-commerce Routes (MUST be before admin routes to avoid conflicts)
+// Main Store Route (Unified Store)
+Route::get('store', [FrontendProductController::class, 'unifiedStore'])->name('store.unified');
+
+// Individual product and store pages
+Route::get('product/{slug}', [FrontendProductController::class, 'show'])->name('products.show');
+Route::get('store/{slug}', [FrontendProductController::class, 'storeShow'])->name('stores.show');
+
+// Legacy routes (kept for backward compatibility)
+Route::get('products', [FrontendProductController::class, 'index'])->name('products.index');
+Route::get('products/search', [FrontendProductController::class, 'search'])->name('products.search');
+Route::get('products/category/{slug}', [FrontendProductController::class, 'category'])->name('products.category');
+Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores.index');
+
+// AJAX endpoints for frontend
+Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
+Route::get('api/store', [FrontendProductController::class, 'getStores'])->name('api.store');
+
+// Cart routes (works for both authenticated and guest users)
+Route::prefix('cart')->name('cart.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Frontend\CartController::class, 'index'])->name('index');
+    Route::post('/add', [App\Http\Controllers\Frontend\CartController::class, 'add'])->name('add');
+    Route::put('/update', [App\Http\Controllers\Frontend\CartController::class, 'update'])->name('update');
+    Route::delete('/remove', [App\Http\Controllers\Frontend\CartController::class, 'remove'])->name('remove');
+    Route::delete('/clear', [App\Http\Controllers\Frontend\CartController::class, 'clear'])->name('clear');
+    Route::get('/count', [App\Http\Controllers\Frontend\CartController::class, 'count'])->name('count');
+    Route::post('/transfer-guest', [App\Http\Controllers\Frontend\CartController::class, 'transferGuestCart'])->name('transfer-guest');
+});
+
+// Frontend pages
+Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.cart');
+
+// Authenticated frontend routes
+Route::middleware('auth')->group(function () {
+    Route::get('checkout', [FrontendProductController::class, 'checkout'])->name('products.checkout');
+    Route::post('orders', [FrontendProductController::class, 'storeOrder'])->name('orders.store');
+    Route::get('order-success', [FrontendProductController::class, 'orderSuccess'])->name('products.order-success');
+    Route::get('my-order/{id}', [FrontendProductController::class, 'showOrder'])->name('customer.order.show');
+});
+
 Route::group(['middleware' => ['auth', 'verified']], function()
 {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
@@ -707,46 +747,6 @@ Route::get('/test-order-status', function() {
         return response()->json(['error' => $e->getMessage()]);
     }
 })->middleware('auth');
-
-// Frontend E-commerce Routes
-// Main Store Route (Unified Store)
-Route::get('store', [FrontendProductController::class, 'unifiedStore'])->name('store.unified');
-
-// Individual product and store pages
-Route::get('product/{slug}', [FrontendProductController::class, 'show'])->name('products.show');
-Route::get('store/{slug}', [FrontendProductController::class, 'storeShow'])->name('stores.show');
-
-// Legacy routes (kept for backward compatibility)
-Route::get('products', [FrontendProductController::class, 'index'])->name('products.index');
-Route::get('products/search', [FrontendProductController::class, 'search'])->name('products.search');
-Route::get('products/category/{slug}', [FrontendProductController::class, 'category'])->name('products.category');
-Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores.index');
-
-// AJAX endpoints for frontend
-Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
-Route::get('api/store', [FrontendProductController::class, 'getStores'])->name('api.store');
-
-// Cart routes (works for both authenticated and guest users)
-Route::prefix('cart')->name('cart.')->group(function () {
-    Route::get('/', [App\Http\Controllers\Frontend\CartController::class, 'index'])->name('index');
-    Route::post('/add', [App\Http\Controllers\Frontend\CartController::class, 'add'])->name('add');
-    Route::put('/update', [App\Http\Controllers\Frontend\CartController::class, 'update'])->name('update');
-    Route::delete('/remove', [App\Http\Controllers\Frontend\CartController::class, 'remove'])->name('remove');
-    Route::delete('/clear', [App\Http\Controllers\Frontend\CartController::class, 'clear'])->name('clear');
-    Route::get('/count', [App\Http\Controllers\Frontend\CartController::class, 'count'])->name('count');
-    Route::post('/transfer-guest', [App\Http\Controllers\Frontend\CartController::class, 'transferGuestCart'])->name('transfer-guest');
-});
-
-// Frontend pages
-Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.cart');
-
-// Authenticated frontend routes
-Route::middleware('auth')->group(function () {
-    Route::get('checkout', [FrontendProductController::class, 'checkout'])->name('products.checkout');
-    Route::post('orders', [FrontendProductController::class, 'storeOrder'])->name('orders.store');
-    Route::get('order-success', [FrontendProductController::class, 'orderSuccess'])->name('products.order-success');
-    Route::get('my-order/{id}', [FrontendProductController::class, 'showOrder'])->name('customer.order.show');
-});
 
 // Role-based Theming Demo Route
 Route::get('/theme-demo', function () {

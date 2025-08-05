@@ -23,7 +23,7 @@ trait EcommerceNotificationTrait
             'order' => $order,
             'order_number' => $order->formatted_order_number,
             'total_amount' => getPriceFormat($order->total_amount),
-            'order_date' => $order->created_at->format('Y-m-d H:i:s'),
+            'order_date' => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : now()->format('Y-m-d H:i:s'),
             'store_name' => $order->is_admin_order ? 'Admin Store' : ($order->store ? $order->store->name : 'N/A'),
             'user_name' => $order->customer ? $order->customer->display_name : 'Guest',
             'datetime' => now()->format('Y-m-d H:i:s')
@@ -263,8 +263,7 @@ trait EcommerceNotificationTrait
     {
         \Log::info('EcommerceNotificationTrait::sendNotification called with data: ', $data);
         // Get site setup and general settings
-        $sitesetup = \App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-        $app_setting = $sitesetup ? json_decode($sitesetup->value) : null;
+        $app_setting = \App\Models\Setting::getValueByKey('site-setup', 'site-setup');
         date_default_timezone_set($app_setting->time_zone ?? 'UTC');
         $data['datetime'] = date('Y-m-d H:i:s');
 
@@ -288,8 +287,7 @@ trait EcommerceNotificationTrait
         }
 
         // Get general settings for company info
-        $generalsetting = \App\Models\Setting::where('type','general-setting')->where('key', 'general-setting')->first();
-        $generalsetting = json_decode($generalsetting->value);
+        $generalsetting = \App\Models\Setting::getValueByKey('general-setting', 'general-setting');
 
         // Prepare notification data
         $notification_data = [

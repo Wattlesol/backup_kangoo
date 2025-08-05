@@ -262,8 +262,8 @@ function sitesetupSession($type='get'){
     }
     switch ($type){
         case "set" :
-            $sitesetup = App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-            $settings = $sitesetup ? json_decode($sitesetup->value) : null;
+            // Use the improved getValueByKey method that handles array/object consistency
+            $settings = App\Models\Setting::getValueByKey('site-setup', 'site-setup');
             if(!empty($settings)){
                 \Session::put('setup_data',$settings);
             }
@@ -312,8 +312,8 @@ function envChanges($type,$value){
 function getPriceFormat($price){
     $price = (double)$price;
 
-    $sitesetup = App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-    $sitesetupdata = $sitesetup ? json_decode($sitesetup->value) : null;
+    // Use the improved getValueByKey method that handles array/object consistency
+    $sitesetupdata = App\Models\Setting::getValueByKey('site-setup', 'site-setup');
     $currencyId = optional($sitesetupdata)->default_currency;
     $currency_position = optional($sitesetupdata)->currency_position;
     $afterdecimalpoint = optional($sitesetupdata)->digitafter_decimal_point;

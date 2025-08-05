@@ -329,6 +329,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'product_id' => $product->id,
                 'product_name' => $product->name,
+                'product_sku' => $product->sku ?? 'N/A',
                 'quantity' => $request->quantity,
                 'unit_price' => $product->effective_price,
                 'total_price' => $subtotal

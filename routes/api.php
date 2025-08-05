@@ -221,13 +221,15 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('payment-gateways',[API\PaymentController::class, 'paymentGateways']);
 
     // E-commerce Authenticated Routes (Direct Purchase - No Cart)
-    // Direct Order Creation
+    // Direct Order Creation (Primary method for mobile/API)
     Route::post('orders', [API\OrderController::class, 'createDirectOrder']);
+
+    // Cart-based Order Creation (Alternative method)
+    Route::post('orders/from-cart', [API\OrderController::class, 'create']);
 
     // Order Management
     Route::get('orders', [API\OrderController::class, 'index']);
     Route::get('orders/{id}', [API\OrderController::class, 'show']);
-    Route::post('orders', [API\OrderController::class, 'create']);
     Route::post('orders/{id}/cancel', [API\OrderController::class, 'cancel']);
     Route::get('orders/{id}/track', [API\OrderController::class, 'track']);
 
