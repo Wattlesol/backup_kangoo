@@ -249,4 +249,70 @@ class ProductController extends Controller
             return comman_message_response(__('messages.failed'));
         }
     }
+
+    /**
+     * Get products for authenticated provider (mobile-optimized)
+     */
+    public function providerProducts(Request $request)
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user || $user->user_type !== 'provider') {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $perPage = $request->get('per_page', 15);
+            $categoryId = $request->get('category_id');
+            $status = $request->get('status');
+            $search = $request->get('search');
+
+            $query = Product::with(['category', 'variants'])
+                           ->where('created_by', $user->id)
+                           ->where('created_by_type', 'provider');
+
+            // Apply filters
+            if ($categoryId) {
+                $query->byCategory($categoryId);
+            }
+
+            if ($status !== null) {
+                $query->where('status', $status);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
+
+            $products = $query->orderBy('created_at', 'desc')
+                            ->paginate($perPage);
+
+            $response = [
+                'status' => true,
+                'data' => ProductResource::collection($products),
+                'message' => 'Provider products retrieved successfully'
+            ];
+
+            return comman_custom_response($response);
+
+        } catch (\Exception $e) {
+            \Log::error('Provider products API error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to retrieve products'
+            ], 500);
+        }
+    }
 }

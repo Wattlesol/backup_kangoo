@@ -262,6 +262,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::delete('products/{id}', [App\Http\Controllers\ProductController::class, 'destroy'])->middleware('permission:product delete');
         });
 
+        // Mobile-optimized provider products endpoint
+        Route::get('provider/products', [App\Http\Controllers\API\ProductController::class, 'providerProducts']);
+
         // Stores (Admin can manage all, Provider can manage own)
         Route::group(['middleware' => ['permission:store list']], function () {
             Route::get('stores', [App\Http\Controllers\StoreController::class, 'index_data']);

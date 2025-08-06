@@ -321,6 +321,17 @@ class OrderController extends Controller
 
             $query = Order::with(['customer', 'store', 'items.product']);
 
+            // Apply role-based filtering for security
+            $user = auth()->user();
+            if ($user->user_type === 'provider') {
+                // Providers can only see orders containing their own products
+                $query->whereHas('items.product', function($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                      ->where('created_by_type', 'provider');
+                });
+            }
+            // Admin users can see all orders (no additional filtering needed)
+
             // Apply filters
             if ($status) {
                 $query->where('status', $status);
@@ -414,13 +425,26 @@ class OrderController extends Controller
     public function getOrderAPI($id)
     {
         try {
-            $order = Order::with([
+            $user = auth()->user();
+            $query = Order::with([
                 'customer',
                 'store.provider',
                 'items.product',
                 'items.productVariant',
                 'statusHistories.changedBy'
-            ])->findOrFail($id);
+            ]);
+
+            // Apply role-based filtering for security
+            if ($user->user_type === 'provider') {
+                // Providers can only see orders containing their own products
+                $query->whereHas('items.product', function($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                      ->where('created_by_type', 'provider');
+                });
+            }
+            // Admin users can see all orders (no additional filtering needed)
+
+            $order = $query->findOrFail($id);
 
             $orderData = [
                 'id' => $order->id,

@@ -33,8 +33,13 @@ class ProductController extends Controller
         return view('product.index', compact('pageTitle','auth_user','assets','filter','categories'));
     }
 
-    public function index_data(DataTables $datatable, Request $request)
+    public function index_data(DataTables $datatable = null, Request $request)
     {
+        // If it's an API request, return mobile-friendly JSON
+        if($request->is('api/*')) {
+            return $this->getApiProductList($request);
+        }
+
         $query = Product::with(['category', 'creator']);
         $filter = $request->filter;
 
@@ -69,7 +74,7 @@ class ProductController extends Controller
             $query = $query->withTrashed();
         } elseif ($user->user_type === 'provider') {
             // Providers can only see their own products
-            $query->where('created_by_id', $user->id)
+            $query->where('created_by', $user->id)
                   ->where('created_by_type', 'provider');
         } else {
             // Regular users shouldn't access this endpoint, but if they do, show nothing
@@ -255,17 +260,215 @@ class ProductController extends Controller
     }
 
     /**
+     * Get mobile-friendly API product list for providers
+     */
+    private function getApiProductList(Request $request)
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Unauthorized access'
+                ], 401);
+            }
+
+            $perPage = $request->get('per_page', 15);
+            $categoryId = $request->get('category_id');
+            $status = $request->get('status');
+            $search = $request->get('search');
+
+            $query = Product::with(['category', 'creator']);
+
+            // Apply permission-based filtering
+            if ($user->user_type === 'admin') {
+                // Admin can see all products
+                $query = $query->withTrashed();
+            } elseif ($user->user_type === 'provider') {
+                // Providers can only see their own products
+                $query->where('created_by', $user->id)
+                      ->where('created_by_type', 'provider');
+            } else {
+                // Regular users shouldn't access this endpoint
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Access denied'
+                ], 403);
+            }
+
+            // Apply filters
+            if ($categoryId) {
+                $query->where('product_category_id', $categoryId);
+            }
+
+            if ($status !== null) {
+                $query->where('status', $status);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
+
+            $products = $query->orderBy('created_at', 'desc')
+                            ->paginate($perPage);
+
+            // Transform to mobile-friendly format
+            $mobileProducts = $products->map(function($product) {
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'short_description' => $product->short_description,
+                    'slug' => $product->slug,
+                    'sku' => $product->sku,
+                    'base_price' => (float) $product->base_price,
+                    'selling_price' => (float) $product->selling_price,
+                    'stock_quantity' => $product->stock_quantity,
+                    'low_stock_threshold' => $product->low_stock_threshold,
+                    'is_featured' => (bool) $product->is_featured,
+                    'status' => (bool) $product->status,
+                    'approval_status' => $product->approval_status,
+                    'is_available' => (bool) $product->is_available,
+                    'category' => $product->category ? [
+                        'id' => $product->category->id,
+                        'name' => $product->category->name
+                    ] : null,
+                    'creator' => $product->creator ? [
+                        'id' => $product->creator->id,
+                        'name' => $product->creator->display_name,
+                        'type' => $product->created_by_type
+                    ] : null,
+                    'price_formatted' => getPriceFormat($product->base_price),
+                    'is_low_stock' => $product->stock_quantity <= ($product->low_stock_threshold ?? 5),
+                    'created_at' => $product->created_at->toISOString(),
+                    'updated_at' => $product->updated_at->toISOString()
+                ];
+            });
+
+            return response()->json([
+                'status' => true,
+                'data' => $mobileProducts,
+                'pagination' => [
+                    'current_page' => $products->currentPage(),
+                    'last_page' => $products->lastPage(),
+                    'per_page' => $products->perPage(),
+                    'total' => $products->total(),
+                    'from' => $products->firstItem(),
+                    'to' => $products->lastItem()
+                ],
+                'message' => 'Products retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('API Product list error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to retrieve products'
+            ], 500);
+        }
+    }
+
+    /**
      * Display the specified resource.
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show($id, Request $request)
     {
-        $product = Product::with(['category', 'creator', 'variants'])->findOrFail($id);
-        $pageTitle = trans('messages.view_form_title',['form'=>trans('messages.product')]);
-        $auth_user = authSession();
-        return view('product.view', compact('pageTitle','product','auth_user'));
+        try {
+            $user = auth()->user();
+            $product = Product::with(['category', 'creator', 'variants'])->findOrFail($id);
+
+            // Check if user has permission to view this product
+            if ($user && $user->user_type === 'provider') {
+                // Providers can only view their own products
+                if ($product->created_by !== $user->id || $product->created_by_type !== 'provider') {
+                    if($request->is('api/*')) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Access denied'
+                        ], 403);
+                    }
+                    abort(403, 'Access denied');
+                }
+            }
+
+            // If it's an API request, return JSON
+            if($request->is('api/*')) {
+                $productData = [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'short_description' => $product->short_description,
+                    'slug' => $product->slug,
+                    'sku' => $product->sku,
+                    'base_price' => (float) $product->base_price,
+                    'selling_price' => (float) $product->selling_price,
+                    'stock_quantity' => $product->stock_quantity,
+                    'low_stock_threshold' => $product->low_stock_threshold,
+                    'is_featured' => (bool) $product->is_featured,
+                    'status' => (bool) $product->status,
+                    'approval_status' => $product->approval_status,
+                    'is_available' => (bool) $product->is_available,
+                    'weight' => $product->weight,
+                    'dimensions' => $product->dimensions,
+                    'track_inventory' => (bool) $product->track_inventory,
+                    'category' => $product->category ? [
+                        'id' => $product->category->id,
+                        'name' => $product->category->name,
+                        'slug' => $product->category->slug
+                    ] : null,
+                    'creator' => $product->creator ? [
+                        'id' => $product->creator->id,
+                        'name' => $product->creator->display_name,
+                        'type' => $product->created_by_type
+                    ] : null,
+                    'variants' => $product->variants->map(function($variant) {
+                        return [
+                            'id' => $variant->id,
+                            'name' => $variant->name,
+                            'price' => (float) $variant->price,
+                            'stock_quantity' => $variant->stock_quantity
+                        ];
+                    }),
+                    'price_formatted' => getPriceFormat($product->base_price),
+                    'is_low_stock' => $product->stock_quantity <= ($product->low_stock_threshold ?? 5),
+                    'created_at' => $product->created_at->toISOString(),
+                    'updated_at' => $product->updated_at->toISOString()
+                ];
+
+                return response()->json([
+                    'status' => true,
+                    'data' => $productData,
+                    'message' => 'Product details retrieved successfully'
+                ]);
+            }
+
+            // For web requests, return view
+            $pageTitle = trans('messages.view_form_title',['form'=>trans('messages.product')]);
+            $auth_user = authSession();
+            return view('product.view', compact('pageTitle','product','auth_user'));
+
+        } catch (\Exception $e) {
+            if($request->is('api/*')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Product not found'
+                ], 404);
+            }
+            abort(404, 'Product not found');
+        }
     }
 
     /**
@@ -277,41 +480,74 @@ class ProductController extends Controller
      */
     public function update(Request $request, $id)
     {
-        // Validate the request
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'sku' => 'required|string|max:255|unique:products,sku,' . $id,
-            'description' => 'nullable|string',
-            'product_category_id' => 'required|exists:product_categories,id',
-            'base_price' => 'nullable|numeric|min:0',
-            'stock_quantity' => 'required|integer|min:0',
-            'low_stock_threshold' => 'nullable|integer|min:0',
-            'status' => 'required|boolean',
-        ]);
+        try {
+            $user = auth()->user();
+            $product = Product::findOrFail($id);
 
-        $product = Product::findOrFail($id);
-        $data = $request->all();
-        $data['slug'] = Str::slug($data['name']);
+            // Check if user has permission to update this product
+            if ($user && $user->user_type === 'provider') {
+                // Providers can only update their own products
+                if ($product->created_by !== $user->id || $product->created_by_type !== 'provider') {
+                    if($request->is('api/*')) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Access denied'
+                        ], 403);
+                    }
+                    abort(403, 'Access denied');
+                }
+            }
 
-        // Handle dimensions as JSON
-        if (isset($data['dimensions'])) {
-            $data['dimensions'] = json_encode($data['dimensions']);
+            // Validate the request
+            $request->validate([
+                'name' => 'sometimes|required|string|max:255',
+                'sku' => 'sometimes|required|string|max:255|unique:products,sku,' . $id,
+                'description' => 'nullable|string',
+                'product_category_id' => 'sometimes|required|exists:product_categories,id',
+                'base_price' => 'nullable|numeric|min:0',
+                'selling_price' => 'nullable|numeric|min:0',
+                'stock_quantity' => 'sometimes|required|integer|min:0',
+                'low_stock_threshold' => 'nullable|integer|min:0',
+                'status' => 'sometimes|required|boolean',
+                'is_featured' => 'nullable|boolean',
+            ]);
+
+            $data = $request->all();
+
+            // Only update slug if name is provided
+            if (isset($data['name'])) {
+                $data['slug'] = Str::slug($data['name']);
+            }
+
+            // Handle dimensions as JSON
+            if (isset($data['dimensions'])) {
+                $data['dimensions'] = json_encode($data['dimensions']);
+            }
+
+            // Handle meta_data as JSON
+            if (isset($data['meta_data'])) {
+                $data['meta_data'] = json_encode($data['meta_data']);
+            }
+
+            $product->update($data);
+
+            $message = trans('messages.update_form',['form' => trans('messages.product')]);
+
+            if($request->is('api/*')) {
+                return comman_message_response($message);
+            }
+
+            return redirect(route('product.index'))->withSuccess($message);
+
+        } catch (\Exception $e) {
+            if($request->is('api/*')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed to update product: ' . $e->getMessage()
+                ], 500);
+            }
+            return redirect()->back()->withErrors('Failed to update product: ' . $e->getMessage());
         }
-
-        // Handle meta_data as JSON
-        if (isset($data['meta_data'])) {
-            $data['meta_data'] = json_encode($data['meta_data']);
-        }
-
-        $product->update($data);
-
-        $message = trans('messages.update_form',['form' => trans('messages.product')]);
-
-        if($request->is('api/*')) {
-            return comman_message_response($message);
-        }
-
-        return redirect(route('product.index'))->withSuccess($message);
     }
 
     /**
@@ -320,22 +556,67 @@ class ProductController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        if(demoUserPermission()){
-            return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
-        }
-        $product = Product::find($id);
-        $msg= __('messages.msg_fail_to_delete',['item' => __('messages.product')] );
+        try {
+            if(demoUserPermission()){
+                if($request->is('api/*')) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => trans('messages.demo_permission_denied')
+                    ], 403);
+                }
+                return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+            }
 
-        if($product != '') {
+            $user = auth()->user();
+            $product = Product::find($id);
+
+            if (!$product) {
+                $msg = __('messages.not_found_entry',['name' => __('messages.product')]);
+                if($request->is('api/*')) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => $msg
+                    ], 404);
+                }
+                return comman_custom_response(['message'=> $msg , 'status' => false]);
+            }
+
+            // Check if user has permission to delete this product
+            if ($user && $user->user_type === 'provider') {
+                // Providers can only delete their own products
+                if ($product->created_by !== $user->id || $product->created_by_type !== 'provider') {
+                    if($request->is('api/*')) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Access denied'
+                        ], 403);
+                    }
+                    abort(403, 'Access denied');
+                }
+            }
+
             $product->delete();
-            $msg= __('messages.msg_deleted',['name' => __('messages.product')] );
+            $msg = __('messages.msg_deleted',['name' => __('messages.product')]);
+
+            if($request->is('api/*')) {
+                return response()->json([
+                    'status' => true,
+                    'message' => $msg
+                ]);
+            }
+            return comman_custom_response(['message'=> $msg , 'status' => true]);
+
+        } catch (\Exception $e) {
+            if($request->is('api/*')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed to delete product: ' . $e->getMessage()
+                ], 500);
+            }
+            return redirect()->back()->withErrors('Failed to delete product: ' . $e->getMessage());
         }
-        if(request()->is('api/*')) {
-            return comman_message_response($msg);
-        }
-        return comman_custom_response(['message'=> $msg , 'status' => true]);
     }
 
     public function action(Request $request){
