@@ -33,8 +33,7 @@
                         </p>
                     </div>
                 </div>
-                {{-- <location-search :user_id="{{json_encode($auth_user_id)}}" :postjobservice="{{json_encode($postjobservice)}}"></location-search> --}}
-                <div class="text-center p-4 bg-light rounded">Search functionality temporarily disabled</div>
+                <location-search :user_id="{{json_encode($auth_user_id)}}" :postjobservice="{{json_encode($postjobservice)}}"></location-search>
                @endif
 
              </div>
