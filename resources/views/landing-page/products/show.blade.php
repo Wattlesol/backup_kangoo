@@ -84,7 +84,7 @@
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
                                     <span class="h3 text-primary fw-bold mb-0">{{ getPriceFormat($product->effective_price) }}</span>
-                                    @if($product->admin_price_active && $product->admin_override_price != $product->base_price)
+                                    @if($product->selling_price && $product->selling_price != $product->base_price)
                                         <span class="text-muted text-decoration-line-through ms-2 fs-5">{{ getPriceFormat($product->base_price) }}</span>
                                         <span class="badge bg-success ms-2">Sale</span>
                                     @endif

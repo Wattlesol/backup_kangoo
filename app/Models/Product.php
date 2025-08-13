@@ -25,9 +25,9 @@ class Product extends BaseModel implements HasMedia
         'provider_id',
         'base_price',
         'selling_price',
-        'admin_override_price',
-        'admin_price_active',
-        'price_override_type',
+        
+        
+        
         'weight',
         'dimensions',
         'track_inventory',
@@ -54,8 +54,6 @@ class Product extends BaseModel implements HasMedia
     protected $casts = [
         'base_price' => 'decimal:2',
         'selling_price' => 'decimal:2',
-        'admin_override_price' => 'decimal:2',
-        'admin_price_active' => 'boolean',
         'weight' => 'decimal:2',
         'dimensions' => 'array',
         'track_inventory' => 'boolean',
@@ -159,12 +157,12 @@ class Product extends BaseModel implements HasMedia
     }
 
     // Accessors
+    
+
+
     public function getEffectivePriceAttribute()
     {
-        if ($this->admin_price_active && $this->admin_override_price) {
-            return $this->admin_override_price;
-        }
-        return $this->base_price;
+        return $this->selling_price ?? $this->base_price;
     }
 
     public function getMainImageAttribute()
@@ -206,22 +204,7 @@ class Product extends BaseModel implements HasMedia
         return $this->selling_price ?? $this->base_price;
     }
 
-    public function getFinalPrice($storeId = null)
-    {
-        if ($this->admin_price_active && $this->admin_override_price) {
-            switch ($this->price_override_type) {
-                case 'lowest':
-                    return min($this->admin_override_price, $this->getLowestStorePrice($storeId));
-                case 'highest':
-                    return max($this->admin_override_price, $this->getHighestStorePrice($storeId));
-                case 'fixed':
-                default:
-                    return $this->admin_override_price;
-            }
-        }
-
-        return $this->getLowestStorePrice($storeId);
-    }
+    
 
     public function decreaseStock($quantity)
     {

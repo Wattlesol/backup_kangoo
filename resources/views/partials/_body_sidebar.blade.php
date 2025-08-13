@@ -58,7 +58,6 @@ $menu->services->add('<span>'.trans('messages.list_form_title',['form' => trans(
 ->data('permission', 'service list')
 ->link->attr(['class' => '']);
 
-
 $settings = App\Models\Setting::whereIn('type', ['service-configurations','OTHER_SETTING'])
             ->whereIn('key', ['service-configurations', 'OTHER_SETTING'])
             ->get()
@@ -104,8 +103,6 @@ $menu->add('<span>'.__('messages.booking').'</span><span class="custom-tooltip">
 ->nickname('booking')
 ->data('permission', 'booking list');
 
-
-
 $menu->add('<span>'.__('messages.QualityControl',['form' => __('messages.QualityControl')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'complaint.index_data'])
 ->data('permission', 'handyman list')
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -147,7 +144,6 @@ $menu->add('<span>'.__('messages.complaint').'</span><span class="custom-tooltip
 ->nickname('booking')
 ->data('permission', 'booking list');
 }
-
 
 if (auth()->user()->user_type == "handyman"){
     $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.package_booking').'</span></span>', ['route' => 'servicepackage.Handyman_booking'])
@@ -205,7 +201,6 @@ $menu->add('<span>'.__('messages.CreateBooking').'</span><span class="custom-too
 </svg>')
 ->nickname('booking')
 ->data('permission', 'booking create');
-
 
 $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.package_booking').'</span></span>', ['route' => 'servicepackage.servicepackage_booking'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -274,15 +269,6 @@ $menu->add('<span>Orders</span><span class="custom-tooltip"><span class="tooltip
 ->data('role', ['admin', 'demo_admin'])
 ->link->attr(['class' => '']);
 
-$menu->add('<span>Dynamic Pricing</span><span class="custom-tooltip"><span class="tooltip-text">Dynamic Pricing</span></span>', ['route' => 'dynamic-pricing.index'])
-->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M12 2V22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M17 5H9.5C8.57174 5 7.6815 5.36875 7.02513 6.02513C6.36875 6.6815 6 7.57174 6 8.5C6 9.42826 6.36875 10.3185 7.02513 10.9749C7.6815 11.6313 8.57174 12 9.5 12H14.5C15.4283 12 16.3185 12.3687 16.9749 13.0251C17.6313 13.6815 18 14.5717 18 15.5C18 16.4283 17.6313 17.3185 16.9749 17.9749C16.3185 18.6313 15.4283 19 14.5 19H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>')
-->data('permission', 'dynamic_pricing list')
-->data('role', ['admin', 'demo_admin'])
-->link->attr(['class' => '']);
-
 } // End of admin-only ecommerce section
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.time')]), ['class' => 'category-main'])->data('permission', 'user list');
@@ -308,7 +294,6 @@ $menu->add('<span>'.__('messages.Createtime').'</span><span class="custom-toolti
 ->nickname('time')
 ->data('permission', 'booking create');
 
-
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.city')]), ['class' => 'category-main'])->data('permission', 'user list');
 
 $menu->add('<span>'.__('messages.city').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.city').'</span></span>', ['route' => 'city.index'])
@@ -331,7 +316,6 @@ $menu->add('<span>'.__('messages.CreateCity').'</span><span class="custom-toolti
 </svg>')
 ->nickname('city')
 ->data('permission', 'booking create');
-
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.region')]), ['class' => 'category-main'])->data('permission', 'user list');
 
@@ -356,7 +340,6 @@ $menu->add('<span>'.__('messages.create_region').'</span><span class="custom-too
 ->nickname('region')
 ->data('permission', 'user create');
 
-
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.districts')]), ['class' => 'category-main'])->data('permission', 'user list');
 
 $menu->add('<span>'.__('messages.districts').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.districts').'</span></span>', ['route' => 'districts.index'])
@@ -379,7 +362,6 @@ $menu->add('<span>'.__('messages.create_districts').'</span><span class="custom-
 </svg>')
 ->nickname('districts')
 ->data('permission', 'user create');
-
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.price_list')]), ['class' => 'category-main'])->data('permission', 'user list');
 
@@ -404,12 +386,6 @@ $menu->add('<span>'.__('messages.createPriceList').'</span><span class="custom-t
 ->nickname('pricelist')
 ->data('permission', 'user create');
 
-
-
-
-
-
-
 if(optional($servicesetting)->post_services == 1){
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.custom_job')]), ['class' => 'category-main'])->data('permission', 'postjob');
 
@@ -429,7 +405,6 @@ $menu->add('<span>'.__('messages.job_service_list').'</span><span class="custom-
 }
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.user')]), ['class' => 'category-main'])->data('permission', ['provider list','handyman list','user list']);
-
 
 $menu->add('<span>'.__('messages.provider').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.provider').'</span></span>', ['class' => ''])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -458,8 +433,6 @@ $menu->provider->add('<span>'.__('messages.list_form_title',['form' => __('messa
 </svg>')
 ->link->attr(['class' => '']);
 
-
-
 $menu->provider->add('<span>'.__('messages.list_form_title',['form' => __('messages.providertype')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'providertype.index'])
 ->data('permission', 'providertype list')
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -469,7 +442,6 @@ $menu->provider->add('<span>'.__('messages.list_form_title',['form' => __('messa
 <path d="M18 14C19.7542 14.3847 21 15.3589 21 16.5C21 17.5293 19.9863 18.4229 18.5 18.8704" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
 </svg>')
 ->link->attr(['class' => '']);
-
 
 if(default_earning_type() === 'subscription'){
 $menu->provider->add('<span>'.__('messages.list_form_title',['form' => __('messages.subscribe')]).'</span>', ['class' => 'sidebar-layout' ,'route' => ['provider.pending','subscribe']])
@@ -481,7 +453,6 @@ $menu->provider->add('<span>'.__('messages.list_form_title',['form' => __('messa
 </svg>')
 ->link->attr(['class' => '']);
 }
-
 
 $menu->add('<span>'.__('messages.handyman').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.handyman').'</span></span>', ['class' => ''])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -495,8 +466,6 @@ $menu->add('<span>'.__('messages.handyman').'</span><span class="custom-tooltip"
 ->data('permission', 'handyman list')
 ->link->attr(["class" => ""])
 ->href('#handyman');
-
-
 
 $menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messages.handyman')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'handyman.index'])
 ->data('permission', 'handyman list')
@@ -597,10 +566,7 @@ $menu->add('<span>'.__('messages.list_form_title',['form' => trans('messages.all
 ->nickname('user')
 ->data('permission', 'user list');
 
-
 $menu->add('Transactions', ['class' => 'category-main'])->data('permission', ['tax list','payment list','earning list']);
-
-
 
 $menu->add('<span>'.__('messages.payment').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.payment').'</span></span>', ['route' => 'payment.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -612,8 +578,6 @@ $menu->add('<span>'.__('messages.payment').'</span><span class="custom-tooltip">
 ')
 ->nickname('payment')
 ->data('permission', 'payment list');
-
-
 
 $menu->add('<span>'.__('messages.earning').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.earning').'</span></span>', ['route' => 'earning'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -637,7 +601,6 @@ $menu->add('<span>'.__('messages.wallet').'</span><span class="custom-tooltip"><
 ->nickname('wallet')
 ->data('permission', 'wallet list');
 }
-
 
 $menu->add(__('messages.promotion'), ['class' => 'category-main'])->data('permission', 'coupon list');
 
@@ -670,7 +633,6 @@ $menu->coupon->add('<span>'.__('messages.add_form_title',['form' => __('messages
 </svg>')
 ->link->attr(['class' => '']);
 
-
 $menu->add('Ratings', ['class' => 'category-main'])->data('permission', ['userrating list','handymanrating list']);
 
 $menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.user_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.user_ratings').'</span></span>', ['route' => 'booking-rating.index'])
@@ -686,7 +648,6 @@ $menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.
 </svg>')
 ->nickname('handyman_ratings')
 ->data('permission', 'handymanrating list');
-
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.system')]), ['class' => 'category-main'])
 ->data('permission', ['terms condition','privacy policy','help support','refund cancellation policy','document list']);
@@ -806,7 +767,6 @@ $menu->pages->add('<span>'.__('messages.refund_cancellation_policy').'</span>', 
 </svg>')
 ->link->attr(['class' => '']);
 
-
 $menu->add('<span>'.__('messages.document').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.document').'</span></span>', ['class' => ''])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C22 4.92893 22 7.28595 22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12Z" stroke="currentColor" stroke-width="1.5"/>
@@ -840,7 +800,6 @@ $menu->document->add('<span>'.__('messages.add_form_title',['form' => trans('mes
 ->data('permission', 'document add')
 ->link->attr(['class' => '']);
 
-
 $menu->add('<span>'.__('messages.frontend_setting').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.frontend_setting').'</span></span>', ['route' => 'frontend_setting.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M15.5 9L15.6716 9.17157C17.0049 10.5049 17.6716 11.1716 17.6716 12C17.6716 12.8284 17.0049 13.4951 15.6716 14.8284L15.5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -852,7 +811,6 @@ $menu->add('<span>'.__('messages.frontend_setting').'</span><span class="custom-
 ->data('role', ['admin','demo_admin'])
 ->link->attr(["class" => ""]);
 
-
 $menu->add('<span>'.__('messages.setting').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.setting').'</span></span>', ['route' => 'setting.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
@@ -861,9 +819,6 @@ $menu->add('<span>'.__('messages.setting').'</span><span class="custom-tooltip">
 ')
 ->nickname('setting')
 ->data('permission', 'system setting');
-
-
-
 
 })->filter(function ($item) {
 return checkMenuRoleAndPermission($item);

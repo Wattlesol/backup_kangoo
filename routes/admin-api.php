@@ -61,7 +61,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('get-coupon-list',[API\CommanController::class,'getCouponList']);
     Route::get('get-coupon-service',[API\CommanController::class,'getCouponService']);
 
-
     Route::post('document-save', [ App\Http\Controllers\DocumentsController::class, 'store' ] );
     Route::post('document-delete/{id}', [ App\Http\Controllers\DocumentsController::class, 'destroy' ] );
     Route::post('document-action',[ App\Http\Controllers\DocumentsController::class, 'action' ]);
@@ -112,7 +111,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     Route::post('wallet-delete/{id}',[App\Http\Controllers\WalletController::class,'destroy']);
 
-
     Route::get('get-slider-list',[ API\SliderController::class, 'getSliderList' ]);
     Route::post('slider-save',[ App\Http\Controllers\SliderController::class, 'store' ]);
 
@@ -161,14 +159,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('orders/{id}/update-status', [App\Http\Controllers\OrderController::class, 'updateStatus']);
         Route::post('orders/{id}/update-payment-status', [App\Http\Controllers\OrderController::class, 'updatePaymentStatus']);
         Route::delete('orders/{id}', [App\Http\Controllers\OrderController::class, 'destroy']);
-
-        // Dynamic Pricing
-        Route::get('dynamic-pricing', [App\Http\Controllers\DynamicPricingController::class, 'index_data']);
-        Route::get('dynamic-pricing/analytics', [App\Http\Controllers\DynamicPricingController::class, 'analytics']);
-        Route::post('dynamic-pricing/update', [App\Http\Controllers\DynamicPricingController::class, 'updatePricing']);
-        Route::post('dynamic-pricing/bulk-update', [App\Http\Controllers\DynamicPricingController::class, 'bulkUpdatePricing']);
-        Route::post('dynamic-pricing/price-comparison', [App\Http\Controllers\DynamicPricingController::class, 'priceComparison']);
-        Route::get('dynamic-pricing/{id}', [App\Http\Controllers\DynamicPricingController::class, 'show']);
 
         // Theme Management
         Route::get('theme-colors', [App\Http\Controllers\ThemeController::class, 'getThemeColors']);

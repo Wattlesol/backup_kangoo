@@ -634,22 +634,6 @@ class ProductController extends Controller
         return comman_custom_response(['message'=> $msg , 'status' => true]);
     }
 
-    public function updatePricing(Request $request)
-    {
-        $data = $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'admin_override_price' => 'nullable|numeric|min:0',
-            'admin_price_active' => 'boolean',
-            'price_override_type' => 'in:lowest,highest,fixed'
-        ]);
-
-        $product = Product::findOrFail($data['product_id']);
-        $product->update($data);
-
-        $message = trans('messages.pricing_updated_successfully');
-        return comman_custom_response(['message'=> $message , 'status' => true]);
-    }
-
     /**
      * Get product analytics
      */

@@ -56,7 +56,6 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\Provider\ProductController as ProviderProductController;
 use App\Http\Controllers\Provider\OrderController as ProviderOrderController;
 use App\Http\Controllers\Frontend\ProductController as FrontendProductController;
-use App\Http\Controllers\DynamicPricingController;
 use App\Http\Controllers\QualityControlController;
 
 /*

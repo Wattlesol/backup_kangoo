@@ -22,7 +22,7 @@ class GuestCart
         $variant = $variantId ? ProductVariant::findOrFail($variantId) : null;
         
         // Determine the price
-        $price = $variant ? $variant->final_price : $product->getFinalPrice($storeId);
+        $price = $variant ? $variant->final_price : $product->effective_price;
         
         // Create item key
         $itemKey = self::generateItemKey($productId, $variantId, $storeId);
