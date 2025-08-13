@@ -1,17 +1,5 @@
 <?php
 
-// Suppress deprecation warnings in all environments to clean up console output
-error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
-
-// Suppress deprecation warnings in production
-if (env('APP_ENV') === 'production' || env('APP_DEBUG') === 'false' || env('APP_DEBUG') === false) {
-    error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
-    ini_set('display_errors', '0');
-    ini_set('log_errors', '1');
-}
-
-
-
 /*
 |--------------------------------------------------------------------------
 | Create The Application

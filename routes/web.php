@@ -53,7 +53,6 @@ use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\OrderController;
-use App\Http\Controllers\Provider\StoreController as ProviderStoreController;
 use App\Http\Controllers\Provider\ProductController as ProviderProductController;
 use App\Http\Controllers\Provider\OrderController as ProviderOrderController;
 use App\Http\Controllers\Frontend\ProductController as FrontendProductController;
@@ -70,8 +69,6 @@ use App\Http\Controllers\QualityControlController;
 | contains the "web" middleware group. Now create something great!
 |
 */
-
-
 
 require __DIR__.'/auth.php';
 require __DIR__.'/frontend.php';
@@ -110,18 +107,7 @@ Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores
 Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
 Route::get('api/store', [FrontendProductController::class, 'getStores'])->name('api.store');
 
-// Cart routes (works for both authenticated and guest users)
-Route::prefix('cart')->name('cart.')->group(function () {
-    Route::get('/', [App\Http\Controllers\Frontend\CartController::class, 'index'])->name('index');
-    Route::post('/add', [App\Http\Controllers\Frontend\CartController::class, 'add'])->name('add');
-    Route::put('/update', [App\Http\Controllers\Frontend\CartController::class, 'update'])->name('update');
-    Route::delete('/remove', [App\Http\Controllers\Frontend\CartController::class, 'remove'])->name('remove');
-    Route::delete('/clear', [App\Http\Controllers\Frontend\CartController::class, 'clear'])->name('clear');
-    Route::get('/count', [App\Http\Controllers\Frontend\CartController::class, 'count'])->name('count');
-    Route::post('/transfer-guest', [App\Http\Controllers\Frontend\CartController::class, 'transferGuestCart'])->name('transfer-guest');
-});
-
-// Frontend pages
+// Cart functionality handled by FrontendProductController
 Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.cart');
 
 // Authenticated frontend routes
@@ -155,7 +141,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::get('index_data',[CategoryController::class,'index_data'])->name('category.index_data');
         Route::post('category-bulk-action', [CategoryController::class, 'bulk_action'])->name('category.bulk-action');
         Route::post('category-action',[CategoryController::class, 'action'])->name('category.action');
-        Route::post('category/{id}', [CategoryController::class, 'destroy'])->name('category.destroy');
+        Route::post('category/{id}', [CategoryController::class, 'destroy'])->name('category.delete');
         Route::post('check-in-trash', [CategoryController::class, 'check_in_trash'])->name('check-in-trash');
 
     });
@@ -257,9 +243,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('proiver_booking_servicepackage/AssignHandyman/{booking_id?}', [ServicePackageController::class,'AssignHandyman'])->name('proiver_booking_servicepackage.AssignHandyman');
         Route::post('/proof-image-comment', [ServicePackageController::class, 'storeProofImageComment'])->name('proof_image_comment.store');
 
-
-
-
         Route::get('provider/show/complaint', [ServicePackageController::class,'complaint_provider'])->name('users.complaint_provider');
         Route::get('provider/show/complaint/data/{complaint_id?}', [ServicePackageController::class,'complaint_show'])->name('users.complaint_show_provider');
 
@@ -285,8 +268,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('save-payment',[App\Http\Controllers\API\PaymentController::class, 'savePayment'])->name('payment.save');
     Route::get('save-stripe-payment/{id}',[App\Http\Controllers\BookingController::class, 'saveStripePayment']);
 
-
-
     Route::get('user-change-password', [ CustomerController::class , 'getChangePassword'])->name('user.getchangepassword');
     Route::post('user-change-password', [ CustomerController::class , 'changePassword'])->name('user.changepassword');
     Route::group(['middleware' => ['permission:user list']], function () {
@@ -305,7 +286,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('comission/{id}',[SettingController::class,'comission'])->name('setting.comission');
     Route::get('details/{id}',[BookingController::class,'bookingDetailsData'])->name('booking.detailsdata');
 
-
     // Setting
     Route::get('setting/{page?}',[ SettingController::class, 'settings'])->name('setting.index');
     Route::post('/layout-page',[ SettingController::class, 'layoutPage'])->name('layout_page');
@@ -316,11 +296,9 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     // Route::post('handyman-dashboard-setting',[ SettingController::class , 'handymandashboardtogglesetting'])->name('handymantogglesetting');
     // Route::post('config-save',[ SettingController::class , 'configUpdate'])->name('configUpdate');
 
-
     Route::post('env-setting', [ SettingController::class , 'envChanges'])->name('envSetting');
     Route::post('update-profile', [ SettingController::class , 'updateProfile'])->name('updateProfile');
     Route::post('change-password', [ SettingController::class , 'changePassword'])->name('changePassword');
-
 
     //Frontend Setting
 
@@ -341,8 +319,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('theme-colors/delete-brand-color', [\App\Http\Controllers\ThemeController::class, 'deleteBrandColor'])->name('theme.delete-brand-color');
         Route::post('theme-colors/create-defaults', [\App\Http\Controllers\ThemeController::class, 'createDefaults'])->name('theme.create-defaults');
         Route::post('theme-colors/reset-defaults', [\App\Http\Controllers\ThemeController::class, 'resetToDefaults'])->name('theme.reset-colors');
-
-
 
         Route::post('/header-page-settings', [FrontendSettingController::class, 'headingpagesettings'])->name('heading_page_settings');
         Route::post('/footer-page-settings', [FrontendSettingController::class, 'footerpagesettings'])->name('footer_page_settings');
@@ -428,8 +404,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('earning/{id}', [EarningController::class, 'destroy'])->name('earning.destroy');
     Route::get('earning/{id}', [EarningController::class, 'show'])->name('earning.show');
 
-
-
     //region//
     Route::group(['prefix' => 'region','as' => 'region.'], function () {
         Route::get('/', [RegionController::class, 'index'])->name('index');
@@ -440,7 +414,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::get('/destroy/{id?}', [RegionController::class, 'destroy'])->name('destroy');
     });
     //region//
-
 
     //TimeController//
     Route::group(['prefix' => 'time','as' => 'time.'], function () {
@@ -496,7 +469,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::get('/destroy/{id?}', [PriceCityController::class, 'destroy'])->name('destroy');
     });
     //pricecity//
-
 
     Route::get('handyman-earning',[EarningController::class,'handymanEarning'])->name('handymanEarning');
     Route::get('handyman-earning-data',[EarningController::class,'handymanEarningData'])->name('handymanEarningData');
@@ -563,7 +535,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('bank/create/', [BankController::class,'create'])->name('bank.create');
     Route::get('bank-list/{providerbank}',[BankController::class, 'banklist'])->name('bank.list');
 
-
     Route::get('/provider-detail-page',[ ProviderController::class, 'providerDetail'])->name('provider_detail_pages');
     Route::post('/provider-detail-page',[ ProviderController::class, 'providerDetail'])->name('provider_detail_pages');
     Route::post('/booking-layout-page/{id}',[ BookingController::class, 'bookingstatus'])->name('booking_layout_page');
@@ -598,7 +569,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('blog-action',[BlogController::class, 'action'])->name('blog.action');
         Route::post('blog/{id}', [BlogController::class, 'destroy'])->name('blog.destroy');
     });
-
 
     Route::group(['middleware' => ['permission:handyman list']], function () {
         Route::get('complaint',[QualityControlController::class,'index'])->name('complaint.index_data');
@@ -728,23 +698,4 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     });
 Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list');
 Route::post('/service-list',[HomeController::class, 'getAjaxServiceList'])->name('service-list');
-
-// Role-based Theming Demo Route
-Route::get('/theme-demo', function () {
-    return view('examples.role-theming-demo');
-})->name('theme.demo');
-
-// Simple Theme Test Route
-Route::get('/test-theme', function () {
-    return view('test-theme');
-})->name('test.theme');
-
-// Test Dynamic CSS Generation
-Route::get('/test-css', function () {
-    $controller = new \App\Http\Controllers\DynamicCssController();
-    $request = new \Illuminate\Http\Request(['role' => 'customer', 'theme' => 'light']);
-    return $controller->generateThemeCss($request);
-})->name('test.css');
-
-
 

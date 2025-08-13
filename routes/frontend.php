@@ -20,27 +20,6 @@ use App\Http\Controllers\CustomerController;
 
 require __DIR__.'/auth.php';
 
-// Temporary simple homepage for debugging
-Route::get('/test-home', function() {
-    return '<h1>Simple Test Homepage</h1><p>This is working!</p>';
-});
-
-// Temporary simplified homepage to bypass complex data loading
-Route::get('/simple-home', function() {
-    $pageTitle = 'Kangoo Car Care';
-    $auth_user_id = null;
-    $favourite = null;
-    $postjobservice = null;
-    $totalRating = "0.00";
-    $providers_service_rating = "0.00";
-    $sectionData = [];
-
-    return view('landing-page.index', compact(
-        'pageTitle', 'auth_user_id', 'favourite', 'postjobservice',
-        'totalRating', 'providers_service_rating', 'sectionData'
-    ));
-});
-
 Route::get('/', [FrontendController::class, 'index'])->name('frontend.index');
 Route::get('/login-page', [FrontendController::class, 'userLoginView'])->name('user.login');
 Route::post('/user-login', [CustomerController::class, 'userLogin'])->name('user.user_login');
@@ -82,7 +61,6 @@ Route::get('/rating-all', [FrontendController::class, 'ratingList'])->name('rati
 
 Route::get('/post-job-detail/{id}', [FrontendController::class, 'postJobDetail'])->name('post.job.detail');
 
-
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/booking-list', [FrontendController::class, 'bookingList'])->name('booking.list');
     // Customer order management (moved from standalone route to customer dashboard)
@@ -106,14 +84,4 @@ Route::get('/post-job-datatable', [FrontendController::class, 'postJobDatatable'
 Route::get('/favouriteservice-datatable', [FrontendController::class, 'favouriteServiceDatatable'])->name('favouriteservice.data');
 Route::get('/rating-datatable', [FrontendController::class, 'ratingDatatable'])->name('rating.data');
 Route::post('/user-subscribe', [FrontendController::class, 'userSubscribe'])->name('user.subscribe');
-
-
-
-
-
-
-
-
-
-
 

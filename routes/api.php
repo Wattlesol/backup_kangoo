@@ -48,8 +48,6 @@ Route::get('featured-products', [API\ProductController::class, 'featured']);
 Route::get('store', [API\StoreController::class, 'index']);
 Route::get('store/products', [API\StoreController::class, 'products']);
 
-
-
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
@@ -61,36 +59,12 @@ Route::prefix('v1/theme')->group(function () {
     Route::post('/check-update', [App\Http\Controllers\Api\ThemeController::class, 'checkThemeUpdate']);
 });
 
-// Test route for customer store APIs
-Route::get('/test-store', function() {
-    try {
-        $store = App\Models\Store::where('store_type', 'main')->first();
-        $products = App\Models\Product::where('is_available', true)->limit(5)->get();
-
-        return response()->json([
-            'status' => true,
-            'store' => $store ? $store->name : 'No main store found',
-            'products_count' => $products->count(),
-            'sample_products' => $products->pluck('name'),
-            'message' => 'Customer store APIs are working!'
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => false,
-            'error' => $e->getMessage(),
-            'message' => 'API test failed'
-        ]);
-    }
-});
-
 Route::post('register',[API\User\UserController::class, 'register']);
 Route::post('login',[API\User\UserController::class,'login']);
 Route::post('forgot-password',[ API\User\UserController::class,'forgotPassword']);
 Route::post('social-login',[ API\User\UserController::class, 'socialLogin' ]);
 Route::post('contact-us', [ API\User\UserController::class, 'contactUs' ] );
 Route::post('user-email-verify',[API\User\UserController::class,'verify']);
-
-
 
 Route::get('dashboard-detail',[ API\DashboardController::class, 'dashboardDetail' ]);
 Route::get('service-rating-list',[API\ServiceController::class,'getServiceRating']);
@@ -111,7 +85,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('booking-save', [ App\Http\Controllers\BookingController::class, 'store' ] );
     Route::post('get-payment-method', [ App\Http\Controllers\BookingController::class, 'getPaymentMethod' ] );
     Route::post('create-stripe-payment', [ App\Http\Controllers\BookingController::class, 'createStripePayment' ] );
-
 
     Route::post('booking-update', [ API\BookingController::class, 'bookingUpdate' ] );
     Route::get('provider-dashboard',[ API\DashboardController::class, 'providerDashboard' ]);
@@ -143,7 +116,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('payment-history',[API\PaymentController::class, 'paymentHistory']);
     Route::get('cash-detail',[API\PaymentController::class, 'paymentDetail']);
     Route::get('user-bank-detail',[API\CommanController::class, 'getBankList']);
-
 
     Route::post('save-provideraddress', [ App\Http\Controllers\ProviderAddressMappingController::class, 'store' ]);
     Route::get('provideraddress-list', [ API\ProviderAddressMappingController::class, 'getProviderAddressList' ]);
@@ -188,21 +160,16 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('save-bid',[  App\Http\Controllers\PostJobBidController::class, 'store' ]);
     Route::get('get-bid-list',[  API\PostJobBidController::class, 'getPostBidList' ]);
 
-
     Route::post('save-provider-slot', [ App\Http\Controllers\ProviderSlotController::class, 'store'] );
     Route::get('get-provider-slot', [API\ProviderSlotController::class, 'getProviderSlot' ] );
-
 
     Route::post('package-save',[  App\Http\Controllers\ServicePackageController::class, 'store' ]);
     Route::get('package-list',[API\ServicePackageController::class,'getServicePackageList']);
     Route::post('package-delete/{id}', [ App\Http\Controllers\ServicePackageController::class, 'destroy' ] );
 
-
-
     Route::post('blog-save', [ App\Http\Controllers\BlogController::class, 'store' ] );
     Route::post('blog-delete/{id}', [ App\Http\Controllers\BlogController::class, 'destroy' ] );
     Route::post('blog-action',[ App\Http\Controllers\BlogController::class, 'action' ]);
-
 
     Route::post('save-favourite-provider',[ API\ProviderFavouriteController::class, 'saveFavouriteProvider' ]);
     Route::post('delete-favourite-provider',[ API\ProviderFavouriteController::class, 'deleteFavouriteProvider' ]);
