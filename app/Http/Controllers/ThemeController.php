@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\ThemeSetting;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Artisan;
 
 class ThemeController extends Controller
 {
@@ -47,7 +49,7 @@ class ThemeController extends Controller
                 'themeColors'
             ));
         } catch (\Exception $e) {
-            \Log::error('Theme Colors Index Error:', ['error' => $e->getMessage()]);
+            Log::error('Theme Colors Index Error:', ['error' => $e->getMessage()]);
             return redirect()->back()->with('error', 'Failed to load theme colors: ' . $e->getMessage());
         }
     }
@@ -69,11 +71,11 @@ class ThemeController extends Controller
             $brandColorsFormatted = $this->formatColorsForDisplay($brandColors);
 
             // Debug: Log the data being passed
-            \Log::info('Brand Colors Data:', ['count' => count($brandColorsFormatted), 'data' => $brandColorsFormatted]);
+            Log::info('Brand Colors Data:', ['count' => count($brandColorsFormatted), 'data' => $brandColorsFormatted]);
 
             return view('setting.theme-brand-colors', compact('brandColorsFormatted'));
         } catch (\Exception $e) {
-            \Log::error('Brand Colors Error:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            Log::error('Brand Colors Error:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json(['error' => 'Failed to load brand colors: ' . $e->getMessage()], 500);
         }
     }
@@ -128,26 +130,56 @@ class ThemeController extends Controller
         }
 
         try {
+            // Handle both formats: nested colors array or direct form fields
             $colors = $request->input('colors', []);
 
+            // If no nested colors array, check for direct form fields
+            if (empty($colors)) {
+                $brandColors = $request->input('brand_colors', []);
+                $roleColors = $request->input('role_colors', []);
+
+                $colors = [];
+                if (!empty($brandColors)) {
+                    $colors['brand_colors'] = $brandColors;
+                }
+                if (!empty($roleColors)) {
+                    $colors['role_colors'] = $roleColors;
+                }
+            }
+
+            $updatedCount = 0;
             foreach ($colors as $group => $groupColors) {
                 foreach ($groupColors as $key => $value) {
                     // Validate hex color
                     if (!preg_match('/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/', $value)) {
-                        return response()->json(['success' => false, 'message' => "Invalid color format for {$key}"]);
+                        return response()->json(['success' => false, 'message' => "Invalid color format for {$key}: {$value}"]);
                     }
 
                     ThemeSetting::updateSetting($group, $key, $value);
+                    $updatedCount++;
                 }
+            }
+
+            if ($updatedCount === 0) {
+                return response()->json(['success' => false, 'message' => 'No valid color data received']);
             }
 
             // Clear cache
             ThemeSetting::clearCache();
 
             // Clear dynamic CSS cache for real-time updates
-            \App\Http\Controllers\DynamicCssController::clearThemeCache();
+            if (class_exists('\App\Http\Controllers\DynamicCssController')) {
+                \App\Http\Controllers\DynamicCssController::clearThemeCache();
+            }
 
-            return response()->json(['success' => true, 'message' => trans('messages.update_form', ['form' => trans('messages.theme_colors')])]);
+            // Also clear Laravel's general cache to ensure fresh CSS generation
+            \Illuminate\Support\Facades\Cache::flush();
+
+            return response()->json([
+                'success' => true,
+                'message' => trans('messages.update_form', ['form' => trans('messages.theme_colors')]),
+                'updated_count' => $updatedCount
+            ]);
 
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Failed to update theme colors: ' . $e->getMessage()]);
@@ -308,7 +340,7 @@ class ThemeController extends Controller
 
         try {
             // Run the seeder to reset colors
-            \Artisan::call('db:seed', ['--class' => 'ThemeSettingsSeeder']);
+            Artisan::call('db:seed', ['--class' => 'ThemeSettingsSeeder']);
 
             ThemeSetting::clearCache();
             \App\Http\Controllers\DynamicCssController::clearThemeCache();
@@ -500,7 +532,7 @@ class ThemeController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Get theme colors error: ' . $e->getMessage());
+            Log::error('Get theme colors error: ' . $e->getMessage());
 
             if($request->is('api/*')) {
                 return comman_message_response('Failed to fetch theme colors: ' . $e->getMessage());

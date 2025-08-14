@@ -1,5 +1,6 @@
 {{ Form::model($themeColors, ['method' => 'POST', 'route' => ['theme.update-colors'], 'data-toggle' => 'validator', 'id' => 'theme-colors-form']) }}
 
+@csrf
 {{ Form::hidden('page', $page, array('placeholder' => 'id','class' => 'form-control')) }}
 
                         <div class="row">
@@ -261,40 +262,62 @@ $(document).ready(function() {
         const submitBtn = form.find('button[type="submit"]');
         const originalText = submitBtn.html();
 
+        // Debug: Log form data
+        const formData = form.serialize();
+        console.log('Form data being sent:', formData);
+
         // Show loading state
         submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
 
         $.ajax({
             url: form.attr('action'),
             method: 'POST',
-            data: form.serialize(),
+            data: formData,
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            },
             success: function(response) {
+                console.log('Success response:', response);
                 if (response.success) {
                     // Show success notification
-                    Snackbar.show({
-                        text: response.message,
-                        pos: 'bottom-center',
-                        backgroundColor: '#28a745'
-                    });
+                    if (typeof Snackbar !== 'undefined') {
+                        Snackbar.show({
+                            text: response.message,
+                            pos: 'bottom-center',
+                            backgroundColor: '#28a745'
+                        });
+                    } else {
+                        alert('Colors updated successfully!');
+                    }
                 } else {
                     // Show error notification
+                    const errorMsg = response.message || 'An error occurred';
+                    if (typeof Snackbar !== 'undefined') {
+                        Snackbar.show({
+                            text: errorMsg,
+                            pos: 'bottom-center',
+                            backgroundColor: '#dc3545',
+                            actionTextColor: 'white'
+                        });
+                    } else {
+                        alert('Error: ' + errorMsg);
+                    }
+                }
+            },
+            error: function(xhr) {
+                console.log('Error response:', xhr);
+                // Show error notification
+                const errorMessage = xhr.responseJSON?.message || 'An error occurred while saving';
+                if (typeof Snackbar !== 'undefined') {
                     Snackbar.show({
-                        text: response.message || 'An error occurred',
+                        text: errorMessage,
                         pos: 'bottom-center',
                         backgroundColor: '#dc3545',
                         actionTextColor: 'white'
                     });
+                } else {
+                    alert('Error: ' + errorMessage);
                 }
-            },
-            error: function(xhr) {
-                // Show error notification
-                const errorMessage = xhr.responseJSON?.message || 'An error occurred while saving';
-                Snackbar.show({
-                    text: errorMessage,
-                    pos: 'bottom-center',
-                    backgroundColor: '#dc3545',
-                    actionTextColor: 'white'
-                });
             },
             complete: function() {
                 // Restore button state

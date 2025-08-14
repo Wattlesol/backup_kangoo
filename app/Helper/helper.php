@@ -79,7 +79,8 @@ function checkRolePermission($role,$permission){
 }
 
 function demoUserPermission(){
-    if(\Auth::user()->hasAnyRole(['demo_admin'])){
+    $user = \Auth::user();
+    if($user && $user->hasAnyRole(['demo_admin'])){
         return true;
     }else{
         return false;

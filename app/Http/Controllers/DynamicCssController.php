@@ -237,18 +237,50 @@ class DynamicCssController extends Controller
      */
     private function generateComponentCss()
     {
-        return "/* Component-specific theme styles */\n" .
-               ".card {\n" .
-               "  border-color: rgba(var(--primary-color-rgb), 0.1);\n" .
-               "}\n\n" .
+        return "/* Component-specific theme styles - High specificity overrides */\n" .
+
+               "/* Override Bootstrap and static CSS primary colors */\n" .
+               "body .text-primary,\n" .
+               "html .text-primary,\n" .
                ".text-primary {\n" .
                "  color: var(--primary-color) !important;\n" .
                "}\n\n" .
+
+               "body .bg-primary,\n" .
+               "html .bg-primary,\n" .
                ".bg-primary {\n" .
                "  background-color: var(--primary-color) !important;\n" .
                "}\n\n" .
+
+               "body .btn-primary,\n" .
+               "html .btn-primary,\n" .
+               ".btn-primary {\n" .
+               "  background-color: var(--primary-color) !important;\n" .
+               "  border-color: var(--primary-color) !important;\n" .
+               "}\n\n" .
+
+               "body .btn-primary:hover,\n" .
+               "html .btn-primary:hover,\n" .
+               ".btn-primary:hover {\n" .
+               "  background-color: var(--primary-color-dark) !important;\n" .
+               "  border-color: var(--primary-color-dark) !important;\n" .
+               "}\n\n" .
+
+               "body .border-primary,\n" .
+               "html .border-primary,\n" .
                ".border-primary {\n" .
                "  border-color: var(--primary-color) !important;\n" .
+               "}\n\n" .
+
+               "/* Override hardcoded Bootstrap CSS variables */\n" .
+               ":root {\n" .
+               "  --bs-primary: var(--primary-color) !important;\n" .
+               "  --bs-primary-rgb: var(--primary-color-rgb) !important;\n" .
+               "}\n\n" .
+
+               "/* Card styling */\n" .
+               ".card {\n" .
+               "  border-color: rgba(var(--primary-color-rgb), 0.1);\n" .
                "}\n\n";
     }
 
@@ -260,37 +292,75 @@ class DynamicCssController extends Controller
      */
     private function generateLandingPageComponents($theme)
     {
-        return "/* Landing page components */\n" .
+        return "/* Landing page components - High specificity overrides */\n" .
+
+               "/* Hero section with brand colors */\n" .
                ".hero-section {\n" .
                "  background: linear-gradient(135deg, var(--brand-blue), var(--brand-green));\n" .
                "}\n\n" .
+
+               "/* CTA buttons */\n" .
                ".cta-button {\n" .
                "  background-color: var(--brand-yellow);\n" .
                "  color: #333;\n" .
                "}\n\n" .
+
+               "/* Feature cards */\n" .
                ".feature-card:hover {\n" .
                "  border-color: var(--brand-blue);\n" .
                "}\n\n" .
-               "/* Override hardcoded primary colors */\n" .
+
+               "/* Override hardcoded primary colors with high specificity */\n" .
+               "body .bg-primary,\n" .
+               "html .bg-primary,\n" .
                ".bg-primary {\n" .
-               "  background-color: var(--primary-color) !important;\n" .
+               "  background-color: var(--brand-blue) !important;\n" .
                "}\n\n" .
+
+               "body .text-primary,\n" .
+               "html .text-primary,\n" .
                ".text-primary {\n" .
-               "  color: var(--primary-color) !important;\n" .
+               "  color: var(--brand-blue) !important;\n" .
                "}\n\n" .
+
+               "body .btn-primary,\n" .
+               "html .btn-primary,\n" .
                ".btn-primary {\n" .
-               "  background-color: var(--primary-color) !important;\n" .
-               "  border-color: var(--primary-color) !important;\n" .
+               "  background-color: var(--brand-blue) !important;\n" .
+               "  border-color: var(--brand-blue) !important;\n" .
                "}\n\n" .
+
+               "body .btn-primary:hover,\n" .
+               "html .btn-primary:hover,\n" .
                ".btn-primary:hover {\n" .
-               "  background-color: var(--primary-color-dark) !important;\n" .
-               "  border-color: var(--primary-color-dark) !important;\n" .
+               "  background-color: var(--brand-blue-dark) !important;\n" .
+               "  border-color: var(--brand-blue-dark) !important;\n" .
                "}\n\n" .
+
+               "/* Override Bootstrap CSS variables for landing pages */\n" .
+               ":root {\n" .
+               "  --bs-primary: var(--brand-blue) !important;\n" .
+               "  --bs-primary-rgb: var(--brand-blue-rgb) !important;\n" .
+               "}\n\n" .
+
                "/* Brand color rotating cards */\n" .
+               "body .rotating-card-1,\n" .
                ".rotating-card-1 { background-color: var(--brand-yellow) !important; }\n" .
+
+               "body .rotating-card-2,\n" .
                ".rotating-card-2 { background-color: var(--brand-red) !important; }\n" .
+
+               "body .rotating-card-3,\n" .
                ".rotating-card-3 { background-color: var(--brand-green) !important; }\n" .
-               ".rotating-card-4 { background-color: var(--brand-blue) !important; }\n\n";
+
+               "body .rotating-card-4,\n" .
+               ".rotating-card-4 { background-color: var(--brand-blue) !important; }\n\n" .
+
+               "/* Primary color class for landing pages */\n" .
+               "body .primary-color,\n" .
+               ".primary-color {\n" .
+               "  color: var(--brand-blue) !important;\n" .
+               "}\n\n";
     }
 
     /**

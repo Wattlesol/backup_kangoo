@@ -88,6 +88,11 @@ Route::get('/verify/{id}', [VerificationController::class, 'verify'])->name('ver
 Route::get('css/theme-colors.css', [\App\Http\Controllers\DynamicCssController::class, 'generateThemeCss'])->name('theme.css');
 Route::get('css/landing-theme.css', [\App\Http\Controllers\DynamicCssController::class, 'generateLandingCss'])->name('landing.theme.css');
 
+// Test route for theme colors (development only)
+Route::get('test-theme-colors', function() {
+    return view('test-theme-colors');
+});
+
 // Frontend E-commerce Routes (MUST be before admin routes to avoid conflicts)
 // Main Store Route (Unified Store)
 Route::get('store', [FrontendProductController::class, 'unifiedStore'])->name('store.unified');
