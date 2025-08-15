@@ -5,9 +5,9 @@
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? 'Pending Product Approvals' }}</h5>
+                            <h5 class="font-weight-bold">{{ $pageTitle ?? __('messages.pending_product_approvals') }}</h5>
                             <a href="{{ route('product-approval.rejected') }}" class="btn btn-sm btn-danger">
-                                <i class="fa fa-times"></i> View Rejected
+                                <i class="fa fa-times"></i> {{ __('messages.view_rejected') }}
                             </a>
                         </div>
                     </div>
@@ -38,7 +38,7 @@
                 <div class="d-flex gap-3 align-items-center">
                     <div class="form-group">
                         <select class="form-control select2" id="column_provider">
-                            <option value="">All Providers</option>
+                            <option value="">{{ __('messages.all_providers') }}</option>
                             @foreach($providers ?? [] as $provider)
                                 <option value="{{ $provider->id }}">{{ $provider->display_name }}</option>
                             @endforeach
@@ -52,13 +52,13 @@
                     <thead>
                         <tr>
                             <th><input type="checkbox" class="form-check-input" id="select-all-table"></th>
-                            <th>Product</th>
-                            <th>Provider</th>
-                            <th>Category</th>
-                            <th>Price</th>
-                            <th>Submitted</th>
-                            <th>Status</th>
-                            <th>Action</th>
+                            <th>{{ __('messages.product') }}</th>
+                            <th>{{ __('messages.provider') }}</th>
+                            <th>{{ __('messages.category') }}</th>
+                            <th>{{ __('messages.price') }}</th>
+                            <th>{{ __('messages.submitted') }}</th>
+                            <th>{{ __('messages.status') }}</th>
+                            <th>{{ __('messages.action') }}</th>
                         </tr>
                     </thead>
                     <tbody>

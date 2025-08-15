@@ -196,6 +196,11 @@ class ProductController extends Controller
             return redirect()->route('login')->with('message', 'Please login to checkout');
         }
 
+        // Ensure only customers can access checkout
+        if ($user->user_type !== 'user') {
+            abort(403, 'Access denied. Only customers can access checkout.');
+        }
+
         // Get product information from request parameters
         $productId = $request->get('product_id');
         $quantity = $request->get('quantity', 1);
@@ -220,6 +225,11 @@ class ProductController extends Controller
 
         if (!$user) {
             return redirect()->route('login')->with('message', 'Please login to place an order');
+        }
+
+        // Ensure only customers can place orders
+        if ($user->user_type !== 'user') {
+            abort(403, 'Access denied. Only customers can place orders.');
         }
 
         // Validate the request
@@ -311,6 +321,11 @@ class ProductController extends Controller
             return redirect()->route('login')->with('message', 'Please login to view your orders');
         }
 
+        // Ensure only customers can view orders
+        if ($user->user_type !== 'user') {
+            abort(403, 'Access denied. Only customers can view orders.');
+        }
+
         // Get the order for the current user only
         $order = Order::with(['items.product', 'items.product.category', 'store'])
                      ->where('customer_id', $user->id)
@@ -319,6 +334,53 @@ class ProductController extends Controller
         $pageTitle = 'Order Details - #' . $order->order_number;
 
         return view('landing-page.products.order-detail', compact('order', 'pageTitle'));
+    }
+
+    /**
+     * Cancel a customer order
+     */
+    public function cancelOrder($id, Request $request)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Please login to cancel orders'], 401);
+        }
+
+        // Ensure only customers can cancel orders
+        if ($user->user_type !== 'user') {
+            return response()->json(['success' => false, 'message' => 'Access denied. Only customers can cancel orders.'], 403);
+        }
+
+        try {
+            // Get the order for the current user only
+            $order = Order::where('customer_id', $user->id)->findOrFail($id);
+
+            // Check if order can be cancelled
+            if (!$order->can_be_cancelled) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This order cannot be cancelled. Only pending or confirmed orders can be cancelled.'
+                ], 400);
+            }
+
+            // Get cancellation reason from request or use default
+            $reason = $request->input('reason', 'Cancelled by customer');
+
+            // Cancel the order using the model method
+            $order->cancel($reason, $user->id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order cancelled successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel order. Please try again.'
+            ], 500);
+        }
     }
 
     /**
@@ -492,13 +554,39 @@ class ProductController extends Controller
 
         $products = $query->paginate($perPage);
 
-        // Transform products for frontend
+        // Transform products for customer-friendly frontend display
         $products->getCollection()->transform(function ($product) {
+            // Customer-focused pricing information
             $product->price_formatted = getPriceFormat($product->selling_price ?: $product->base_price);
+            $product->original_price = $product->base_price;
+            $product->sale_price = $product->selling_price;
+            $product->has_discount = $product->selling_price && $product->selling_price < $product->base_price;
+            $product->discount_percentage = $product->has_discount ?
+                round((($product->base_price - $product->selling_price) / $product->base_price) * 100) : 0;
+
+            // Customer-relevant product information
             $product->category_name = $product->category ? $product->category->name : '';
-            $product->provider_name = $product->provider ? $product->provider->display_name : '';
-            $product->image_url = $product->getFirstMediaUrl('product_images') ?: null;
+            $product->main_image = $product->getFirstMediaUrl('product_images') ?: asset('images/default-product.jpg');
             $product->url = route('products.show', $product->slug);
+
+            // Stock and availability (customer-friendly)
+            $product->is_in_stock = $product->stock_quantity > 0;
+            $product->is_low_stock = $product->stock_quantity <= ($product->low_stock_threshold ?? 5);
+            $product->stock_status = $product->is_in_stock ?
+                ($product->is_low_stock ? 'Low Stock' : 'In Stock') : 'Out of Stock';
+
+            // Customer benefits and features
+            $product->key_features = $this->extractKeyFeatures($product);
+            $product->customer_benefits = $this->getCustomerBenefits($product);
+
+            // Remove technical/administrative fields that customers don't need
+            unset($product->sku, $product->created_by, $product->created_by_type,
+                  $product->provider_id, $product->approval_status, $product->approved_at,
+                  $product->approved_by, $product->admin_notes, $product->provider_notes,
+                  $product->meta_data, $product->sort_order, $product->track_inventory,
+                  $product->minimum_order_quantity, $product->maximum_order_quantity,
+                  $product->low_stock_threshold);
+
             return $product;
         });
 
@@ -596,5 +684,68 @@ class ProductController extends Controller
             'inStockOnly',
             'featuredOnly'
         ));
+    }
+
+    /**
+     * Extract key features from product for customer display
+     */
+    private function extractKeyFeatures($product)
+    {
+        $features = [];
+
+        // Add weight if available (useful for shipping)
+        if ($product->weight) {
+            $features[] = "Weight: {$product->weight} kg";
+        }
+
+        // Add dimensions if available
+        if ($product->dimensions) {
+            if (is_array($product->dimensions)) {
+                $features[] = "Dimensions: " . implode(' x ', $product->dimensions) . " cm";
+            } else {
+                $features[] = "Dimensions: {$product->dimensions}";
+            }
+        }
+
+        // Add category as a feature
+        if ($product->category) {
+            $features[] = "Category: {$product->category->name}";
+        }
+
+        // Add featured status
+        if ($product->is_featured) {
+            $features[] = "Featured Product";
+        }
+
+        return $features;
+    }
+
+    /**
+     * Get customer benefits and selling points
+     */
+    private function getCustomerBenefits($product)
+    {
+        $benefits = [
+            'Fast Delivery Available',
+            'Secure Payment Options',
+            'Quality Guaranteed'
+        ];
+
+        // Add stock-based benefits
+        if ($product->stock_quantity > 0) {
+            $benefits[] = 'Ready to Ship';
+        }
+
+        // Add discount benefit
+        if ($product->selling_price && $product->selling_price < $product->base_price) {
+            $benefits[] = 'Special Offer Price';
+        }
+
+        // Add featured benefit
+        if ($product->is_featured) {
+            $benefits[] = 'Top Rated Product';
+        }
+
+        return $benefits;
     }
 }

@@ -5,9 +5,9 @@
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? 'Rejected Products' }}</h5>
+                            <h5 class="font-weight-bold">{{ $pageTitle ?? __('messages.rejected_products') }}</h5>
                             <a href="{{ route('product-approval.pending') }}" class="btn btn-sm btn-warning">
-                                <i class="fa fa-clock"></i> View Pending
+                                <i class="fa fa-clock"></i> {{ __('messages.view_pending') }}
                             </a>
                         </div>
                     </div>
@@ -25,7 +25,7 @@
                             @csrf
                             <select name="action_type" class="form-control select2" id="quick-action-type" style="width:100%" disabled>
                                 <option value="">{{ __('messages.no_action') }}</option>
-                                <option value="reconsider">Reconsider for Approval</option>
+                                <option value="reconsider">{{ __('messages.reconsider_for_approval') }}</option>
                             </select>
 
                             <button id="quick-action-apply" class="btn btn-primary" data-ajax="true"
@@ -41,14 +41,14 @@
                     <thead>
                         <tr>
                             <th><input type="checkbox" class="form-check-input" id="select-all-table"></th>
-                            <th>Product</th>
-                            <th>Provider</th>
-                            <th>Category</th>
-                            <th>Price</th>
-                            <th>Rejected Date</th>
-                            <th>Rejected By</th>
-                            <th>Reason</th>
-                            <th>Action</th>
+                            <th>{{ __('messages.product') }}</th>
+                            <th>{{ __('messages.provider') }}</th>
+                            <th>{{ __('messages.category') }}</th>
+                            <th>{{ __('messages.price') }}</th>
+                            <th>{{ __('messages.rejected_date') }}</th>
+                            <th>{{ __('messages.rejected_by') }}</th>
+                            <th>{{ __('messages.reason') }}</th>
+                            <th>{{ __('messages.action') }}</th>
                         </tr>
                     </thead>
                     <tbody>

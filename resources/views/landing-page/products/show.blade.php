@@ -9,11 +9,7 @@
                 <nav aria-label="breadcrumb" class="text-center iq-breadcrumb-two">
                     <h2 class="title text-white">{{ $product->name }}</h2>
                     <ol class="breadcrumb main-bg">
-                        <li class="breadcrumb-item"><a href="{{ route('frontend.index') }}">Home</a></li>
-                        <li class="breadcrumb-item"><a href="{{ route('products.index') }}">Products</a></li>
-                        @if($product->category)
-                            <li class="breadcrumb-item"><a href="{{ route('products.category', $product->category->slug) }}">{{ $product->category->name }}</a></li>
-                        @endif
+                        <li class="breadcrumb-item"><a href="{{ route('store.unified') }}">Store</a></li>
                         <li class="breadcrumb-item active">{{ $product->name }}</li>
                     </ol>
                 </nav>
@@ -285,10 +281,11 @@
                             </div>
                             <div class="tab-pane fade" id="specifications" role="tabpanel">
                                 <div class="p-3">
+                                    <h6 class="fw-semibold mb-3">Product Specifications</h6>
                                     <table class="table table-borderless">
                                         <tr>
-                                            <td><strong>SKU:</strong></td>
-                                            <td>{{ $product->sku }}</td>
+                                            <td><strong>Category:</strong></td>
+                                            <td>{{ $product->category ? $product->category->name : 'General' }}</td>
                                         </tr>
                                         @if($product->weight)
                                             <tr>
@@ -309,12 +306,56 @@
                                             </tr>
                                         @endif
                                         <tr>
-                                            <td><strong>Category:</strong></td>
-                                            <td>{{ $product->category ? $product->category->name : 'N/A' }}</td>
+                                            <td><strong>Availability:</strong></td>
+                                            <td>
+                                                @if($product->is_in_stock)
+                                                    <span class="text-success">✓ In Stock</span>
+                                                @else
+                                                    <span class="text-danger">✗ Out of Stock</span>
+                                                @endif
+                                            </td>
                                         </tr>
+                                        @if($product->is_featured)
+                                            <tr>
+                                                <td><strong>Product Type:</strong></td>
+                                                <td><span class="badge bg-warning text-dark">Featured Product</span></td>
+                                            </tr>
+                                        @endif
                                     </table>
+
+                                    <!-- Customer Benefits Section -->
+                                    <div class="mt-4">
+                                        <h6 class="fw-semibold mb-3">Why Choose This Product</h6>
+                                        <div class="row g-2">
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <i class="fas fa-shipping-fast text-primary me-2"></i>
+                                                    <small>Fast & Reliable Delivery</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <i class="fas fa-shield-alt text-success me-2"></i>
+                                                    <small>Quality Guaranteed</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <i class="fas fa-credit-card text-info me-2"></i>
+                                                    <small>Secure Payment Options</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <i class="fas fa-undo text-warning me-2"></i>
+                                                    <small>Easy Returns & Exchanges</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 </div>

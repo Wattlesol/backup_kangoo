@@ -3,7 +3,7 @@
 use \Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
-function authSession($force=false){
+function authSession(bool $force = false){
     $session = new \App\Models\User;
     if($force){
         $user = \Auth::user()->getRoleNames();
@@ -21,11 +21,11 @@ function authSession($force=false){
     return $session;
 }
 
-function comman_message_response( $message, $status_code = 200){
+function comman_message_response(string $message, int $status_code = 200){
 	return response()->json( [ 'message' => $message ], $status_code );
 }
 
-function comman_custom_response( $response, $status_code = 200 ){
+function comman_custom_response(array $response, int $status_code = 200 ){
     return response()->json($response,$status_code);
 }
 
@@ -87,7 +87,7 @@ function demoUserPermission(){
     }
 }
 
-function getSingleMedia($model, $collection = 'profile_image', $skip=true   ){
+function getSingleMedia($model, string $collection = 'profile_image', ?bool $skip = true){
     if (!\Auth::check() && $skip) {
         return asset('images/user/user.png');
     }
@@ -203,7 +203,7 @@ function getAttachmentArray($attchments){
     return $files;
 }
 
-function getMediaFileExit($model, $collection = 'profile_image'){
+function getMediaFileExit($model, string $collection = 'profile_image'){
     if($model==null){
         return asset('images/user/user.png');;
     }
@@ -227,7 +227,7 @@ function formatOffset($offset){
         . ':' . str_pad($minutes, 2, '0');
 }
 
-function settingSession($type='get'){
+function settingSession(string $type = 'get'){
     if(\Session::get('setting_data') == ''){
         $type='set';
     }
@@ -242,7 +242,7 @@ function settingSession($type='get'){
     return \Session::get('setting_data');
 }
 
-function imageSession($type='get'){
+function imageSession(string $type = 'get'){
     if(\Session::get('images_data') == ''){
         $type='set';
     }
@@ -257,7 +257,7 @@ function imageSession($type='get'){
     return \Session::get('images_data');
 }
 
-function sitesetupSession($type='get'){
+function sitesetupSession(string $type = 'get'){
     if(\Session::get('setup_data') == ''){
         $type='set';
     }
@@ -1767,7 +1767,7 @@ function create_bank_tranfer($data){
 
 }
 
-function calculateReadingTime($content, $wpm = 100) {
+function calculateReadingTime(string $content, int $wpm = 100) {
     $wordCount = str_word_count(strip_tags($content));
 
     $readingTime = intval($wordCount / $wpm);

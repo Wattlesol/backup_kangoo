@@ -81,6 +81,11 @@ Route::group(['prefix' => 'auth'], function() {
     Route::get('lock-screen', [HomeController::class, 'authlockScreen'])->name('auth.lock-screen');
 });
 
+// General logout routes for direct access (both GET and POST)
+Route::match(['get', 'post'], '/logout-direct', [AuthenticatedSessionController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('logout.direct');
+
 Route::get('lang/{locale}', [HomeController::class,'lang'])->name('switch-language');
 Route::get('/verify/{id}', [VerificationController::class, 'verify'])->name('verify');
 
@@ -120,6 +125,7 @@ Route::middleware('auth')->group(function () {
     Route::post('orders', [FrontendProductController::class, 'storeOrder'])->name('orders.store');
     Route::get('order-success', [FrontendProductController::class, 'orderSuccess'])->name('products.order-success');
     Route::get('my-order/{id}', [FrontendProductController::class, 'showOrder'])->name('customer.order.show');
+    Route::post('my-order/{id}/cancel', [FrontendProductController::class, 'cancelOrder'])->name('customer.order.cancel');
 });
 
 Route::group(['middleware' => ['auth', 'verified']], function()
@@ -683,12 +689,12 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 
 });
 
-    // Provider Routes (Single Store Architecture)
-    Route::group(['prefix' => 'provider', 'middleware' => ['role:provider']], function () {
+// Provider Dashboard Routes (Single Store Architecture) - Different prefix to avoid conflict
+Route::group(['prefix' => 'provider-dashboard', 'middleware' => ['auth', 'role:provider']], function () {
         Route::get('dashboard', [ProviderOrderController::class, 'dashboard'])->name('provider.dashboard');
 
         // Product Management - Providers manage their own products
-        Route::group(['middleware' => ['can:provider_product manage']], function () {
+        Route::group(['middleware' => ['permission:provider_product manage']], function () {
             Route::resource('product', ProviderProductController::class, ['as' => 'provider']);
             Route::get('product-index-data', [ProviderProductController::class, 'index_data'])->name('provider.product.index_data');
         });
@@ -700,6 +706,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('order-update-status', [ProviderOrderController::class, 'updateStatus'])->name('provider.order.update-status');
         Route::get('order-statistics', [ProviderOrderController::class, 'statistics'])->name('provider.order.statistics');
     });
+
 Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list');
 Route::post('/service-list',[HomeController::class, 'getAjaxServiceList'])->name('service-list');
 

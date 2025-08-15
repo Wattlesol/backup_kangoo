@@ -438,23 +438,74 @@ $(document).ready(function() {
         const bodyClass = isGridView ? 'card-body' : 'card-body flex-grow-1';
 
         const price = product.effective_price || product.base_price || 0;
+        const originalPrice = product.original_price || product.base_price;
+        const hasDiscount = product.has_discount || false;
+        const discountPercentage = product.discount_percentage || 0;
         const image = product.main_image || '/images/default-product.png';
+        const stockStatus = product.stock_status || 'In Stock';
+        const isInStock = product.is_in_stock !== false;
+
+        // Build discount badge
+        const discountBadge = hasDiscount ?
+            `<span class="badge bg-danger position-absolute top-0 end-0 m-2">${discountPercentage}% OFF</span>` : '';
+
+        // Build featured badge
+        const featuredBadge = product.is_featured ?
+            '<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2"><i class="fas fa-star me-1"></i>Featured</span>' : '';
+
+        // Build stock badge
+        const stockBadge = !isInStock ?
+            '<span class="badge bg-secondary position-absolute" style="bottom: 10px; left: 10px;">Out of Stock</span>' : '';
+
+        // Build price display
+        const priceDisplay = hasDiscount ?
+            `<div class="price-section">
+                <span class="h6 text-primary fw-bold mb-0">$${parseFloat(price).toFixed(2)}</span>
+                <small class="text-muted text-decoration-line-through ms-1">$${parseFloat(originalPrice).toFixed(2)}</small>
+            </div>` :
+            `<span class="h6 text-primary fw-bold mb-0">$${parseFloat(price).toFixed(2)}</span>`;
 
         return `
             <div class="${cardClass}">
                 <div class="card h-100 border-0 shadow-sm product-card ${layoutClass}" style="transition: transform 0.2s;">
                     <div class="${isGridView ? '' : 'd-flex'}">
-                        <img src="${image}" class="${imageClass} rounded-top" alt="${product.name}"
-                             style="${isGridView ? 'height: 220px;' : 'width: 150px; height: 150px;'} object-fit: cover;">
+                        <div class="position-relative">
+                            <img src="${image}" class="${imageClass} rounded-top" alt="${product.name}"
+                                 style="${isGridView ? 'height: 220px;' : 'width: 150px; height: 150px;'} object-fit: cover;">
+                            ${featuredBadge}
+                            ${discountBadge}
+                            ${stockBadge}
+                        </div>
                         <div class="${bodyClass} p-3">
                             <h6 class="card-title text-dark fw-semibold mb-2">${product.name}</h6>
-                            <p class="card-text text-muted small mb-3">${product.short_description || ''}</p>
+                            <p class="card-text text-muted small mb-2">${product.short_description || ''}</p>
+
+                            <!-- Category and Stock Status -->
                             <div class="mb-3">
-                                <span class="badge bg-light text-dark border">${product.category ? product.category.name : 'Uncategorized'}</span>
+                                <span class="badge bg-light text-dark border me-1">${product.category ? product.category.name : 'General'}</span>
+                                <span class="badge ${isInStock ? 'bg-success' : 'bg-secondary'} text-white">${stockStatus}</span>
                             </div>
-                            <div class="d-flex ${isGridView ? 'justify-content-between' : 'justify-content-between'} align-items-center">
-                                <span class="h6 text-primary fw-bold mb-0">$${parseFloat(price).toFixed(2)}</span>
-                                <a href="/product/${product.slug}" class="btn btn-primary btn-sm">{{__('landingpage.view_details')}}</a>
+
+                            <!-- Customer Benefits -->
+                            ${isGridView ? '' : `
+                                <div class="mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-shipping-fast me-1"></i>Fast Delivery •
+                                        <i class="fas fa-shield-alt me-1"></i>Quality Guaranteed
+                                    </small>
+                                </div>
+                            `}
+
+                            <div class="d-flex ${isGridView ? 'justify-content-between' : 'justify-content-between'} align-items-center mt-auto">
+                                ${priceDisplay}
+                                ${isInStock ?
+                                    `<a href="/product/${product.slug}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye me-1"></i>{{__('landingpage.view_details')}}
+                                    </a>` :
+                                    `<button class="btn btn-secondary btn-sm" disabled>
+                                        <i class="fas fa-times me-1"></i>Out of Stock
+                                    </button>`
+                                }
                             </div>
                         </div>
                     </div>

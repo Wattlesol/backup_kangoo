@@ -1182,5 +1182,61 @@
     'edit_form_title' => 'Edit :form',
     'add_form_title' => 'Add :form',
     'update_form_title' => 'Update :form',
+
+    // Missing translation keys
+    'orders_containing_your_products' => 'Orders containing your products',
+    'your_items' => 'Your Items',
+    'your_total' => 'Your Total',
+    'order_total' => 'Order Total',
+    'select_category' => 'Select Category',
+    'short_description' => 'Short Description',
+    'weight' => 'Weight',
+    'note' => 'Note',
+
+    // Admin product approval translations
+    'product' => 'Product',
+    'provider' => 'Provider',
+    'category' => 'Category',
+    'price' => 'Price',
+    'rejected_date' => 'Rejected Date',
+    'rejected_by' => 'Rejected By',
+    'reason' => 'Reason',
+    'action' => 'Action',
+    'submitted' => 'Submitted',
+    'status' => 'Status',
+    'rejected_products' => 'Rejected Products',
+    'pending_product_approvals' => 'Pending Product Approvals',
+    'view_pending' => 'View Pending',
+    'view_rejected' => 'View Rejected',
+    'reconsider_for_approval' => 'Reconsider for Approval',
+    'all_providers' => 'All Providers',
+
+    // Customer export translations
+    'name' => 'Name',
+    'phone' => 'Phone',
+
+    // Document translations
+    'document_name' => 'Document Name',
+    'document' => 'Document',
+    'expiry_date' => 'Expiry Date',
+    'notes' => 'Notes',
+    'file' => 'File',
+    'edit' => 'Edit',
+    'delete' => 'Delete',
+    'count' => 'Count',
+    'are_you_sure_delete' => 'Are you sure you want to delete this item?',
+
+    // Order cancellation translations
+    'cancellation_reason' => 'Cancellation Reason',
+    'enter_cancellation_reason' => 'Please enter the reason for cancelling this order',
+    'cancel_order' => 'Cancel Order',
+    'back' => 'Back',
+    'reason_required' => 'Please provide a reason for cancellation',
+    'cancel_order_confirmation' => 'This action cannot be undone. Are you sure you want to cancel this order?',
+    'yes_cancel' => 'Yes, Cancel Order',
+    'no_keep' => 'No, Keep Order',
+    'cancelled' => 'Cancelled',
+    'order_cancelled_successfully' => 'Order cancelled successfully',
+    'something_wrong' => 'Something went wrong. Please try again.',
 )
     ?>

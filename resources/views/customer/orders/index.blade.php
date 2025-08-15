@@ -149,10 +149,10 @@
                                             </td>
                                             <td>
                                                 <div class="btn-group" role="group">
-                                                    <a href="{{ route('order.show', $order->id) }}" class="btn btn-sm btn-outline-primary" title="{{ __('messages.view') }}">
+                                                    <a href="{{ route('customer.order.show', $order->id) }}" class="btn btn-sm btn-outline-primary" title="{{ __('messages.view') }}">
                                                         <i class="fas fa-eye"></i>
                                                     </a>
-                                                    @if($order->status === 'pending')
+                                                    @if($order->can_be_cancelled)
                                                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="cancelOrder({{ $order->id }})" title="{{ __('messages.cancel') }}">
                                                             <i class="fas fa-times"></i>
                                                         </button>
@@ -197,25 +197,48 @@ function cancelOrder(orderId) {
         cancelButtonText: '{{ __("messages.no_keep") }}'
     }).then((result) => {
         if (result.isConfirmed) {
-            // Add AJAX call to cancel order
-            fetch(`/order/${orderId}/cancel`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            // Prompt for cancellation reason
+            Swal.fire({
+                title: '{{ __("messages.cancellation_reason") }}',
+                input: 'textarea',
+                inputPlaceholder: '{{ __("messages.enter_cancellation_reason") }}',
+                inputAttributes: {
+                    'aria-label': '{{ __("messages.enter_cancellation_reason") }}'
+                },
+                showCancelButton: true,
+                confirmButtonText: '{{ __("messages.cancel_order") }}',
+                cancelButtonText: '{{ __("messages.back") }}',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return '{{ __("messages.reason_required") }}'
+                    }
                 }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire('{{ __("messages.cancelled") }}', data.message, 'success')
-                        .then(() => location.reload());
-                } else {
-                    Swal.fire('{{ __("messages.error") }}', data.message, 'error');
+            }).then((reasonResult) => {
+                if (reasonResult.isConfirmed) {
+                    // Add AJAX call to cancel order
+                    fetch(`/my-order/${orderId}/cancel`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            reason: reasonResult.value
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire('{{ __("messages.cancelled") }}', data.message, 'success')
+                                .then(() => location.reload());
+                        } else {
+                            Swal.fire('{{ __("messages.error") }}', data.message, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire('{{ __("messages.error") }}', '{{ __("messages.something_wrong") }}', 'error');
+                    });
                 }
-            })
-            .catch(error => {
-                Swal.fire('{{ __("messages.error") }}', '{{ __("messages.something_wrong") }}', 'error');
             });
         }
     });

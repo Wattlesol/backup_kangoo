@@ -40,7 +40,10 @@ class ProductController extends Controller
             return $this->getApiProductList($request);
         }
 
-        $query = Product::with(['category', 'creator']);
+        // Only show approved products in main products list
+        // Pending products should be managed through Product Approval section
+        $query = Product::with(['category', 'creator'])
+                       ->where('approval_status', 'approved');
         $filter = $request->filter;
 
         if (isset($filter)) {
@@ -283,8 +286,8 @@ class ProductController extends Controller
 
             // Apply permission-based filtering
             if ($user->user_type === 'admin') {
-                // Admin can see all products
-                $query = $query->withTrashed();
+                // Admin can see all approved products (pending products managed separately)
+                $query = $query->where('approval_status', 'approved')->withTrashed();
             } elseif ($user->user_type === 'provider') {
                 // Providers can only see their own products
                 $query->where('created_by', $user->id)

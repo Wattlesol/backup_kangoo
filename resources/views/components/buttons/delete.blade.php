@@ -8,7 +8,7 @@
 ])
 
 <form action="{{ $route }}" method="POST" style="display: inline-block;" 
-      @if($confirm) onsubmit="return confirm('Are you sure you want to delete this item?')" @endif>
+      @if($confirm) onsubmit="return confirm('{{ __('messages.are_you_sure_delete') }}')" @endif>
     @csrf
     @method($method)
     <button type="submit" class="{{ $class }}" title="{{ $title }}">

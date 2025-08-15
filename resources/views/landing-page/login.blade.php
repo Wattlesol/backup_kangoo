@@ -139,6 +139,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const serviceId = urlParams.get('service_id');
             const Favservice = urlParams.get('favorite_service');
+            const redirectUrl = urlParams.get('redirect');
 
             $.ajax({
                 method: 'post',
@@ -147,7 +148,10 @@
                 dataType: 'json',
                 success: function(response) {
                     if(response.data){
-                       if(serviceId !=null){
+                       if(redirectUrl != null){
+                        // Redirect to the intended URL (e.g., checkout page)
+                        window.location.href = decodeURIComponent(redirectUrl);
+                       }else if(serviceId !=null){
                         window.location.href = baseUrl + '/book-service?id=' + serviceId;
                        }else if(Favservice != null){
                         window.location.href = baseUrl + '/service-detail/' + Favservice;

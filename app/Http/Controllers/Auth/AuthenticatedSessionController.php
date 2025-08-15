@@ -36,13 +36,15 @@ class AuthenticatedSessionController extends Controller
         $user = \Auth::user();
 
         if($request->login == 'user_login' && $user->user_type === 'user'){
-            return redirect(RouteServiceProvider::FRONTEND);
-        } 
+            // For customer login, check if there's an intended URL (e.g., checkout page)
+            return redirect()->intended(RouteServiceProvider::FRONTEND);
+        }
         elseif($request->login == 'user_login' && $user->user_type !== 'user') {
             Auth::logout();
             return redirect()->back()->withErrors(['message' => 'You are not allowed to log in from here.']);
         }
         else{
+            // For admin/provider login, always go to dashboard
             return redirect(RouteServiceProvider::HOME);
         }
     }

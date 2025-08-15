@@ -21,7 +21,7 @@ class OrderController extends Controller
         $auth_user = auth()->user();
 
         if ($auth_user->user_type !== 'provider') {
-            return redirect()->route('home')->withErrors('Unauthorized access');
+            abort(403, 'User does not have the right permissions.');
         }
 
         $filter = [

@@ -27,6 +27,10 @@ Route::get('/register-page', [FrontendController::class, 'userRegistrationView']
 Route::get('/provider-register', [FrontendController::class, 'partnerRegistrationView'])->name('partner.register');
 Route::get('/forgotpassword-page', [FrontendController::class, 'forgotPassword'])->name('user.forgot_password');
 
+// Frontend logout routes (both GET and POST)
+Route::post('/user-logout', [CustomerController::class, 'userLogout'])->name('user.logout');
+Route::get('/user-logout', [CustomerController::class, 'userLogout'])->name('user.logout.get');
+
 Route::get('/category-list', [FrontendController::class, 'catgeoryList'])->name('category.list');
 
 Route::get('/subcategory-list', [FrontendController::class, 'subCatgeoryList'])->name('subcategory.list');

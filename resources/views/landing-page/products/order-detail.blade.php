@@ -6,8 +6,7 @@
         <!-- Breadcrumb -->
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
-                <li class="breadcrumb-item"><a href="{{ url('/store') }}">Store</a></li>
+                <li class="breadcrumb-item"><a href="{{ route('store.unified') }}">Store</a></li>
                 <li class="breadcrumb-item active" aria-current="page">Order #{{ $order->order_number }}</li>
             </ol>
         </nav>
@@ -313,8 +312,42 @@
 <script>
 function cancelOrder(orderId) {
     if (confirm('Are you sure you want to cancel this order?')) {
-        // Add cancel order functionality here
-        alert('Order cancellation feature will be implemented');
+        // Prompt for cancellation reason
+        const reason = prompt('Please enter the reason for cancelling this order:');
+
+        if (reason === null) {
+            return; // User cancelled the prompt
+        }
+
+        if (reason.trim() === '') {
+            alert('Please provide a reason for cancellation');
+            return;
+        }
+
+        // Send cancel request
+        fetch(`/my-order/${orderId}/cancel`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                reason: reason.trim()
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Order cancelled successfully');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to cancel order. Please try again.');
+        });
     }
 }
 </script>

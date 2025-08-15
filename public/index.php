@@ -1,5 +1,10 @@
 <?php
 
+// Suppress PHP 8.4 deprecation warnings for Laravel 8 compatibility
+if (version_compare(PHP_VERSION, '8.4.0', '>=')) {
+    error_reporting(E_ALL & ~E_DEPRECATED);
+}
+
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 

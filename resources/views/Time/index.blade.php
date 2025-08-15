@@ -32,8 +32,8 @@
                     <td>{{$key+1}}</td>
                     <td>{{$item->name}}</td>
                     <td>
-                        <a href="{{route('time.edit',['id'=>$item->id])}}" class="btn btn-info"> Edit<i class="ti-pin"></i> </a>
-                        <a href="{{route('time.destroy',['id'=>$item->id])}}" class="btn btn-danger"> Delete <i class="ti-trash"></i> </a>
+                        <a href="{{route('time.edit',['id'=>$item->id])}}" class="btn btn-info"> {{ __('messages.edit') }}<i class="ti-pin"></i> </a>
+                        <a href="{{route('time.destroy',['id'=>$item->id])}}" class="btn btn-danger"> {{ __('messages.delete') }} <i class="ti-trash"></i> </a>
                     </td>
                 </tr>
             @empty
@@ -48,7 +48,7 @@
         <br>
         @if($data->count()>0)
             <div class="row">
-                <div class="col-md-5 col-sm-3 "> Count {{$data->total()}} </div>
+                <div class="col-md-5 col-sm-3 "> {{ __('messages.count') }} {{$data->total()}} </div>
                 <div class="col-md-7 col-sm-7">{{$data->appends(\Request::except('_token'))->render()}}</div>
             </div>
         @endif
