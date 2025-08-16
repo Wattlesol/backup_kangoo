@@ -239,6 +239,30 @@ class DynamicCssController extends Controller
     {
         return "/* Component-specific theme styles - High specificity overrides */\n" .
 
+               "/* NAVBAR BACKGROUND FIX - Always use body background, never primary color */\n" .
+               "body .iq-navbar,\n" .
+               "html .iq-navbar,\n" .
+               ".iq-navbar,\n" .
+               "body .iq-navbar.navs-color,\n" .
+               "html .iq-navbar.navs-color,\n" .
+               ".iq-navbar.navs-color,\n" .
+               "body header .navbar,\n" .
+               "html header .navbar,\n" .
+               "header .navbar {\n" .
+               "  background-color: var(--bs-body-bg) !important;\n" .
+               "  background: var(--bs-body-bg) !important;\n" .
+               "}\n\n" .
+
+               "/* Navbar text colors should adapt to theme */\n" .
+               "body .iq-navbar .navbar-nav .nav-item .nav-link,\n" .
+               "html .iq-navbar .navbar-nav .nav-item .nav-link,\n" .
+               ".iq-navbar .navbar-nav .nav-item .nav-link,\n" .
+               "body .iq-navbar.navs-color .navbar-nav .nav-item .nav-link,\n" .
+               "html .iq-navbar.navs-color .navbar-nav .nav-item .nav-link,\n" .
+               ".iq-navbar.navs-color .navbar-nav .nav-item .nav-link {\n" .
+               "  color: var(--bs-body-color) !important;\n" .
+               "}\n\n" .
+
                "/* Override Bootstrap and static CSS primary colors */\n" .
                "body .text-primary,\n" .
                "html .text-primary,\n" .
@@ -293,6 +317,30 @@ class DynamicCssController extends Controller
     private function generateLandingPageComponents($theme)
     {
         return "/* Landing page components - High specificity overrides */\n" .
+
+               "/* NAVBAR BACKGROUND FIX - Always use body background for landing pages */\n" .
+               "body .iq-navbar,\n" .
+               "html .iq-navbar,\n" .
+               ".iq-navbar,\n" .
+               "body .iq-navbar.navs-color,\n" .
+               "html .iq-navbar.navs-color,\n" .
+               ".iq-navbar.navs-color,\n" .
+               "body header .navbar,\n" .
+               "html header .navbar,\n" .
+               "header .navbar {\n" .
+               "  background-color: var(--bs-body-bg) !important;\n" .
+               "  background: var(--bs-body-bg) !important;\n" .
+               "}\n\n" .
+
+               "/* Navbar text colors should adapt to theme */\n" .
+               "body .iq-navbar .navbar-nav .nav-item .nav-link,\n" .
+               "html .iq-navbar .navbar-nav .nav-item .nav-link,\n" .
+               ".iq-navbar .navbar-nav .nav-item .nav-link,\n" .
+               "body .iq-navbar.navs-color .navbar-nav .nav-item .nav-link,\n" .
+               "html .iq-navbar.navs-color .navbar-nav .nav-item .nav-link,\n" .
+               ".iq-navbar.navs-color .navbar-nav .nav-item .nav-link {\n" .
+               "  color: var(--bs-body-color) !important;\n" .
+               "}\n\n" .
 
                "/* Hero section with brand colors */\n" .
                ".hero-section {\n" .
