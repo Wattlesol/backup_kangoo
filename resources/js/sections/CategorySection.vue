@@ -17,71 +17,38 @@
 
 </template>
 <script setup>
-import { onMounted,ref} from 'vue';
-import { CATEGORY_API} from '../data/api'; 
+import { onMounted,ref, defineProps, watchEffect } from 'vue';
 import CategoryCard from '../components/CategoryCard.vue';
 import CategoryShimmer  from '../shimmer/CategoryShimmer.vue'
 import {useSection} from '../store/index'
 const store = useSection()
+const props = defineProps({ categoryIds: { type: Array, default: () => [] } })
 const categoryDetails = ref([]);
-const categories = ref([]);
 const isLoading=ref(1);
 
-// get all category
-const fetchTopCategories = async () => {
-      try {
-         const response = await fetch(CATEGORY_API({ per_page: 'all', status: 1 }));
-         const data = await response.json();
-         if (data && Array.isArray(data.data)) {
-       
-         const TotalServices = data.data.filter(user => user.services !== undefined);
-         const sortedCategories = TotalServices.sort((a, b) => b.services - a.services);
-         //const topCategories = sortedCategories.slice(0, 10);
-         categories.value = sortedCategories;
-         } else {
-         console.error('Invalid data structure or missing array of providers.');
-         }
-      } catch (error) {
-         console.error('Error fetching or processing data:', error);
-      }
-   };
-
-const getCategoryDetails = async () => {
+// fetch only the categories referenced by landing settings via the store (deduped)
+const loadByIds = async (ids) => {
+  if (!ids || ids.length === 0) { categoryDetails.value = []; isLoading.value = 0; return; }
   try {
-    await store.get_landing_page_setting_list({ per_page: 10, page: 1 });
-    const settings = store.landing_page_setting_list_data.data.find(setting => setting.key === 'section_2' && setting.status === 1);
-    if (settings) {
-      const categoryIds = getJsonValue(settings.value, 'category_id');
-      await fetchTopCategories();
-      const allCategories = categories.value;
-      const selectedCategories = allCategories.filter(category => categoryIds.includes(String(category.id)));
-      categories.value = selectedCategories.map(category => ({
-        id: category.id,
-        name: category.name,
-        description: category.description,
-        category_image:category.category_image,
-      }));
-      categoryDetails.value = categories.value;
-      isLoading.value=0
-    }
-  } catch (error) {
-    console.error('Error fetching category details:', error);
-  }
-};
-
+    await store.get_categries_list({ per_page: 'all', ids: ids.join(',') });
+    const cats = store.categries_list_data?.data || [];
+    categoryDetails.value = cats.map(category => ({
+      id: category.id,
+      name: category.name,
+      description: category.description,
+      category_image: category.category_image,
+    }));
+  } catch (e) { console.error('Category load failed', e); }
+  finally { isLoading.value = 0; }
+}
 
 onMounted(async () => {
-  await fetchTopCategories();
-  await getCategoryDetails();
+  await loadByIds(props.categoryIds);
 });
 
-function getJsonValue(jsonString, key) {
-  try {
-    const parsedJson = JSON.parse(jsonString);
-    return parsedJson[key];
-  } catch (error) {
-    console.error('Error parsing JSON:', error);
-    return null;
+watchEffect(() => {
+  if (Array.isArray(props.categoryIds)) {
+    loadByIds(props.categoryIds);
   }
-}
+});
 </script>

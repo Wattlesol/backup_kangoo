@@ -170,7 +170,7 @@
                                <div class="col-md-6">
                                   <label class="form-label text-capitalize">{{ $t('landingpage.Service_Category')}}</label>
                                   
-                                  <select class="form-select" v-model="selectedCategory">
+                                  <select class="form-select" v-model="selectedCategory" @focus="ensureCategoriesLoaded" @click="ensureCategoriesLoaded">
                                      <option value="" disabled selected>{{ $t('landingpage.select_category')}}</option>
                                      <option v-for="category in allCategory" :key="category.id" :value="category.id">{{ category.name }}</option>
                                   </select>
@@ -228,10 +228,11 @@
 
 <script setup>
 import { ref,computed, onMounted,defineProps} from 'vue';
+const props = defineProps({ section1: { type: Object, default: () => ({}) }, user_id: { type: [String, Number, null], default: null }, postjobservice: { type: [Array, Object, null], default: null } });
 import { CATEGORY_API,SERVICE_API, POST_SERVICE_API} from '../data/api'; 
 import {useSection} from '../store/index'
 //import {useObserveSection} from '../hooks/Observer'
-const props = defineProps(['postjobservice','user_id']);
+
 
 const store = useSection()
 //const [userlogin] = useObserveSection(() => store.login({email : 'email', password: 'password'}))
@@ -271,14 +272,30 @@ console.error('Error fetching or processing data:', error);
 }
 };
 onMounted(() => {
-resetFormData();
-fetchTopCategories();
+  resetFormData();
+  if (props.section1 && Object.keys(props.section1).length) {
+    section1Data.value = [{ id: 'section_1', key: 'section_1', value: JSON.stringify(props.section1) }];
+  }
+  // Lazy-load categories on first interaction to avoid duplicate initial API
 });
 
-const shouldShowSearchBox= async () => {
-const settings = this.landingPageSettings.find(setting => setting.key === 'section_1');
-return settings && settings.value.current_location === 1 && settings.value.enable_search === 1;
+// Fetch categories only when user opens the category select or first gets focus
+const ensureCategoriesLoaded = async () => {
+  if (allCategory.value.length > 0) return;
+  try {
+    await store.get_categries_list({ per_page: 'all', status: 1 });
+    const data = store.categries_list_data?.data || [];
+    const TotalServices = data.filter(user => user.services !== undefined);
+    const sortedCategories = TotalServices.sort((a, b) => b.services - a.services);
+    categories.value = sortedCategories;
+    allCategory.value = TotalServices;
+  } catch (e) { console.error('Error fetching categories:', e); }
 };
+
+const shouldShowSearchBox = computed(() => {
+  const obj = props.section1 || {};
+  return obj.current_location === 'on' && obj.enable_search === 'on';
+});
 
 const getCategoryNames = (categoryIds) => {
 if (!categoryIds || !Array.isArray(categoryIds)) {
@@ -325,11 +342,11 @@ serviceDescription.value = '';
 };
 
 const removeCurrentLocation = async () => {
-window.location.reload()
-const response = await fetch(SERVICE_API({ per_page: 'all'}));
-//const data = await response.json();
-localStorage.removeItem('loction_current_lat')
-localStorage.removeItem('loction_current_long')
+  window.location.reload();
+  // refresh list after location cleared
+  try { await fetch(SERVICE_API({ per_page: 'all'})); } catch(e){}
+  localStorage.removeItem('loction_current_lat');
+  localStorage.removeItem('loction_current_long');
 localStorage.setItem('is_location_on','off')
 closeModal();
 };

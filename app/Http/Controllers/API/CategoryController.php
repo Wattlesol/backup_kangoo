@@ -6,51 +6,77 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Category;
 use App\Http\Resources\API\CategoryResource;
-
+use Illuminate\Support\Facades\Cache;
 
 class CategoryController extends Controller
 {
     public function getCategoryList(Request $request){
-        $category = Category::where('status',1);
-        $auth_user = auth()->user();
-        if(auth()->user() !== null){
-            if(auth()->user()->hasRole('admin')){
-                $category = new Category();
-                $category = $category->withTrashed();
+        // Build a cache key from query params and auth role (safe, short ttl)
+        $auth = auth()->user();
+        $role = $auth && method_exists($auth, 'hasRole') && $auth->hasRole('admin') ? 'admin' : 'guest';
+        $key = 'api:category-list:' . http_build_query([
+            'is_featured' => $request->get('is_featured'),
+            'per_page' => $request->get('per_page'),
+            'page' => $request->get('page'),
+            'role' => $role,
+        ]);
+
+        $ttl = 60; // seconds
+
+        $payload = Cache::remember($key, $ttl, function () use ($request, $role) {
+            $query = Category::query()
+                ->when($role !== 'admin', fn($q) => $q->where('status', 1))
+                ->withCount('services')
+                ->with('media'); // avoid N+1 for images
+
+            if($request->has('is_featured')){
+                $query->where('is_featured', $request->is_featured);
             }
-        }
-        if($request->has('is_featured')){
-            $category->where('is_featured',$request->is_featured);
-        }
 
-        $per_page = config('constant.PER_PAGE_LIMIT');
-        if( $request->has('per_page') && !empty($request->per_page)){
-            if(is_numeric($request->per_page)){
-                $per_page = $request->per_page;
+            $per_page = config('constant.PER_PAGE_LIMIT');
+            if( $request->has('per_page') && !empty($request->per_page)){
+                if(is_numeric($request->per_page)){
+                    $per_page = $request->per_page;
+                }
+                if($request->per_page === 'all' ){
+                    $per_page = $query->count();
+                }
             }
-            if($request->per_page === 'all' ){
-                $per_page = $category->count();
+
+            // Optional filter: fetch only specific IDs (comma-separated)
+            if ($request->has('ids') && !empty($request->ids)) {
+                $ids = array_filter(explode(',', $request->ids));
+                if (!empty($ids)) {
+                    $query->whereIn('id', $ids);
+                }
             }
+
+            $paginated = $query->select(['id','name','description','status','is_featured','color','updated_at','deleted_at'])
+                ->orderBy('name','asc')->paginate($per_page);
+            $items = CategoryResource::collection($paginated);
+            $itemsArray = $items->resolve(); // convert to plain array for safe caching/etag
+
+            return [
+                'pagination' => [
+                    'total_items' => $paginated->total(),
+                    'per_page' => $paginated->perPage(),
+                    'currentPage' => $paginated->currentPage(),
+                    'totalPages' => $paginated->lastPage(),
+                    'from' => $paginated->firstItem(),
+                    'to' => $paginated->lastItem(),
+                    'next_page' => $paginated->nextPageUrl(),
+                    'previous_page' => $paginated->previousPageUrl(),
+                ],
+                'data' => $itemsArray,
+            ];
+        });
+
+        // HTTP caching headers (client reuse across reloads when not disabled)
+        $etag = 'W/"'.md5(json_encode($payload)).'"';
+        $resp = comman_custom_response($payload);
+        if (request()->headers->get('If-None-Match') === $etag) {
+            return response()->json([], 304)->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
         }
-
-        $category = $category->orderBy('name','asc')->paginate($per_page);
-        $items = CategoryResource::collection($category);
-
-        $response = [
-            'pagination' => [
-                'total_items' => $items->total(),
-                'per_page' => $items->perPage(),
-                'currentPage' => $items->currentPage(),
-                'totalPages' => $items->lastPage(),
-                'from' => $items->firstItem(),
-                'to' => $items->lastItem(),
-                'next_page' => $items->nextPageUrl(),
-                'previous_page' => $items->previousPageUrl(),
-            ],
-            'data' => $items,
-        ];
-
-        return comman_custom_response($response);
+        return $resp->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
     }
-
 }

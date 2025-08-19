@@ -5,6 +5,22 @@ import { TESTIMONIAL_API } from '../data/api';
 import { PROVIDER_API,BOOKINGLIST_API,POSTJOBLIST_API,BOOKINGSTATUS_API } from '../data/api';
 
 import axios from 'axios';
+// Simple in-flight and response cache for GETs used on landing
+const inflight = new Map();
+const cache = new Map();
+
+async function cachedGet(url) {
+  if (cache.has(url)) return cache.get(url);
+  if (inflight.has(url)) return inflight.get(url);
+  const p = axios.get(url).then(res => {
+    cache.set(url, res);
+    inflight.delete(url);
+    return res;
+  }).catch(err => { inflight.delete(url); throw err; });
+  inflight.set(url, p);
+  return p;
+}
+
 export const useSection = defineStore('section', {
     state: () => (sectionState),
     getters: {
@@ -21,9 +37,12 @@ export const useSection = defineStore('section', {
         post_job_list_data: (state) => state.post_job_list,
     },
     actions:{
-        async get_categries_list({per_page,page}){
-            const searchData = { per_page: per_page,page:page }
-            const response = await axios.get(CATEGORY_API(searchData))
+        async get_categries_list({per_page,page, ids, is_featured, status}){
+            const searchData = { per_page, page };
+            if (ids) searchData.ids = ids;
+            if (is_featured !== undefined) searchData.is_featured = is_featured;
+            if (status !== undefined) searchData.status = status;
+            const response = await cachedGet(CATEGORY_API(searchData))
             this.categories_list = response.data
         },
         async get_blog_list({per_page}){
@@ -33,13 +52,13 @@ export const useSection = defineStore('section', {
         },
         async get_provider_list({per_page, user_type}){
             const searchData = { per_page: per_page, user_type: user_type }
-            const response = await axios.get(PROVIDER_API(searchData))
+            const response = await cachedGet(PROVIDER_API(searchData))
             this.provider_list = response.data
 
         },
         async get_landing_page_setting_list({per_page,page}){
           const searchData = { per_page: per_page,page:page }
-          const response = await axios.get(LANDING_PAGE_SETTING_API(searchData))
+          const response = await cachedGet(LANDING_PAGE_SETTING_API(searchData))
           this.landing_page_settings_list= response.data
       },
        
@@ -61,7 +80,7 @@ export const useSection = defineStore('section', {
                 searchData.is_price_max = is_price_max;
               }
 
-              const response = await axios.get(SERVICE_API(searchData));
+              const response = await cachedGet(SERVICE_API(searchData));
               this.service_list = response.data;
             } catch (error) {
               console.error('Error fetching service list:', error);
@@ -70,31 +89,31 @@ export const useSection = defineStore('section', {
 
         async get_testimonial_list(){
 
-            const response = await axios.get(TESTIMONIAL_API())
+            const response = await cachedGet(TESTIMONIAL_API())
             this.testimonial_list = response.data
         },
 
         async get_featured_category_list({is_featured}){
             const searchData = { is_featured: is_featured }
-            const response = await axios.get(FEATURED_CATEGORY_API(searchData))
+            const response = await cachedGet(FEATURED_CATEGORY_API(searchData))
             this.featured_category_list = response.data
         },
 
         async get_booking_list({per_page}){
             const searchData = { per_page: per_page }
-            const response = await axios.get(BOOKINGLIST_API(searchData))
+            const response = await cachedGet(BOOKINGLIST_API(searchData))
             this.booking_list = response.data
         },
 
         async get_post_job_list({per_page}){
           const searchData = { per_page: per_page }
-          const response = await axios.get(POSTJOBLIST_API(searchData))
+          const response = await cachedGet(POSTJOBLIST_API(searchData))
           this.post_job_list = response.data
       },
 
         async get_booking_status({per_page}){
           const searchData = { per_page: per_page }
-          const response = await axios.get(BOOKINGSTATUS_API(searchData))
+          const response = await cachedGet(BOOKINGSTATUS_API(searchData))
           this.booking_status = response.data
       },
 

@@ -251,10 +251,11 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         });
 
         // Dynamic Pricing (Admin only)
-        Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
-            Route::get('dynamic-pricing', [App\Http\Controllers\DynamicPricingController::class, 'index_data']);
-            Route::post('dynamic-pricing/update', [App\Http\Controllers\DynamicPricingController::class, 'updatePricing'])->middleware('permission:dynamic_pricing edit');
-        });
+        // Dynamic Pricing routes disabled (controller missing)
+        // Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
+        //     Route::get('dynamic-pricing', [App\Http\Controllers\DynamicPricingController::class, 'index_data']);
+        //     Route::post('dynamic-pricing/update', [App\Http\Controllers\DynamicPricingController::class, 'updatePricing'])->middleware('permission:dynamic_pricing edit');
+        // });
     });
 
 });

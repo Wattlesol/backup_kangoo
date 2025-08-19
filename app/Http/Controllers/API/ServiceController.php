@@ -29,7 +29,15 @@ class ServiceController extends Controller
 {
     public function getServiceList(Request $request){
 
-        $service = Service::where('service_type','service')->with(['providers','category','serviceRating'])->orderBy('created_at','desc');
+        $service = Service::where('service_type','service')
+            ->with([
+                'providers:id,display_name,city_id,login_type,social_image,status,is_subscribe',
+                'category:id,name',
+                'subcategory:id,name',
+            ])
+            ->withCount('serviceRating')
+            ->withAvg('serviceRating as rating_avg', 'rating')
+            ->orderBy('created_at','desc');
         $category = Category::onlyTrashed()->get();
         $category = $category->pluck('id');
         $service = $service->whereNotIn('category_id',$category);
@@ -144,34 +152,44 @@ class ServiceController extends Controller
 
         }
 
-        $service = $service->paginate($per_page);
-     
-        $items = ServiceResource::collection($service);
+        $service = $service->select(['id','name','category_id','subcategory_id','provider_id','price','type','duration','discount','status','description','is_featured','deleted_at','is_slot','visit_type','is_enable_advance_payment','advance_payment_amount'])
+            ->paginate($per_page);
 
+        $items = ServiceResource::collection($service);
+        $itemsArray = $items->resolve();
 
         $userservices  = null;
         if($request->customer_id != null){
-            $user_service = Service::where('status',1)->where('added_by',$request->customer_id)->get();
-            $userservices = ServiceResource::collection($user_service);
+            $user_service = Service::where('status',1)->where('added_by',$request->customer_id)
+                ->select(['id','name','category_id','subcategory_id','provider_id','price','type','duration','discount','status','description','is_featured','deleted_at','is_slot','visit_type','is_enable_advance_payment','advance_payment_amount'])
+                ->get();
+            $userservices = ServiceResource::collection($user_service)->resolve();
         }
-        $response = [
+        $payload = [
             'pagination' => [
-                'total_items' => $items->total(),
-                'per_page' => $items->perPage(),
-                'currentPage' => $items->currentPage(),
-                'totalPages' => $items->lastPage(),
-                'from' => $items->firstItem(),
-                'to' => $items->lastItem(),
-                'next_page' => $items->nextPageUrl(),
-                'previous_page' => $items->previousPageUrl(),
+                'total_items' => $service->total(),
+                'per_page' => $service->perPage(),
+                'currentPage' => $service->currentPage(),
+                'totalPages' => $service->lastPage(),
+                'from' => $service->firstItem(),
+                'to' => $service->lastItem(),
+                'next_page' => $service->nextPageUrl(),
+                'previous_page' => $service->previousPageUrl(),
             ],
-            'data' => $items,
+            'data' => $itemsArray,
             'user_services' => $userservices,
-            'max'=> $service->max('price'),
-            'min'=> $service->min('price'),
+            'max'=> (float) Service::whereKey($service->pluck('id'))->max('price'),
+            'min'=> (float) Service::whereKey($service->pluck('id'))->min('price'),
         ];
-        
-        return comman_custom_response($response);
+
+        // Cache headers for faster repeat views
+        $ttl = 60; // seconds
+        $etag = 'W/"'.md5(json_encode($payload)).'"';
+        $resp = comman_custom_response($payload);
+        if (request()->headers->get('If-None-Match') === $etag) {
+            return response()->json([], 304)->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
+        }
+        return $resp->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
     }
 
     public function getServiceDetail(Request $request){
@@ -343,15 +361,26 @@ class ServiceController extends Controller
     
         return comman_custom_response($response);
     }
-    public function getTopRatedService(){
-        $rating_data = BookingRating::whereNotNull('review')->orderBy('rating','desc')->limit(5)->get();
-        $items = BookingRatingResource::collection($rating_data);
+    public function getTopRatedService(Request $request){
+        $ttl = 300;
+        $key = 'api:top-rated-service:limit=5';
 
-        $response = [
-            'data' => $items,
-        ];
-        
-        return comman_custom_response($response);
+        $payload = \Cache::remember($key, $ttl, function () {
+            $rating_data = BookingRating::whereNotNull('review')
+                ->with(['service.media','customer'])
+                ->orderBy('rating','desc')
+                ->limit(5)
+                ->get();
+            $items = BookingRatingResource::collection($rating_data);
+            return [ 'data' => $items ];
+        });
+
+        $etag = 'W/"'.md5(json_encode($payload)).'"';
+        $resp = comman_custom_response($payload);
+        if (in_array($etag, request()->getETags(), true)) {
+            return response()->json([], 304)->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
+        }
+        return $resp->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
     }
     public function serviceReviewsList(Request $request){
         $id = $request->service_id;

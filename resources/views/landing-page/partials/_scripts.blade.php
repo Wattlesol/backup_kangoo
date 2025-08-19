@@ -8,8 +8,8 @@
 <script src="{{ asset('js/app.js') }}"></script>
 
 <!-- Dynamic Theme Management -->
-<script src="{{ asset('js/role-based-theming.js?v=' . time()) }}" defer></script>
-<script src="{{ asset('js/theme-manager.js?v=' . time()) }}" defer></script>
+<script src="{{ asset('js/role-based-theming.js?v=' . env('ASSET_VERSION', 1)) }}" defer></script>
+<script src="{{ asset('js/theme-manager.js?v=' . env('ASSET_VERSION', 1)) }}" defer></script>
 
 <!-- Enhanced Theme Management Script -->
 <script>

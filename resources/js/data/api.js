@@ -3,7 +3,17 @@ var getBaseURL = getMeta.getAttribute('content');
 export const BASE_URL = getBaseURL + '/api'
 
 const generateQueryParams = (object) => {
-    return new URLSearchParams(object).toString()
+    const params = new URLSearchParams();
+    const src = object || {};
+    Object.keys(src)
+      .sort()
+      .forEach((key) => {
+        const val = src[key];
+        if (val !== undefined && val !== null && val !== '') {
+          params.append(key, val);
+        }
+      });
+    return params.toString();
 }
 export const CATEGORY_API = (queryPerams) => {return `${BASE_URL}/category-list?${generateQueryParams(queryPerams)}`}
 export const BLOG_API = (queryPerams) => {return `${BASE_URL}/blog-list?${generateQueryParams(queryPerams)}`}

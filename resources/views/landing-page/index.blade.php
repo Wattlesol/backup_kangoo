@@ -33,7 +33,7 @@
                         </p>
                     </div>
                 </div>
-                <location-search :user_id="{{json_encode($auth_user_id)}}" :postjobservice="{{json_encode($postjobservice)}}"></location-search>
+                <location-search :user_id="{{ json_encode($auth_user_id) }}" :postjobservice="{{ json_encode($postjobservice) }}" :section1="{{ json_encode($sectionData['section_1'] ?? []) }}"></location-search>
                @endif
 
              </div>
@@ -106,7 +106,7 @@
             <a href="{{ route('category.list') }}"
                 class="btn btn-link p-0 text-capitalize flex-shrink-0 font-size-14">{{__('messages.view_all')}}</a>
         </div>
-        <category-section></category-section>
+        <category-section :category-ids="{{ json_encode($sectionData['section_2']['category_id'] ?? []) }}"></category-section>
     </div>
 </div>
 @endif

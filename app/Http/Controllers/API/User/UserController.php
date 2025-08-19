@@ -201,82 +201,102 @@ class UserController extends Controller
 
     public function userList(Request $request)
     {
-        $user_type = isset($request['user_type']) ? $request['user_type'] : 'handyman';
-        $status = isset($request['status']) ? $request['status'] : 1;
+        $ttl = 120; // 2 minutes short cache for landing
+        $user_type = $request->get('user_type', 'handyman');
+        $status = $request->get('status', 1);
 
-        $user_list = User::orderBy('id','desc')->where('user_type',$user_type);
-        if(!empty($status)){
-            $user_list = $user_list->where('status',$status);
-        }
+        $auth = auth()->user();
+        $isAdmin = $auth && method_exists($auth, 'hasRole') && $auth->hasRole('admin');
+        $cacheKey = 'api:user-list:' . http_build_query([
+            'user_type' => $user_type,
+            'status' => $status,
+            'provider_id' => $request->get('provider_id'),
+            'city_id' => $request->get('city_id'),
+            'keyword' => $request->get('keyword'),
+            'is_admin' => $isAdmin ? 1 : 0,
+            'page' => $request->get('page'),
+            'per_page' => $request->get('per_page'),
+        ]);
 
-        if(default_earning_type() === 'subscription' && $user_type == 'provider' && auth()->user() !== null && !auth()->user()->hasRole('admin')){
-            $user_list = $user_list->where('is_subscribe',1);
-        }
+        $payload = \Cache::remember($cacheKey, $ttl, function () use ($request, $user_type, $status, $isAdmin) {
+            $user_list = User::orderBy('id','desc')->where('user_type',$user_type);
+            if(!empty($status)){
+                $user_list = $user_list->where('status',$status);
+            }
 
-        if(auth()->user() !== null && auth()->user()->hasRole('admin')){
-            $user_list = $user_list->withTrashed();
+            if(default_earning_type() === 'subscription' && $user_type == 'provider' && !$isAdmin){
+                $user_list = $user_list->where('is_subscribe',1);
+            }
+
+            if($isAdmin){
+                $user_list = $user_list->withTrashed();
+                if($request->has('keyword') && isset($request->keyword))
+                {
+                    $user_list = $user_list->where('display_name','like','%'.$request->keyword.'%');
+                }
+                if($user_type == 'handyman' && $status == 0){
+                    $user_list = $user_list->orWhere('provider_id',NULL)->where('user_type' ,'handyman');
+                }
+                if($user_type == 'handyman' && $status == 1){
+                    $user_list = $user_list->whereNotNull('provider_id')->where('user_type' ,'handyman');
+                }
+            }
+            if($request->has('provider_id'))
+            {
+                $user_list = $user_list->where('provider_id',$request->provider_id);
+            }
+            if($request->has('city_id') && !empty($request->city_id))
+            {
+                $user_list = $user_list->where('city_id',$request->city_id);
+            }
             if($request->has('keyword') && isset($request->keyword))
             {
                 $user_list = $user_list->where('display_name','like','%'.$request->keyword.'%');
             }
-            if($user_type == 'handyman' && $status == 0){
-                $user_list = $user_list->orWhere('provider_id',NULL)->where('user_type' ,'handyman');
+            if($request->has('booking_id')){
+                $booking_data = Booking::find($request->booking_id);
+                $service_address = $booking_data->handymanByAddress;
+                if($service_address != null)
+                {
+                    $user_list = $user_list->where('service_address_id', $service_address->id);
+                }
             }
-            if($user_type == 'handyman' && $status == 1){
-                $user_list = $user_list->whereNotNull('provider_id')->where('user_type' ,'handyman');
+            $per_page = config('constant.PER_PAGE_LIMIT');
+            if( $request->has('per_page') && !empty($request->per_page)){
+                if(is_numeric($request->per_page)){
+                    $per_page = $request->per_page;
+                }
+                if($request->per_page === 'all' ){
+                    $per_page = $user_list->count();
+                }
             }
 
-        }
-        if($request->has('provider_id'))
-        {
-            $user_list = $user_list->where('provider_id',$request->provider_id);
-        }
-        if($request->has('city_id') && !empty($request->city_id))
-        {
-            $user_list = $user_list->where('city_id',$request->city_id);
-        }
-        if($request->has('keyword') && isset($request->keyword))
-        {
-            $user_list = $user_list->where('display_name','like','%'.$request->keyword.'%');
-        }
-        if($request->has('booking_id')){
-            $booking_data = Booking::find($request->booking_id);
+            $paginated = $user_list->select(['id','display_name','user_type','status','city_id','provider_id','login_type','social_image','email_verified_at','deleted_at'])
+                ->paginate($per_page);
+            $items = UserResource::collection($paginated);
+            $itemsArray = $items->resolve();
 
-            $service_address = $booking_data->handymanByAddress;
-            if($service_address != null)
-            {
-                $user_list = $user_list->where('service_address_id', $service_address->id);
-            }
+            return [
+                'pagination' => [
+                    'total_items' => $paginated->total(),
+                    'per_page' => $paginated->perPage(),
+                    'currentPage' => $paginated->currentPage(),
+                    'totalPages' => $paginated->lastPage(),
+                    'from' => $paginated->firstItem(),
+                    'to' => $paginated->lastItem(),
+                    'next_page' => $paginated->nextPageUrl(),
+                    'previous_page' => $paginated->previousPageUrl(),
+                ],
+                'data' => $itemsArray,
+            ];
+        });
+
+        $etag = 'W/"'.md5(json_encode($payload)).'"';
+        $resp = comman_custom_response($payload);
+        if (in_array($etag, $request->getETags(), true)) {
+            return response()->json([], 304)->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
         }
-        $per_page = config('constant.PER_PAGE_LIMIT');
-        if( $request->has('per_page') && !empty($request->per_page)){
-            if(is_numeric($request->per_page)){
-                $per_page = $request->per_page;
-            }
-            if($request->per_page === 'all' ){
-                $per_page = $user_list->count();
-            }
-        }
-
-        $user_list = $user_list->paginate($per_page);
-
-        $items = UserResource::collection($user_list);
-
-        $response = [
-            'pagination' => [
-                'total_items' => $items->total(),
-                'per_page' => $items->perPage(),
-                'currentPage' => $items->currentPage(),
-                'totalPages' => $items->lastPage(),
-                'from' => $items->firstItem(),
-                'to' => $items->lastItem(),
-                'next_page' => $items->nextPageUrl(),
-                'previous_page' => $items->previousPageUrl(),
-            ],
-            'data' => $items,
-        ];
-
-        return comman_custom_response($response);
+        return $resp->header('ETag', $etag)->header('Cache-Control', 'public, max-age='.$ttl);
     }
 
     public function userDetail(Request $request)

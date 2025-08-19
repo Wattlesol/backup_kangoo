@@ -23,8 +23,8 @@
         $themeMode = session('theme_mode');
     }
 @endphp
-<link rel="stylesheet" href="{{ route('theme.css', ['role' => $userRole, 'theme' => $themeMode]) }}?v={{ time() }}" id="dynamic-theme-css">
-<link rel="stylesheet" href="{{ route('landing.theme.css', ['theme' => $themeMode]) }}?v={{ time() }}" id="dynamic-landing-css">
+<link rel="stylesheet" href="{{ route('theme.css', ['role' => $userRole, 'theme' => $themeMode]) }}?v={{ env('ASSET_VERSION', 1) }}" id="dynamic-theme-css">
+<link rel="stylesheet" href="{{ route('landing.theme.css', ['theme' => $themeMode]) }}?v={{ env('ASSET_VERSION', 1) }}" id="dynamic-landing-css">
 
 <!-- Theme Configuration Script -->
 <script>

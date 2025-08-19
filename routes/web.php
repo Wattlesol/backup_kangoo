@@ -675,17 +675,17 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         ->name('order.bulk-action')
         ->middleware('permission:order edit');
 
-    // Dynamic Pricing Routes (Admin only)
-    Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
-        Route::get('dynamic-pricing', [DynamicPricingController::class, 'index'])->name('dynamic-pricing.index');
-        Route::get('dynamic-pricing-data', [DynamicPricingController::class, 'index_data'])->name('dynamic-pricing.index_data');
-        Route::get('dynamic-pricing/{id}', [DynamicPricingController::class, 'show'])->name('dynamic-pricing.show');
-        Route::post('dynamic-pricing/update', [DynamicPricingController::class, 'updatePricing'])->name('dynamic-pricing.update');
-        Route::post('dynamic-pricing/bulk-update', [DynamicPricingController::class, 'bulkUpdatePricing'])->name('dynamic-pricing.bulk-update');
-        Route::get('dynamic-pricing/analytics', [DynamicPricingController::class, 'analytics'])->name('dynamic-pricing.analytics');
-        Route::post('dynamic-pricing/price-comparison', [DynamicPricingController::class, 'priceComparison'])->name('dynamic-pricing.price-comparison');
-        Route::get('dynamic-pricing/export', [DynamicPricingController::class, 'export'])->name('dynamic-pricing.export');
-    });
+    // Dynamic Pricing Routes (Admin only) - temporarily disabled (controller missing)
+    // Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
+    //     Route::get('dynamic-pricing', [DynamicPricingController::class, 'index'])->name('dynamic-pricing.index');
+    //     Route::get('dynamic-pricing-data', [DynamicPricingController::class, 'index_data'])->name('dynamic-pricing.index_data');
+    //     Route::get('dynamic-pricing/{id}', [DynamicPricingController::class, 'show'])->name('dynamic-pricing.show');
+    //     Route::post('dynamic-pricing/update', [DynamicPricingController::class, 'updatePricing'])->name('dynamic-pricing.update');
+    //     Route::post('dynamic-pricing/bulk-update', [DynamicPricingController::class, 'bulkUpdatePricing'])->name('dynamic-pricing.bulk-update');
+    //     Route::get('dynamic-pricing/analytics', [DynamicPricingController::class, 'analytics'])->name('dynamic-pricing.analytics');
+    //     Route::post('dynamic-pricing/price-comparison', [DynamicPricingController::class, 'priceComparison'])->name('dynamic-pricing.price-comparison');
+    //     Route::get('dynamic-pricing/export', [DynamicPricingController::class, 'export'])->name('dynamic-pricing.export');
+    // });
 
 });
 

@@ -31,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
         Order::observe(OrderObserver::class);
         Store::observe(StoreObserver::class);
 
-        // Register view composers
-        view()->composer('*', \App\View\Composers\ThemeComposer::class);
+        // Register view composers (narrow scope to layouts that need theme vars)
+        view()->composer(['layouts.dashboard', 'components.master-layout'], \App\View\Composers\ThemeComposer::class);
     }
 }

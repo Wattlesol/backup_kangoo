@@ -119,12 +119,18 @@ class ThemeSetting extends Model
      */
     public static function getColor($group, $key, $default = '#000000')
     {
-        $setting = self::where('setting_group', $group)
-            ->where('setting_key', $key)
-            ->where('is_active', true)
-            ->first();
-
-        return $setting ? $setting->setting_value : $default;
+        // Avoid per-call queries by using the grouped settings cache
+        $all = self::getAllGrouped();
+        $grouped = $all->get($group);
+        if ($grouped) {
+            $match = $grouped->first(function ($item) use ($key) {
+                return $item->setting_key === $key;
+            });
+            if ($match) {
+                return $match->setting_value;
+            }
+        }
+        return $default;
     }
 
     /**

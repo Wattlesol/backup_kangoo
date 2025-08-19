@@ -39,8 +39,8 @@ class ServiceResource extends JsonResource
             'subcategory_name'  => optional($this->subcategory)->name,
             'attchments' => getAttachments($this->getMedia('service_attachment')),
             'attchments_array' => getAttachmentArray($this->getMedia('service_attachment'),null),
-            'total_review'  => $this->serviceRating->count('id'),
-            'total_rating'  => count($this->serviceRating) > 0 ? (float) number_format(max($this->serviceRating->avg('rating'),0), 2) : 0,
+            'total_review'  => $this->service_rating_count ?? 0,
+            'total_rating'  => isset($this->rating_avg) ? (float) number_format(max($this->rating_avg,0), 2) : 0,
             'is_favourite'  => $this->getUserFavouriteService->where('user_id',$user_id)->first() ? 1 : 0,
             'service_address_mapping' => $this->providerServiceAddress,
             'attchment_extension' => $extention, //true:for png false: other

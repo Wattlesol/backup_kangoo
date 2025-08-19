@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="{{ asset('css/custom.css')}}">
 <link rel="stylesheet" href="{{ asset('css/provide.css?v=' . time()) }}">
 <!-- Dynamic Theme Colors CSS -->
-<link rel="stylesheet" href="{{ route('theme.css', ['role' => auth()->user()->user_type ?? 'customer', 'theme' => 'light']) }}?v={{ time() }}" id="dynamic-theme-css">
+<link rel="stylesheet" href="{{ route('theme.css', ['role' => auth()->user()->user_type ?? 'customer', 'theme' => 'light']) }}?v={{ env('ASSET_VERSION', 1) }}" id="dynamic-theme-css">
 <script src="{{ asset('js/role-based-theming.js?v=' . time()) }}" defer></script>
 <script src="{{ asset('js/theme-manager.js?v=' . time()) }}" defer></script>
 <!-- @if(session()->get('dir') == 'rtl')

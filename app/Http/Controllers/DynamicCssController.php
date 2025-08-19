@@ -26,10 +26,18 @@ class DynamicCssController extends Controller
                 return $this->buildThemeCss($role, $theme);
             });
 
+            $etag = 'W/"'.md5($css).'"';
+            $clientEtags = $request->getETags();
+            if (in_array($etag, $clientEtags, true)) {
+                return response('', 304)
+                    ->header('ETag', $etag)
+                    ->header('Cache-Control', 'public, max-age=3600');
+            }
             return response($css)
                 ->header('Content-Type', 'text/css')
                 ->header('Cache-Control', 'public, max-age=3600')
-                ->header('ETag', md5($css));
+                ->header('ETag', $etag)
+                ->header('Last-Modified', gmdate('D, d M Y H:i:s', time()).' GMT');
 
         } catch (\Exception $e) {
             return response('/* Error generating theme CSS */', 500)
@@ -52,9 +60,18 @@ class DynamicCssController extends Controller
                 return $this->buildLandingPageCss($theme);
             });
 
+            $etag = 'W/"'.md5($css).'"';
+            $clientEtags = $request->getETags();
+            if (in_array($etag, $clientEtags, true)) {
+                return response('', 304)
+                    ->header('ETag', $etag)
+                    ->header('Cache-Control', 'public, max-age=3600');
+            }
             return response($css)
                 ->header('Content-Type', 'text/css')
-                ->header('Cache-Control', 'public, max-age=3600');
+                ->header('Cache-Control', 'public, max-age=3600')
+                ->header('ETag', $etag)
+                ->header('Last-Modified', gmdate('D, d M Y H:i:s', time()).' GMT');
 
         } catch (\Exception $e) {
             return response('/* Error generating landing CSS */', 500)

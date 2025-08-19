@@ -310,58 +310,43 @@ function envChanges($type,$value){
     }
 }
 
-function getPriceFormat($price){
-    $price = (double)$price;
 
-    // Use the improved getValueByKey method that handles array/object consistency
+// Cache currency context per request to avoid repeated DB lookups
+function __currency_context_cache(array $override = []){
+    static $ctx = null;
+    if ($override) {
+        $ctx = array_merge($ctx ?? [], $override);
+    }
+    if ($ctx !== null) return $ctx;
     $sitesetupdata = App\Models\Setting::getValueByKey('site-setup', 'site-setup');
     $currencyId = optional($sitesetupdata)->default_currency;
     $currency_position = optional($sitesetupdata)->currency_position;
-    $afterdecimalpoint = optional($sitesetupdata)->digitafter_decimal_point;
     $country = App\Models\Country::find($currencyId);
+    $symbol = $country ? $country->symbol : '$';
+    $position = $currency_position ?: 'left';
+    $ctx = ['symbol' => $symbol, 'position' => $position, 'decimals' => optional($sitesetupdata)->digitafter_decimal_point];
+    return $ctx;
+}
 
-    $symbol = '$';
-    if (!empty($country)) {
-        $symbol = $country->symbol;
+function getPriceFormat($price){
+    $price = (double)$price;
+    $ctx = __currency_context_cache();
+    $symbol = $ctx['symbol'] ?? '$';
+    $position = $ctx['position'] ?? 'left';
+    $afterdecimalpoint = $ctx['decimals'] ?? 2;
+
+    if ($position === 'left') {
+        return $symbol . number_format((float)$price, $afterdecimalpoint, '.', '');
     }
-
-    $position = 'left';
-    if( !empty($currency_position) ){
-        $position = $currency_position;
-    }
-
-    if ($position == 'left') {
-        $price = $symbol."".number_format((float)$price,$afterdecimalpoint,'.','');
-    } else {
-        $price = number_format((float)$price,$afterdecimalpoint,'.','')."".$symbol;
-    }
-
-    return $price;
+    return number_format((float)$price, $afterdecimalpoint, '.', '') . $symbol;
 }
 
 function currency_data(){
-
-    $sitesetup = App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-    $sitesetupdata = $sitesetup ? json_decode($sitesetup->value) : null;
-    $currencyId = optional($sitesetupdata)->default_currency;
-    $currency_position = optional($sitesetupdata)->currency_position;
-    $country = App\Models\Country::find($currencyId);
-
-    $symbol = '$';
-    if (!empty($country)) {
-        $symbol = $country->symbol;
-    }
-     $position = 'left';
-    if( !empty($currency_position) ){
-        $position = $currency_position;
-    }
-
-    $data = [
-        'currency_symbol' => $symbol,
-        'currency_position' => $position,
+    $ctx = __currency_context_cache();
+    return [
+        'currency_symbol' => $ctx['symbol'] ?? '$',
+        'currency_position' => $ctx['position'] ?? 'left',
     ];
-
-    return  $data;
 }
 
 function payment_status(){
@@ -1361,8 +1346,11 @@ function get_user_name($user_id){
 }
 
 function getUserRoleTheme(){
+    static $cached = null;
+    if ($cached !== null) return $cached;
+
     if (!\Auth::check()) {
-        return [
+        return $cached = [
             'role' => 'guest',
             'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_light', '#4A75FB'),
             'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_dark', '#004CB2'),
@@ -1374,21 +1362,21 @@ function getUserRoleTheme(){
 
     // Determine user role and return appropriate theme colors from database
     if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
-        return [
+        return $cached = [
             'role' => 'admin',
             'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'admin_light', '#5F60B9'),
             'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'admin_dark', '#4153b3'),
             'theme_class' => 'theme-admin'
         ];
     } elseif ($user->hasRole('provider')) {
-        return [
+        return $cached = [
             'role' => 'provider',
             'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'provider_light', '#EF5535'),
             'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'provider_dark', '#9B1F0B'),
             'theme_class' => 'theme-provider'
         ];
     } elseif ($user->hasRole('handyman')) {
-        return [
+        return $cached = [
             'role' => 'handyman',
             'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'handyman_light', '#2DB665'),
             'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'handyman_dark', '#005F2D'),
@@ -1396,7 +1384,7 @@ function getUserRoleTheme(){
         ];
     } else {
         // Default to customer theme for 'user' role and any other roles
-        return [
+        return $cached = [
             'role' => 'customer',
             'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_light', '#4A75FB'),
             'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_dark', '#004CB2'),
@@ -1406,13 +1394,15 @@ function getUserRoleTheme(){
 }
 
 function getBrandColors(){
+    static $cached = null;
+    if ($cached !== null) return $cached;
     // Get brand colors from database, fallback to defaults if not found
-    return \App\Models\ThemeSetting::getBrandColors() ?: [
+    return $cached = (\App\Models\ThemeSetting::getBrandColors() ?: [
         'yellow' => ['light' => '#F0B521', 'dark' => '#8D6710'],
         'red' => ['light' => '#EF5535', 'dark' => '#9B1F0B'],
         'green' => ['light' => '#2DB665', 'dark' => '#005F2D'],
         'blue' => ['light' => '#4A75FB', 'dark' => '#004CB2'],
-    ];
+    ]);
 }
 
 function getRotatingCardColor($index){

@@ -146,6 +146,7 @@
     };
 
   const loadCategoryData = () =>{
+    // Avoid duplicate initial load; rely on CategorySection/LocationSearch when on landing
     store.get_categries_list({ per_page: 'all' });
   }
 

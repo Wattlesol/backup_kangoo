@@ -33,11 +33,10 @@ class ThemeInjectionMiddleware
 
         $response = $next($request);
 
-        // Inject theme CSS into HTML responses
+        // Remove full-response mutation; head now includes CSS via partials/_head.blade.php
+        // Kept as no-op to preserve middleware contract without altering routes/pipeline
         if ($this->shouldInjectCss($response)) {
-            $content = $response->getContent();
-            $content = $this->injectThemeCss($content, $userRole, $isDarkMode);
-            $response->setContent($content);
+            // no-op: CSS link is part of the base layout now
         }
 
         return $response;
