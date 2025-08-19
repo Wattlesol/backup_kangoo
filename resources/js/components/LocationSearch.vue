@@ -441,19 +441,7 @@ console.error('Error submitting service:', error);
 };
 
 
-const landingPageSettings = ref([]);
-const section1Data = ref([]);
-
-onMounted(async () => {
-try {
-await store.get_landing_page_setting_list({ per_page: 10, page: 1 });
-landingPageSettings.value = store.landing_page_setting_list_data.data;
-section1Data.value = landingPageSettings.value.filter(item => item.key === 'section_1');
-console.log(section1Data.value);
-} catch (error) {
-console.error('Error fetching landing page settings:', error);
-}
-});
+// Landing settings are provided via Blade as props.section1; avoid duplicate API calls here.
 
 function getJsonValue(jsonString, key) {
 try {
