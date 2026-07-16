@@ -70,7 +70,7 @@ COPY docker/restore-database.sh /usr/local/bin/kangoo-restore-database
 
 RUN chmod +x /usr/local/bin/kangoo-entrypoint /usr/local/bin/kangoo-restore-database
 
-EXPOSE 8080
+EXPOSE 8091
 
 ENTRYPOINT ["kangoo-entrypoint"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

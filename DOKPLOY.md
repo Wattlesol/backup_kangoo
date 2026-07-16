@@ -6,7 +6,7 @@ This repo is prepared for Dokploy using the root `Dockerfile`.
 
 - Build type: Dockerfile
 - Dockerfile path: `Dockerfile`
-- Exposed port: `8080`
+- Exposed port: `8091`
 - Health/path check: `/`
 
 ## Required Environment
@@ -74,4 +74,4 @@ For this Kangoo restore, keep both flags `false`; the restore script seeds only 
 docker compose up --build
 ```
 
-Open `http://localhost:8080`.
+Open `http://localhost:8091`.
