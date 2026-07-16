@@ -32,6 +32,7 @@ if [ "${RUN_SEEDERS:-false}" = "true" ]; then
   php artisan db:seed --force
 fi
 
+php artisan migrate --force --path=database/migrations/2024_01_01_000000_create_theme_settings_table.php >/dev/null 2>&1 || true
 php artisan db:seed --class=ThemeSettingsSeeder --force >/dev/null 2>&1 || true
 
 php artisan config:cache

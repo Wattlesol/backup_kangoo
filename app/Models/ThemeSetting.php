@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class ThemeSetting extends Model
 {
@@ -52,6 +54,10 @@ class ThemeSetting extends Model
      */
     public static function getAllGrouped()
     {
+        if (!self::tableExists()) {
+            return collect();
+        }
+
         return Cache::remember(self::CACHE_KEY, self::CACHE_DURATION, function () {
             return self::where('is_active', true)
                 ->orderBy('setting_group')
@@ -119,6 +125,10 @@ class ThemeSetting extends Model
      */
     public static function getColor($group, $key, $default = '#000000')
     {
+        if (!self::tableExists()) {
+            return $default;
+        }
+
         $setting = self::where('setting_group', $group)
             ->where('setting_key', $key)
             ->where('is_active', true)
@@ -179,6 +189,15 @@ class ThemeSetting extends Model
     public static function clearCache()
     {
         Cache::forget(self::CACHE_KEY);
+    }
+
+    private static function tableExists()
+    {
+        try {
+            return Schema::hasTable('theme_settings');
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 
     /**
