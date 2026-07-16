@@ -1,0 +1,58 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kangoo:local
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      APP_NAME: "${APP_NAME:-Kangoo}"
+      APP_ENV: "${APP_ENV:-local}"
+      APP_KEY: "${APP_KEY:-}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_URL: "${APP_URL:-http://localhost:${APP_PORT:-8080}}"
+      ASSET_URL: "${ASSET_URL:-${APP_URL:-http://localhost:${APP_PORT:-8080}}}"
+      LOG_CHANNEL: "${LOG_CHANNEL:-stderr}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
+      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      DB_HOST: "${DB_HOST:-mysql}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_DATABASE: "${DB_DATABASE:-kangoo}"
+      DB_USERNAME: "${DB_USERNAME:-kangoo}"
+      DB_PASSWORD: "${DB_PASSWORD:-kangoo}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+      CACHE_DRIVER: "${CACHE_DRIVER:-file}"
+      SESSION_DRIVER: "${SESSION_DRIVER:-file}"
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-sync}"
+      RESTORE_DB_ON_BOOT: "${RESTORE_DB_ON_BOOT:-false}"
+      RESTORE_DB_IF_EMPTY: "${RESTORE_DB_IF_EMPTY:-true}"
+      RESTORE_DB_FRESH: "${RESTORE_DB_FRESH:-false}"
+      RESTORE_DB_DUMP: "${RESTORE_DB_DUMP:-database/dumps/kangoo_sa.sql.gz}"
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-false}"
+      RUN_SEEDERS: "${RUN_SEEDERS:-false}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: "${DB_DATABASE:-kangoo}"
+      MYSQL_USER: "${DB_USERNAME:-kangoo}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-kangoo}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+    ports:
+      - "${MYSQL_PUBLIC_PORT:-3306}:3306"
+    volumes:
+      - kangoo-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  kangoo-mysql:

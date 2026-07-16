@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Store;
 use App\Observers\OrderObserver;
 use App\Observers\StoreObserver;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,6 +28,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        if (config('app.url')) {
+            URL::forceRootUrl(config('app.url'));
+
+            if (parse_url(config('app.url'), PHP_URL_SCHEME) === 'https') {
+                URL::forceScheme('https');
+            }
+        }
+
         // Register model observers
         Order::observe(OrderObserver::class);
         Store::observe(StoreObserver::class);

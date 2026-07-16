@@ -54,9 +54,9 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 // Theme API routes for mobile apps
 Route::prefix('v1/theme')->group(function () {
-    Route::get('/colors', [App\Http\Controllers\Api\ThemeController::class, 'getThemeColors']);
-    Route::get('/colors/{role}', [App\Http\Controllers\Api\ThemeController::class, 'getRoleTheme']);
-    Route::post('/check-update', [App\Http\Controllers\Api\ThemeController::class, 'checkThemeUpdate']);
+    Route::get('/colors', [App\Http\Controllers\API\ThemeController::class, 'getThemeColors']);
+    Route::get('/colors/{role}', [App\Http\Controllers\API\ThemeController::class, 'getRoleTheme']);
+    Route::post('/check-update', [App\Http\Controllers\API\ThemeController::class, 'checkThemeUpdate']);
 });
 
 Route::post('register',[API\User\UserController::class, 'register']);
@@ -250,11 +250,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::put('orders/{id}/payment-status', [App\Http\Controllers\OrderController::class, 'updatePaymentStatus'])->middleware('permission:order edit');
         });
 
-        // Dynamic Pricing (Admin only)
-        Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
-            Route::get('dynamic-pricing', [App\Http\Controllers\DynamicPricingController::class, 'index_data']);
-            Route::post('dynamic-pricing/update', [App\Http\Controllers\DynamicPricingController::class, 'updatePricing'])->middleware('permission:dynamic_pricing edit');
-        });
+        // Dynamic pricing routes are disabled because DynamicPricingController is
+        // not present in this codebase. Restore the controller before enabling.
     });
 
 });

@@ -1,0 +1,13 @@
+.git
+.gitignore
+.DS_Store
+docker-compose.yml
+node_modules
+npm-debug.log
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*.log
+tests
+.phpunit.result.cache

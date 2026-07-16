@@ -33,13 +33,6 @@ class ThemeInjectionMiddleware
 
         $response = $next($request);
 
-        // Inject theme CSS into HTML responses
-        if ($this->shouldInjectCss($response)) {
-            $content = $response->getContent();
-            $content = $this->injectThemeCss($content, $userRole, $isDarkMode);
-            $response->setContent($content);
-        }
-
         return $response;
     }
 
