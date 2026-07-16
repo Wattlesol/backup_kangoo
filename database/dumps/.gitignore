@@ -1,3 +1,4 @@
 *.sql
 *.sql.gz
+!kangoo_sa.sql.gz
 !.gitignore

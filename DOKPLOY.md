@@ -41,7 +41,7 @@ The bundled restore dump is the correct Kangoo database section from `kangoo.sql
 - source database: `tywgrrte_kangoo_sa`
 - expected file path: `database/dumps/kangoo_sa.sql.gz`
 
-The dump is intentionally not committed to GitHub because it contains live database data. Upload `kangoo_sa.sql.gz` to that path in the deployed app before running the first restore, or temporarily place it there through your Dokploy/server file workflow.
+The dump is temporarily committed so Dokploy can restore the database during deployment. Remove `database/dumps/kangoo_sa.sql.gz` from git after the first successful live restore.
 
 For the first deploy, use:
 
