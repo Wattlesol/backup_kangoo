@@ -26,12 +26,33 @@ class ServiceRequest extends FormRequest
     public function rules()
     {
         $id = request()->id;
+        if (auth()->check() && auth()->user()->hasRole('provider') && !request()->is('api/*')) {
+            return [
+                'id' => 'required|exists:services,id',
+                'status' => 'required',
+                'duration' => 'nullable',
+                'partner_availability_notes' => 'nullable|string',
+                'required_employee_skills' => 'nullable|string',
+            ];
+        }
+
         return [
             'name'                           => 'required|unique:services,name,'.$id,
             'category_id'                    => 'required',
             'type'                           => 'required',
             'price'                          => 'required|min:0',
             'status'                         => 'required',
+            'name_ar'                        => 'nullable|string|max:255',
+            'name_en'                        => 'nullable|string|max:255',
+            'government_entity'              => 'nullable|string|max:255',
+            'required_documents'             => 'nullable|string',
+            'estimated_completion_time'      => 'nullable|string|max:255',
+            'government_fee'                 => 'nullable|numeric|min:0',
+            'service_fee'                    => 'nullable|numeric|min:0',
+            'service_instructions'           => 'nullable|string',
+            'terms_and_conditions'           => 'nullable|string',
+            'partner_availability_notes'     => 'nullable|string',
+            'required_employee_skills'       => 'nullable|string',
         ];
     }
     public function messages()

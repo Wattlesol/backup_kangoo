@@ -254,11 +254,50 @@ class ServiceController extends Controller
         }
 
         $services = $request->all();
+        $services['required_documents'] = $this->linesToArray($request->required_documents);
+        $services['required_employee_skills'] = $this->linesToArray($request->required_employee_skills);
 
         $services['service_type'] = !empty($request->service_type) ? $request->service_type : 'service';
         $services['provider_id'] = !empty($request->provider_id) ? $request->provider_id : auth()->user()->id;
         if(auth()->user()->hasRole('user')){
             $services['service_type'] = 'user_post_service';
+        }
+
+        if(auth()->user()->hasRole('provider') && !$request->is('api/*')) {
+            if(empty($request->id)) {
+                return redirect()->back()->withErrors('Partners can enable and maintain assigned Sanad services, but cannot create public master services.');
+            }
+
+            $existingService = Service::where('provider_id', auth()->id())->findOrFail($request->id);
+            $services = array_merge($existingService->only([
+                'name',
+                'name_ar',
+                'name_en',
+                'category_id',
+                'subcategory_id',
+                'provider_id',
+                'type',
+                'price',
+                'discount',
+                'description',
+                'government_entity',
+                'required_documents',
+                'estimated_completion_time',
+                'government_fee',
+                'service_fee',
+                'service_instructions',
+                'terms_and_conditions',
+                'is_featured',
+                'service_type',
+                'visit_type',
+            ]), [
+                'id' => $existingService->id,
+                'status' => $request->status,
+                'duration' => $request->duration,
+                'is_slot' => $request->has('is_slot') ? 1 : 0,
+                'partner_availability_notes' => $request->partner_availability_notes,
+                'required_employee_skills' => $this->linesToArray($request->required_employee_skills),
+            ]);
         }
 
         if($request->id == null && default_earning_type() === 'subscription'){
@@ -472,5 +511,24 @@ class ServiceController extends Controller
         $message = __('messages.delete_form',[ 'form' => __('messages.favourite') ] );
 
         return  redirect()->back()->withSuccess($message);
+    }
+
+    private function linesToArray($value)
+    {
+        if (is_array($value)) {
+            return array_values(array_filter($value));
+        }
+
+        if (empty($value)) {
+            return null;
+        }
+
+        return collect(preg_split('/\r\n|\r|\n/', $value))
+            ->map(function ($line) {
+                return trim($line);
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 }
