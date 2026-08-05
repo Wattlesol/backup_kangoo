@@ -132,6 +132,7 @@ Route::middleware('auth')->group(function () {
 Route::group(['middleware' => ['auth', 'verified']], function()
 {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('sanad/dashboard', [SanadWebController::class, 'dashboard'])->name('sanad.dashboard');
     Route::get('sanad/ai', [SanadWebController::class, 'aiConsole'])->name('sanad.ai.index');
     Route::post('sanad/ai/ask', [SanadWebController::class, 'askAi'])->name('sanad.ai.ask');
     Route::post('sanad/ai/knowledge', [SanadWebController::class, 'storeAiKnowledge'])->name('sanad.ai.knowledge.store');

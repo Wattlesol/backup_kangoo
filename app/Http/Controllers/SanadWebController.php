@@ -20,6 +20,17 @@ use Illuminate\Support\Str;
 
 class SanadWebController extends Controller
 {
+    public function dashboard()
+    {
+        $auth_user = authSession();
+        $user = auth()->user();
+        $role = $this->sanadRole($user);
+        $pageTitle = 'Sanad ' . Str::headline($role) . ' Dashboard';
+        $dashboard = $this->roleDashboardData($role);
+
+        return view('sanad.dashboard', compact('pageTitle', 'auth_user', 'role', 'dashboard'));
+    }
+
     public function aiConsole(Request $request)
     {
         $user = auth()->user();
@@ -489,6 +500,115 @@ class SanadWebController extends Controller
         }
 
         return $query;
+    }
+
+    private function sanadRole($user)
+    {
+        if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
+            return 'admin';
+        }
+
+        if ($user->hasRole('provider')) {
+            return 'partner';
+        }
+
+        if ($user->hasRole('handyman')) {
+            return 'employee';
+        }
+
+        return 'customer';
+    }
+
+    private function roleDashboardData($role)
+    {
+        $query = Booking::with(['customer', 'provider', 'service', 'payment', 'handymanAdded.handyman', 'sanadDocuments', 'sanadBuzzAlerts'])
+            ->myBooking();
+
+        $totalOrders = (clone $query)->count();
+        $activeOrders = (clone $query)->whereNotIn('status', ['completed', 'cancelled'])->count();
+        $completedOrders = (clone $query)->where('status', 'completed')->count();
+        $cancelledOrders = (clone $query)->where('status', 'cancelled')->count();
+        $overdueOrders = (clone $query)->whereNotNull('sla_due_at')->where('sla_due_at', '<', now())->count();
+        $waitingCustomer = (clone $query)->where('sanad_stage', 'waiting_for_customer')->count();
+        $waitingGovernment = (clone $query)->where('sanad_stage', 'government_processing')->count();
+        $revenue = (clone $query)->whereHas('payment', function ($paymentQuery) {
+            $paymentQuery->where('payment_status', 'paid');
+        })->sum('total_amount');
+
+        $baseMetrics = [
+            ['label' => 'Total Orders', 'value' => $totalOrders, 'filter' => []],
+            ['label' => 'Active Orders', 'value' => $activeOrders, 'filter' => ['status' => 'pending']],
+            ['label' => 'Completed Orders', 'value' => $completedOrders, 'filter' => ['status' => 'completed']],
+            ['label' => 'Delayed Orders', 'value' => $overdueOrders, 'filter' => ['sla_state' => 'overdue']],
+        ];
+
+        $roleMetrics = [
+            'admin' => array_merge($baseMetrics, [
+                ['label' => 'Monthly Revenue', 'value' => getPriceFormat($revenue), 'filter' => ['payment_state' => 'paid']],
+                ['label' => 'Waiting Customer', 'value' => $waitingCustomer, 'filter' => ['sanad_stage' => 'waiting_for_customer']],
+                ['label' => 'Waiting Government', 'value' => $waitingGovernment, 'filter' => ['sanad_stage' => 'government_processing']],
+            ]),
+            'partner' => array_merge($baseMetrics, [
+                ['label' => 'Waiting Customer', 'value' => $waitingCustomer, 'filter' => ['sanad_stage' => 'waiting_for_customer']],
+                ['label' => 'Waiting Government', 'value' => $waitingGovernment, 'filter' => ['sanad_stage' => 'government_processing']],
+                ['label' => 'Pending Settlement', 'value' => getPriceFormat($revenue), 'filter' => ['payment_state' => 'paid']],
+            ]),
+            'employee' => [
+                ['label' => 'Assigned Orders', 'value' => $totalOrders, 'filter' => []],
+                ['label' => 'Today Tasks', 'value' => (clone $query)->whereDate('updated_at', now()->toDateString())->count(), 'filter' => []],
+                ['label' => 'Pending Documents', 'value' => (clone $query)->whereHas('sanadDocuments', function ($documentQuery) {
+                    $documentQuery->where('verification_status', 'pending');
+                })->count(), 'filter' => ['action_state' => 'pending_documents']],
+                ['label' => 'Overdue SLA', 'value' => $overdueOrders, 'filter' => ['sla_state' => 'overdue']],
+            ],
+            'customer' => [
+                ['label' => 'My Requests', 'value' => $totalOrders, 'filter' => []],
+                ['label' => 'In Progress', 'value' => $activeOrders, 'filter' => ['status' => 'pending']],
+                ['label' => 'Completed', 'value' => $completedOrders, 'filter' => ['status' => 'completed']],
+                ['label' => 'Payment Pending', 'value' => (clone $query)->where(function ($paymentStateQuery) {
+                    $paymentStateQuery->whereDoesntHave('payment')
+                        ->orWhereHas('payment', function ($paymentQuery) {
+                            $paymentQuery->whereIn('payment_status', ['pending', 'pending_by_admin', 'advanced_paid']);
+                        });
+                })->count(), 'filter' => ['payment_state' => 'pending']],
+            ],
+        ];
+
+        $recentOrders = (clone $query)->latest()->take(8)->get();
+        $priorityOrders = (clone $query)
+            ->where(function ($priorityQuery) {
+                $priorityQuery->whereIn('sanad_priority', ['urgent', 'high'])
+                    ->orWhereNotNull('sla_due_at')->where('sla_due_at', '<=', now()->addDay());
+            })
+            ->latest()
+            ->take(6)
+            ->get();
+
+        $kanbanStages = ['submitted', 'waiting_for_documents', 'government_processing', 'legal_review', 'accounting', 'quality_review', 'ready_for_delivery', 'completed'];
+        $kanban = collect($kanbanStages)->mapWithKeys(function ($stage) use ($query) {
+            return [$stage => (clone $query)->where('sanad_stage', $stage)->latest()->take(5)->get()];
+        });
+
+        $employeeWorkload = User::where('user_type', 'handyman')
+            ->when($role === 'partner', function ($employeeQuery) {
+                $employeeQuery->where('provider_id', auth()->id());
+            })
+            ->withCount(['handyman as active_orders_count' => function ($bookingQuery) {
+                $bookingQuery->whereHas('bookings', function ($requestQuery) {
+                    $requestQuery->whereNotIn('status', ['completed', 'cancelled']);
+                });
+            }])
+            ->orderByDesc('active_orders_count')
+            ->take(8)
+            ->get();
+
+        return [
+            'metrics' => $roleMetrics[$role] ?? $baseMetrics,
+            'recent_orders' => $recentOrders,
+            'priority_orders' => $priorityOrders,
+            'kanban' => $kanban,
+            'employee_workload' => $employeeWorkload,
+        ];
     }
 
     private function requestQueueSummary()
