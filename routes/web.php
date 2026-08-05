@@ -38,6 +38,7 @@ use App\Http\Controllers\PlanController;
 use App\Http\Controllers\BankController;
 use App\Http\Controllers\PostJobRequestController;
 use App\Http\Controllers\ServicePackageController;
+use App\Http\Controllers\SanadWebController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\BookingRatingController;
 use App\Http\Controllers\HandymanRatingController;
@@ -131,6 +132,20 @@ Route::middleware('auth')->group(function () {
 Route::group(['middleware' => ['auth', 'verified']], function()
 {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('sanad/ai', [SanadWebController::class, 'aiConsole'])->name('sanad.ai.index');
+    Route::post('sanad/ai/ask', [SanadWebController::class, 'askAi'])->name('sanad.ai.ask');
+    Route::post('sanad/ai/knowledge', [SanadWebController::class, 'storeAiKnowledge'])->name('sanad.ai.knowledge.store');
+    Route::get('sanad/requests', [SanadWebController::class, 'indexRequests'])->name('sanad.requests.index');
+    Route::get('sanad/requests/{id}', [SanadWebController::class, 'showRequest'])->name('sanad.requests.show');
+    Route::post('sanad/requests/{id}/employees', [SanadWebController::class, 'assignEmployees'])->name('sanad.requests.employees.assign');
+    Route::post('sanad/requests/{id}/lifecycle', [SanadWebController::class, 'updateRequestLifecycle'])->name('sanad.requests.lifecycle.update');
+    Route::post('sanad/requests/{id}/payment-status', [SanadWebController::class, 'updatePaymentStatus'])->name('sanad.requests.payment.update');
+    Route::post('sanad/requests/{id}/documents', [SanadWebController::class, 'storeDocument'])->name('sanad.requests.documents.store');
+    Route::post('sanad/requests/{id}/documents/{documentId}/approve', [SanadWebController::class, 'approveDocument'])->name('sanad.requests.documents.approve');
+    Route::post('sanad/requests/{id}/buzz', [SanadWebController::class, 'storeBuzz'])->name('sanad.requests.buzz.store');
+    Route::post('sanad/requests/{id}/buzz/{alertId}/acknowledge', [SanadWebController::class, 'acknowledgeBuzz'])->name('sanad.requests.buzz.acknowledge');
+    Route::post('sanad/requests/{id}/chat-messages', [SanadWebController::class, 'storeChatMessage'])->name('sanad.requests.chat.store');
+
     Route::group(['namespace' => '', 'middleware' => ['permission:permission list']], function () {
         Route::resource('permission',PermissionController::class);
         Route::get('permission/add/{type}',[PermissionController::class,'addPermission'])->name('permission.add');

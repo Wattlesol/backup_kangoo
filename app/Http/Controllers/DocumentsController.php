@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Documents;
+use App\Models\ProviderDocument;
+use App\Models\User;
 use App\Http\Requests\DocumentRequest;
 use Yajra\DataTables\DataTables;
 
@@ -22,7 +24,27 @@ class DocumentsController extends Controller
         $pageTitle = trans('messages.list_form_title',['form' => trans('messages.document')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('document.index', compact('pageTitle','auth_user','assets','filter'));
+        $sanadVerificationSummary = $this->sanadVerificationSummary();
+        return view('document.index', compact('pageTitle','auth_user','assets','filter','sanadVerificationSummary'));
+    }
+
+    private function sanadVerificationSummary()
+    {
+        return [
+            'document_types' => Documents::count(),
+            'active_document_types' => Documents::where('status', 1)->count(),
+            'required_document_types' => Documents::where('is_required', 1)->count(),
+            'provider_documents' => ProviderDocument::count(),
+            'verified_provider_documents' => ProviderDocument::where('is_verified', 1)->count(),
+            'pending_provider_documents' => ProviderDocument::where('is_verified', 0)->count(),
+            'partners' => User::where('user_type', 'provider')->count(),
+            'verified_partners' => User::where('user_type', 'provider')
+                ->whereDoesntHave('providerDocument', function ($query) {
+                    $query->where('is_verified', 0);
+                })
+                ->whereHas('providerDocument')
+                ->count(),
+        ];
     }
 
     public function index_data(DataTables $datatable,Request $request)

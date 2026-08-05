@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Service;
+use App\Models\ServiceAddon;
+use App\Models\ServicePackage;
 use App\Models\User;
 use App\Models\Setting;
 use App\Http\Requests\ServiceRequest;
@@ -27,7 +29,25 @@ class ServiceController extends Controller
         $pageTitle = __('messages.list_form_title',['form' => __('messages.service')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('service.index', compact('pageTitle','auth_user','assets','filter','postrequestid','servicepackage'));
+        $sanadServiceSummary = $this->sanadServiceSummary();
+        return view('service.index', compact('pageTitle','auth_user','assets','filter','postrequestid','servicepackage','sanadServiceSummary'));
+    }
+
+    private function sanadServiceSummary()
+    {
+        $serviceQuery = Service::query()->myService();
+        $packageQuery = ServicePackage::query()->myPackage();
+        $addonQuery = ServiceAddon::query()->serviceAddon();
+
+        return [
+            'total_services' => (clone $serviceQuery)->count(),
+            'active_services' => (clone $serviceQuery)->where('status', 1)->count(),
+            'inactive_services' => (clone $serviceQuery)->where('status', 0)->count(),
+            'packages' => (clone $packageQuery)->count(),
+            'active_packages' => (clone $packageQuery)->where('status', 1)->count(),
+            'addons' => (clone $addonQuery)->count(),
+            'active_addons' => (clone $addonQuery)->where('status', 1)->count(),
+        ];
     }
 
     // get datatable data
@@ -163,7 +183,8 @@ class ServiceController extends Controller
         $pageTitle = __('messages.list_form_title',['form' => __('messages.service')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('service.user_service_list', compact('pageTitle','auth_user','assets','filter'));
+        $sanadServiceSummary = $this->sanadServiceSummary();
+        return view('service.user_service_list', compact('pageTitle','auth_user','assets','filter','sanadServiceSummary'));
 
     }
 

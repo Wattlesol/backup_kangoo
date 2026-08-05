@@ -946,7 +946,11 @@ function get_handyman_provider_commission($handyman_id){
 }
 
 function adminEarning(){
-    $revenuedata= \App\Models\Payment::selectRaw('sum(total_amount) as total , booking_id, DATE_FORMAT(datetime , "%m") as month' )
+    $monthExpression = \DB::connection()->getDriverName() === 'sqlite'
+        ? 'strftime("%m", datetime)'
+        : 'DATE_FORMAT(datetime , "%m")';
+
+    $revenuedata= \App\Models\Payment::selectRaw('sum(total_amount) as total , booking_id, '.$monthExpression.' as month' )
     ->whereYear('datetime',date('Y'))
     ->where('payment_status','paid')
     ->groupBy('month');

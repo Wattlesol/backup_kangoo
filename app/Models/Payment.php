@@ -43,7 +43,7 @@ class Payment extends Model
             });
         }
 
-        if($user->hasRole('user')) {
+        if($user->hasAnyRole(['user', 'customer'])) {
             return $query->where('customer_id', $user->id);
         }
 

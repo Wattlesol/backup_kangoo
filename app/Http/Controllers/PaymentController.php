@@ -23,8 +23,25 @@ class PaymentController extends Controller
         ];
         $pageTitle = __('messages.list_form_title',['form' => __('messages.payment')] );
         $assets = ['datatable'];
+        $sanadPaymentSummary = $this->sanadPaymentSummary();
 
-        return view('payment.index', compact('pageTitle','assets','filter'));
+        return view('payment.index', compact('pageTitle','assets','filter','sanadPaymentSummary'));
+    }
+
+    private function sanadPaymentSummary()
+    {
+        $paymentQuery = Payment::query()->myPayment();
+
+        return [
+            'total_payments' => (clone $paymentQuery)->count(),
+            'paid_payments' => (clone $paymentQuery)->where('payment_status', 'paid')->count(),
+            'pending_payments' => (clone $paymentQuery)->whereIn('payment_status', ['pending', 'advanced_paid', 'pending_by_admin'])->count(),
+            'failed_payments' => (clone $paymentQuery)->where('payment_status', 'failed')->count(),
+            'cash_payments' => (clone $paymentQuery)->where('payment_type', 'cash')->count(),
+            'total_amount' => (clone $paymentQuery)->sum('total_amount') ?? 0,
+            'paid_amount' => (clone $paymentQuery)->where('payment_status', 'paid')->sum('total_amount') ?? 0,
+            'pending_amount' => (clone $paymentQuery)->whereIn('payment_status', ['pending', 'advanced_paid', 'pending_by_admin'])->sum('total_amount') ?? 0,
+        ];
     }
 
     public function cashIndex($id)

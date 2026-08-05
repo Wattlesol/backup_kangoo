@@ -5,6 +5,7 @@ $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
 <x-master-layout>
     <div class="container-fluid">
         <div class="row">
+            @include('dashboard.partials.sanad-operations')
             <div class="col-md-12">
                 <div class="row">
                     <div class="col-lg-3 col-md-6">

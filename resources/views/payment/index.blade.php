@@ -5,6 +5,7 @@
   </head>
     <div class="container-fluid">
         <div class="row">
+            @include('payment.partials.sanad-payment-summary')
             <div class="col-lg-12">
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">

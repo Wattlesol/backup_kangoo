@@ -89,6 +89,18 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('booking-update', [ API\BookingController::class, 'bookingUpdate' ] );
     Route::get('provider-dashboard',[ API\DashboardController::class, 'providerDashboard' ]);
     Route::get('admin-dashboard',[ API\DashboardController::class, 'adminDashboard' ]);
+    Route::get('sanad/foundation', [ API\SanadController::class, 'foundation' ]);
+    Route::get('sanad/requests', [ API\SanadController::class, 'requests' ]);
+    Route::post('sanad/requests/{id}/lifecycle', [ API\SanadController::class, 'updateRequestLifecycle' ]);
+    Route::get('sanad/buzz', [ API\SanadController::class, 'buzzAlerts' ]);
+    Route::post('sanad/buzz', [ API\SanadController::class, 'createBuzz' ]);
+    Route::post('sanad/buzz/{id}/acknowledge', [ API\SanadController::class, 'acknowledgeBuzz' ]);
+    Route::get('sanad/document-vault', [ API\SanadController::class, 'documentVault' ]);
+    Route::post('sanad/document-vault', [ API\SanadController::class, 'storeDocumentVault' ]);
+    Route::get('sanad/chat-threads', [ API\SanadController::class, 'chatThreads' ]);
+    Route::post('sanad/chat-messages', [ API\SanadController::class, 'storeChatMessage' ]);
+    Route::post('sanad/ai/ask', [ API\SanadController::class, 'aiAsk' ]);
+    Route::post('sanad/ai/knowledge', [ API\SanadController::class, 'storeAiKnowledge' ]);
     Route::get('booking-list', [ API\BookingController::class, 'getBookingList' ] );
     Route::post('booking-detail', [ API\BookingController::class, 'getBookingDetail' ] );
     Route::post('save-booking-rating', [ API\BookingController::class, 'saveBookingRating' ] );

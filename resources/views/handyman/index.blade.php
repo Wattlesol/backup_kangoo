@@ -5,6 +5,7 @@
   </head>
     <div class="container-fluid">
         <div class="row">
+            @include('handyman.partials.sanad-employee-management-summary')
             <div class="col-lg-12">
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">

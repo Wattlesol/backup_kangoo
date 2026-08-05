@@ -11,6 +11,7 @@ use App\Http\Requests\UserRequest;
 use App\Models\ProviderPayout;
 use App\Models\ProviderSubscription;
 use App\Models\PaymentGateway;
+use App\Models\ProviderDocument;
 use Carbon\Carbon;
 use Yajra\DataTables\DataTables;
 use Hash;
@@ -39,7 +40,25 @@ class ProviderController extends Controller
         $auth_user = authSession();
         $assets = ['datatable'];
         $list_status = $request->status;
-        return view('provider.index', compact('list_status','pageTitle','auth_user','assets','filter'));
+        $sanadPartnerSummary = $this->sanadPartnerSummary();
+        return view('provider.index', compact('list_status','pageTitle','auth_user','assets','filter','sanadPartnerSummary'));
+    }
+
+    private function sanadPartnerSummary()
+    {
+        $providerQuery = User::where('user_type', 'provider');
+        $bookingQuery = Booking::whereNotNull('sanad_stage');
+
+        return [
+            'total_partners' => (clone $providerQuery)->count(),
+            'active_partners' => (clone $providerQuery)->where('status', 1)->count(),
+            'pending_partners' => (clone $providerQuery)->where('status', 0)->count(),
+            'subscribed_partners' => (clone $providerQuery)->where('is_subscribe', 1)->count(),
+            'assigned_requests' => (clone $bookingQuery)->whereNotNull('provider_id')->count(),
+            'unassigned_requests' => (clone $bookingQuery)->whereNull('provider_id')->count(),
+            'pending_documents' => ProviderDocument::where('is_verified', 0)->count(),
+            'provider_revenue' => ProviderPayout::sum('amount') ?? 0,
+        ];
     }
 
     public function index_data(DataTables $datatable,Request $request)
@@ -534,7 +553,7 @@ class ProviderController extends Controller
     }
     public function getProviderTimeSlot(Request $request){
 
-        $id = $request->id;
+        $id = $request->id ?? auth()->user()->id;
         $providerdata = User::with('providerslotsmapping')->where('user_type','provider')->where('id',$id)->first();
         date_default_timezone_set($admin->time_zone ?? 'UTC');
 
@@ -543,7 +562,7 @@ class ProviderController extends Controller
 
         $current_day = strtolower(date('D'));
 
-        $provider_id = $request->id ?? auth()->user()->id;
+        $provider_id = $id;
 
         $days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -568,7 +587,7 @@ class ProviderController extends Controller
     }
 
     public function editProviderTimeSlot(Request $request){
-        $id = $request->id;
+        $id = $request->id ?? auth()->user()->id;
         $providerdata = User::with('providerslotsmapping')->where('user_type','provider')->where('id',$id)->first();
         date_default_timezone_set($admin->time_zone ?? 'UTC');
 
@@ -577,7 +596,7 @@ class ProviderController extends Controller
 
         $current_day = strtolower(date('D'));
 
-        $provider_id = $request->id ?? auth()->user()->id;
+        $provider_id = $id;
 
         $days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 

@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Booking;
 use App\Models\User;
+use App\Models\SanadBuzzAlert;
+use App\Models\SanadDocumentVaultItem;
 use App\Http\Requests\UserRequest;
 use Yajra\DataTables\DataTables;
 use Hash;
@@ -31,7 +34,40 @@ class HandymanController extends Controller
         $auth_user = authSession();
         $assets = ['datatable'];
         $list_status = $request->status;
-        return view('handyman.index', compact('list_status','pageTitle','auth_user','assets','filter'));
+        $sanadEmployeeSummary = $this->sanadEmployeeSummary();
+        return view('handyman.index', compact('list_status','pageTitle','auth_user','assets','filter','sanadEmployeeSummary'));
+    }
+
+    private function sanadEmployeeSummary()
+    {
+        $employeeQuery = User::where('user_type', 'handyman');
+        if (auth()->user()->hasRole('provider')) {
+            $employeeQuery->where('provider_id', auth()->id());
+        }
+
+        $requestQuery = Booking::myBooking()->whereNotNull('sanad_stage');
+
+        return [
+            'total_employees' => (clone $employeeQuery)->count(),
+            'active_employees' => (clone $employeeQuery)->where('status', 1)->count(),
+            'pending_employees' => (clone $employeeQuery)->where('status', 0)->count(),
+            'assigned_tasks' => (clone $requestQuery)->whereHas('handymanAdded')->count(),
+            'unassigned_tasks' => (clone $requestQuery)->whereDoesntHave('handymanAdded')->count(),
+            'in_progress_tasks' => (clone $requestQuery)->where('sanad_stage', 'in_progress')->count(),
+            'review_tasks' => (clone $requestQuery)->where('sanad_stage', 'awaiting_quality_review')->count(),
+            'pending_evidence' => SanadDocumentVaultItem::whereIn('booking_id', (clone $requestQuery)->pluck('id'))
+                ->where('verification_status', 'pending')
+                ->count(),
+            'unread_buzz' => SanadBuzzAlert::whereIn('booking_id', (clone $requestQuery)->pluck('id'))
+                ->where('status', 'unread')
+                ->count(),
+            'paid_tasks' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })->count(),
+            'pending_payment_tasks' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->whereIn('payment_status', ['pending', 'advanced_paid', 'pending_by_admin', 'failed']);
+            })->count(),
+        ];
     }
 
     public function index_data(DataTables $datatable,Request $request)
