@@ -12,6 +12,7 @@ use App\Models\SanadBuzzAlert;
 use App\Models\SanadChatMessage;
 use App\Models\SanadChatThread;
 use App\Models\SanadDocumentVaultItem;
+use App\Models\SanadRequestAction;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -224,7 +225,7 @@ class SanadWebController extends Controller
 
     public function showRequest($id)
     {
-        $bookingdata = Booking::with(['customer', 'provider', 'service', 'payment.paymentHistory', 'handymanAdded.handyman'])
+        $bookingdata = Booking::with(['customer', 'provider', 'service', 'payment.paymentHistory', 'handymanAdded.handyman', 'sanadRequestActions.actor'])
             ->myBooking()
             ->findOrFail($id);
 
@@ -237,6 +238,7 @@ class SanadWebController extends Controller
         $assignableEmployees = $this->assignableEmployees($bookingdata);
         $monitoring = $this->requestMonitoring($bookingdata, $documents, $buzzAlerts, $chatThread);
         $billing = $this->requestBilling($bookingdata);
+        $requestActions = $bookingdata->sanadRequestActions()->with('actor')->latest()->take(12)->get();
 
         return view('sanad.request-show', compact(
             'bookingdata',
@@ -248,8 +250,97 @@ class SanadWebController extends Controller
             'chatMessages',
             'assignableEmployees',
             'monitoring',
-            'billing'
+            'billing',
+            'requestActions'
         ));
+    }
+
+    public function storeRequestAction(Request $request, $id)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        $request->validate([
+            'action' => 'required|string|in:accept_order,reject_order,request_missing_documents,reassign_employees,add_internal_note,complete_current_stage,request_admin_review,mark_completed',
+            'reason' => 'nullable|string|max:1000',
+            'internal_note' => 'nullable|string|max:2000',
+        ]);
+
+        if (in_array($request->action, ['reject_order', 'request_missing_documents', 'reassign_employees', 'request_admin_review'], true) && empty($request->reason)) {
+            return redirect()->back()->withErrors('A reason is required for this Sanad action.');
+        }
+
+        $previousStatus = $booking->status;
+        $previousStage = $booking->sanad_stage;
+        $stage = $booking->sanad_stage ?: 'submitted';
+        $status = $booking->status;
+
+        switch ($request->action) {
+            case 'accept_order':
+                $status = 'accept';
+                $stage = 'assigned_to_partner';
+                break;
+            case 'reject_order':
+                $status = 'rejected';
+                $stage = 'rejected';
+                break;
+            case 'request_missing_documents':
+                $stage = 'waiting_for_documents';
+                break;
+            case 'reassign_employees':
+                $stage = 'assigned_to_employee';
+                break;
+            case 'complete_current_stage':
+                $stage = $this->nextLifecycleStage($stage);
+                if ($stage === 'completed') {
+                    $status = 'completed';
+                }
+                break;
+            case 'request_admin_review':
+                $stage = 'awaiting_quality_review';
+                break;
+            case 'mark_completed':
+                $status = 'completed';
+                $stage = 'completed';
+                break;
+        }
+
+        $booking->status = $status;
+        $booking->sanad_stage = $stage;
+        if ($request->filled('reason')) {
+            $booking->reason = $request->reason;
+        }
+        if ($stage === 'completed' && empty($booking->closed_at)) {
+            $booking->closed_at = now();
+        }
+        if ($stage === 'assigned_to_partner' && empty($booking->assigned_at)) {
+            $booking->assigned_at = now();
+        }
+        $booking->save();
+
+        $action = SanadRequestAction::create([
+            'booking_id' => $booking->id,
+            'actor_id' => optional(auth()->user())->id,
+            'actor_role' => optional(auth()->user())->user_type,
+            'action' => $request->action,
+            'previous_status' => $previousStatus,
+            'current_status' => $booking->status,
+            'previous_stage' => $previousStage,
+            'current_stage' => $booking->sanad_stage,
+            'reason' => $request->reason,
+            'internal_note' => $request->internal_note,
+            'metadata' => [
+                'source' => 'web_dashboard',
+                'role' => $this->sanadRole(auth()->user()),
+            ],
+        ]);
+
+        $this->audit($request, 'sanad.request.action_recorded', $action, [
+            'booking_id' => $booking->id,
+            'action' => $request->action,
+            'previous_stage' => $previousStage,
+            'current_stage' => $booking->sanad_stage,
+        ]);
+
+        return redirect()->back()->withSuccess('Sanad request action recorded.');
     }
 
     public function updatePaymentStatus(Request $request, $id)
@@ -609,6 +700,18 @@ class SanadWebController extends Controller
             'kanban' => $kanban,
             'employee_workload' => $employeeWorkload,
         ];
+    }
+
+    private function nextLifecycleStage($currentStage)
+    {
+        $stages = config('sanad.request_lifecycle', []);
+        $currentIndex = array_search($currentStage, $stages, true);
+
+        if ($currentIndex === false) {
+            return 'in_progress';
+        }
+
+        return $stages[$currentIndex + 1] ?? 'completed';
     }
 
     private function requestQueueSummary()

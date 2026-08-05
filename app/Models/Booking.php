@@ -123,6 +123,10 @@ class Booking extends Model
         return $this->hasMany(SanadBuzzAlert::class, 'booking_id', 'id');
     }
 
+    public function sanadRequestActions(){
+        return $this->hasMany(SanadRequestAction::class, 'booking_id', 'id');
+    }
+
     public function scopeMyBooking($query){
         $user = auth()->user();
         if($user->hasRole('admin') || $user->hasRole('demo_admin')) {

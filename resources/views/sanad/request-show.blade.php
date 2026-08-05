@@ -151,6 +151,70 @@
                             </form>
                         </div>
 
+                        <div class="sanad-action-panel mt-3">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                                <div>
+                                    <h5 class="font-weight-bold mb-1">Partner Order Actions</h5>
+                                    <span class="text-muted">Accept, reject, request documents, complete stages, request admin review, or add internal notes</span>
+                                </div>
+                                <span class="badge badge-light">{{ Str::headline($bookingdata->sanad_stage ?: 'submitted') }}</span>
+                            </div>
+                            <form method="POST" action="{{ route('sanad.requests.actions.store', $bookingdata->id) }}">
+                                @csrf
+                                <div class="row">
+                                    <div class="col-lg-3 col-md-6 mb-3">
+                                        <label class="form-control-label">Action</label>
+                                        <select name="action" class="form-control" required>
+                                            <option value="accept_order">Accept Order</option>
+                                            <option value="reject_order">Reject With Reason</option>
+                                            <option value="request_missing_documents">Request Missing Documents</option>
+                                            <option value="reassign_employees">Reassign Employees</option>
+                                            <option value="add_internal_note">Add Internal Note</option>
+                                            <option value="complete_current_stage">Complete Current Stage</option>
+                                            <option value="request_admin_review">Request Admin Review</option>
+                                            <option value="mark_completed">Mark Completed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-lg-4 col-md-6 mb-3">
+                                        <label class="form-control-label">Reason</label>
+                                        <input type="text" name="reason" class="form-control" placeholder="Required for rejection, missing docs, reassignment, or review">
+                                    </div>
+                                    <div class="col-lg-5 mb-3">
+                                        <label class="form-control-label">Internal Note</label>
+                                        <input type="text" name="internal_note" class="form-control" placeholder="Private operational note">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Record Action</button>
+                            </form>
+
+                            <div class="sanad-action-timeline mt-4">
+                                @forelse($requestActions as $action)
+                                    <div class="sanad-action-item">
+                                        <div>
+                                            <strong>{{ Str::headline($action->action) }}</strong>
+                                            <span>
+                                                {{ Str::headline($action->previous_stage ?: 'none') }}
+                                                <i class="fa fa-arrow-right mx-1"></i>
+                                                {{ Str::headline($action->current_stage ?: 'none') }}
+                                            </span>
+                                            @if($action->reason)
+                                                <small>Reason: {{ $action->reason }}</small>
+                                            @endif
+                                            @if($action->internal_note)
+                                                <small>Note: {{ $action->internal_note }}</small>
+                                            @endif
+                                        </div>
+                                        <div class="text-right">
+                                            <small>{{ optional($action->actor)->display_name ?: Str::headline($action->actor_role ?: 'system') }}</small>
+                                            <small>{{ optional($action->created_at)->diffForHumans() }}</small>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="sanad-empty-state">No operational actions recorded yet</div>
+                                @endforelse
+                            </div>
+                        </div>
+
                         <div class="sanad-billing-panel mt-3">
                             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                                 <div>
@@ -400,6 +464,35 @@
                 border: 1px solid rgba(0, 0, 0, 0.08);
                 border-radius: 8px;
                 background: #fff;
+            }
+
+            .sanad-action-panel {
+                padding: 16px;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                border-radius: 8px;
+                background: #fff;
+            }
+
+            .sanad-action-timeline {
+                display: grid;
+                gap: 10px;
+            }
+
+            .sanad-action-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 16px;
+                padding: 12px;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                border-radius: 8px;
+                background: #f8f9fa;
+            }
+
+            .sanad-action-item span,
+            .sanad-action-item small {
+                display: block;
+                color: #6c757d;
             }
 
             .sanad-billing-panel {

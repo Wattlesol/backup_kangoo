@@ -138,6 +138,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('sanad/ai/knowledge', [SanadWebController::class, 'storeAiKnowledge'])->name('sanad.ai.knowledge.store');
     Route::get('sanad/requests', [SanadWebController::class, 'indexRequests'])->name('sanad.requests.index');
     Route::get('sanad/requests/{id}', [SanadWebController::class, 'showRequest'])->name('sanad.requests.show');
+    Route::post('sanad/requests/{id}/actions', [SanadWebController::class, 'storeRequestAction'])->name('sanad.requests.actions.store');
     Route::post('sanad/requests/{id}/employees', [SanadWebController::class, 'assignEmployees'])->name('sanad.requests.employees.assign');
     Route::post('sanad/requests/{id}/lifecycle', [SanadWebController::class, 'updateRequestLifecycle'])->name('sanad.requests.lifecycle.update');
     Route::post('sanad/requests/{id}/payment-status', [SanadWebController::class, 'updatePaymentStatus'])->name('sanad.requests.payment.update');
