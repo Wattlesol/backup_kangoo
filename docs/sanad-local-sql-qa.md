@@ -12,7 +12,8 @@ The runner `scripts/sanad_local_sql_qa.sh` creates an isolated Docker Compose pr
 4. Runs Laravel migrations against that local SQL database.
 5. Seeds a local QA Sanad request when the restored dump has no bookings.
 6. Runs `scripts/sanad_integrated_qa.sh` against `http://127.0.0.1:8092/api` with request lifecycle verification required.
-7. Runs authenticated web route QA with `scripts/sanad_web_sql_qa.sh`.
+7. Verifies Sanad migration records, idempotency, tables, and columns with `scripts/sanad_migration_qa.sh`.
+8. Runs authenticated web route QA with `scripts/sanad_web_sql_qa.sh`.
 
 It does not edit the existing `.env`, and it does not connect to production.
 
@@ -20,6 +21,7 @@ It does not edit the existing `.env`, and it does not connect to production.
 
 ```bash
 scripts/sanad_local_sql_qa.sh
+scripts/sanad_migration_qa.sh
 scripts/sanad_web_sql_qa.sh
 ```
 
@@ -45,6 +47,7 @@ The full local SQL QA gate passed against `http://127.0.0.1:8092/api`.
 | Local MySQL 8 container | Passed |
 | Fresh restore from `database/dumps/kangoo_sa.sql.gz` | Passed |
 | Laravel migrations on local SQL | Passed |
+| Sanad migration records, idempotency, tables, and columns | Passed |
 | Local QA Sanad request seed | Passed |
 | Authenticated API session | Passed |
 | Foundation role, terminology, lifecycle, privacy, and AI metadata | Passed |

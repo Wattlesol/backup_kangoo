@@ -133,4 +133,7 @@ SANAD_TEST_PASSWORD="${SANAD_TEST_PASSWORD:-12345678}" \
 SANAD_REQUIRE_REQUEST=true \
 scripts/sanad_integrated_qa.sh
 
+echo "Running Sanad migration QA against local SQL database..."
+scripts/sanad_migration_qa.sh
+
 echo "Local Sanad SQL QA completed successfully."
