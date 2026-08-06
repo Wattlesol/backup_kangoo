@@ -83,6 +83,8 @@ php artisan route:list --name=wallet --columns=method,uri,name,action
 php artisan route:list --name=providerpayout --columns=method,uri,name,action
 git diff --check
 BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PASSWORD=12345678 scripts/sanad_api_smoke_test.sh
+PATH=/Users/xain/development/flutter/bin:$PATH flutter analyze lib/screens/sanad/my_sanad_screen.dart lib/model/sanad_models.dart lib/network/rest_apis.dart
+PATH=/Users/xain/development/flutter/bin:$PATH flutter analyze lib/screens/sanad/sanad_operations_screen.dart lib/model/sanad_models.dart lib/networks/rest_apis.dart
 ```
 
 ## Live Smoke Results
@@ -119,7 +121,10 @@ php artisan migrate --force
 
 - Local backend smoke testing used `http://127.0.0.1:8091`.
 - Local generated Android files remain dirty in mobile repos and are not part of delivery commits.
-- Full mobile APK/IPA release builds should be run in the final build environment with the required Flutter, Android, Java, and iOS signing setup.
+- Flutter is installed locally at `/Users/xain/development/flutter`, but it is not currently on the default shell `PATH`.
+- Android release builds are blocked in this workspace by Java 8 and pending Android SDK license acceptance. A Java 17-capable Android/Flutter environment is required for release APK/AAB builds.
+- Xcode 26.6 and CocoaPods 1.16.2 are available locally. The customer iOS no-codesign build reached CocoaPods, but `pod install` was blocked by the local pod/spec installation state after a GoogleSignIn podspec cache error and subsequent repo update.
+- Full mobile APK/IPA release builds should be run in the final build environment with the required Flutter, Android, Java 17, Android licenses, CocoaPods, and iOS signing setup.
 
 ## Remaining QA Gates
 
@@ -127,7 +132,7 @@ The backend, web dashboards, and API smoke tests are complete on the local envir
 
 | Gate | Status | Reason |
 | --- | --- | --- |
-| Customer Flutter APK/IPA build | QA | Flutter is not available on the current PATH and the local Java runtime is Java 8. Android release builds require a Java 17-capable Android/Flutter environment. |
-| Admin/provider Flutter APK/IPA build | QA | Same local build-environment gate as above. Targeted Flutter source analysis was previously completed for the Sanad files. |
+| Customer Flutter APK/IPA build | QA | Targeted Sanad Flutter analysis passed with `/Users/xain/development/flutter`. Android release remains gated by Java 8/Android licenses. iOS no-codesign build reached CocoaPods but is blocked by the local pod/spec installation state. |
+| Admin/provider Flutter APK/IPA build | QA | Targeted Sanad Flutter analysis passed with `/Users/xain/development/flutter`. Full Android/iOS release builds remain gated by the same final mobile build environment requirements. |
 | Client UAT acceptance | QA | Final sign-off requires client review of the deployed environment and mobile builds. |
 | Cross-platform runtime synchronization | QA | API contracts are verified and mobile source is wired to the shared endpoints, but full device/runtime validation requires the mobile build environment. |
