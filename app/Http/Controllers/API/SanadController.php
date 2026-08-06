@@ -111,16 +111,20 @@ class SanadController extends Controller
         $request->validate([
             'booking_id' => 'nullable|integer',
             'recipient_id' => 'nullable|integer',
-            'recipient_role' => 'nullable|string',
-            'priority' => 'nullable|string',
-            'message' => 'nullable|string',
+            'recipient_role' => 'nullable|string|max:255',
+            'priority' => 'nullable|string|in:low,normal,high,urgent',
+            'message' => 'required|string|max:1000',
         ]);
+
+        if ($request->filled('booking_id')) {
+            Booking::myBooking()->findOrFail($request->booking_id);
+        }
 
         $alert = SanadBuzzAlert::create([
             'booking_id' => $request->booking_id,
             'sender_id' => optional(auth()->user())->id,
             'recipient_id' => $request->recipient_id,
-            'recipient_role' => $request->recipient_role,
+            'recipient_role' => $request->recipient_role ?: 'admin',
             'priority' => $request->priority ?: 'urgent',
             'message' => $request->message,
         ]);
@@ -132,18 +136,14 @@ class SanadController extends Controller
 
     public function buzzAlerts(Request $request)
     {
-        $user = auth()->user();
-        $query = SanadBuzzAlert::with('booking')->latest();
-
-        if (!$user->hasRole('admin') && !$user->hasRole('demo_admin')) {
-            $query->where(function ($q) use ($user) {
-                $q->where('recipient_id', $user->id)
-                    ->orWhere('recipient_role', $user->user_type);
-            });
-        }
+        $query = $this->visibleBuzzQuery()->with('booking')->latest();
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        }
+
+        if ($request->filled('booking_id')) {
+            $query->where('booking_id', $request->booking_id);
         }
 
         return comman_custom_response(['data' => $query->paginate($request->per_page ?: 15)]);
@@ -151,7 +151,7 @@ class SanadController extends Controller
 
     public function acknowledgeBuzz(Request $request, $id)
     {
-        $alert = SanadBuzzAlert::findOrFail($id);
+        $alert = $this->visibleBuzzQuery()->findOrFail($id);
         $alert->status = 'acknowledged';
         $alert->acknowledged_at = now();
         $alert->save();
@@ -159,6 +159,22 @@ class SanadController extends Controller
         $this->audit($request, 'sanad.buzz.acknowledged', $alert);
 
         return comman_custom_response(['data' => $alert]);
+    }
+
+    private function visibleBuzzQuery()
+    {
+        $user = auth()->user();
+        $query = SanadBuzzAlert::query();
+
+        if (!$user->hasRole('admin') && !$user->hasRole('demo_admin')) {
+            $query->where(function ($q) use ($user) {
+                $q->where('sender_id', $user->id)
+                    ->orWhere('recipient_id', $user->id)
+                    ->orWhere('recipient_role', $user->user_type);
+            });
+        }
+
+        return $query;
     }
 
     public function documentVault(Request $request)
