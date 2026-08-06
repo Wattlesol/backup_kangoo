@@ -239,6 +239,7 @@ class SanadWebController extends Controller
         $monitoring = $this->requestMonitoring($bookingdata, $documents, $buzzAlerts, $chatThread);
         $billing = $this->requestBilling($bookingdata);
         $requestActions = $bookingdata->sanadRequestActions()->with('actor')->latest()->take(12)->get();
+        $qualityControl = $this->requestQualityControl($bookingdata);
 
         return view('sanad.request-show', compact(
             'bookingdata',
@@ -251,7 +252,8 @@ class SanadWebController extends Controller
             'assignableEmployees',
             'monitoring',
             'billing',
-            'requestActions'
+            'requestActions',
+            'qualityControl'
         ));
     }
 
@@ -259,13 +261,17 @@ class SanadWebController extends Controller
     {
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
-            'action' => 'required|string|in:accept_order,reject_order,request_missing_documents,reassign_employees,add_internal_note,complete_current_stage,request_admin_review,mark_completed',
+            'action' => 'required|string|in:accept_order,reject_order,request_missing_documents,reassign_employees,add_internal_note,complete_current_stage,request_admin_review,quality_approve,quality_reject,quality_rework,mark_completed',
             'reason' => 'nullable|string|max:1000',
             'internal_note' => 'nullable|string|max:2000',
         ]);
 
-        if (in_array($request->action, ['reject_order', 'request_missing_documents', 'reassign_employees', 'request_admin_review'], true) && empty($request->reason)) {
+        if (in_array($request->action, ['reject_order', 'request_missing_documents', 'reassign_employees', 'request_admin_review', 'quality_reject', 'quality_rework'], true) && empty($request->reason)) {
             return redirect()->back()->withErrors('A reason is required for this Sanad action.');
+        }
+
+        if (in_array($request->action, ['quality_approve', 'quality_reject', 'quality_rework'], true) && !auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            return redirect()->back()->withErrors('Only admins can record Sanad quality control decisions.');
         }
 
         $previousStatus = $booking->status;
@@ -296,6 +302,15 @@ class SanadWebController extends Controller
                 break;
             case 'request_admin_review':
                 $stage = 'awaiting_quality_review';
+                break;
+            case 'quality_approve':
+                $stage = 'ready_for_delivery';
+                break;
+            case 'quality_reject':
+                $stage = 'legal_review';
+                break;
+            case 'quality_rework':
+                $stage = 'in_progress';
                 break;
             case 'mark_completed':
                 $status = 'completed';
@@ -793,6 +808,35 @@ class SanadWebController extends Controller
             'transaction_id' => optional($payment)->txn_id,
             'can_update' => (bool) $payment,
             'history_count' => $payment ? $payment->paymentHistory->count() : 0,
+        ];
+    }
+
+    private function requestQualityControl(Booking $booking)
+    {
+        $pendingDocuments = $booking->sanadDocuments()->where('verification_status', 'pending')->count();
+        $rejectedDocuments = $booking->sanadDocuments()->where('verification_status', 'rejected')->count();
+        $openBuzz = $booking->sanadBuzzAlerts()->whereIn('status', ['unread', 'sent'])->count();
+        $openChat = $booking->sanadChatThreads()->where('status', 'open')->count();
+        $paymentStatus = optional($booking->payment)->payment_status ?: 'no_payment';
+        $latestDecision = $booking->sanadRequestActions()
+            ->whereIn('action', ['quality_approve', 'quality_reject', 'quality_rework'])
+            ->latest()
+            ->first();
+        $isReadyForApproval = $pendingDocuments === 0
+            && $rejectedDocuments === 0
+            && $paymentStatus === 'paid'
+            && $booking->handymanAdded()->exists()
+            && in_array($booking->sanad_stage, ['quality_review', 'awaiting_quality_review', 'ready_for_delivery'], true);
+
+        return [
+            'pending_documents' => $pendingDocuments,
+            'rejected_documents' => $rejectedDocuments,
+            'open_buzz' => $openBuzz,
+            'open_chat' => $openChat,
+            'payment_status' => $paymentStatus,
+            'has_assignment' => $booking->handymanAdded()->exists(),
+            'latest_decision' => $latestDecision,
+            'is_ready_for_approval' => $isReadyForApproval,
         ];
     }
 

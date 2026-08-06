@@ -215,6 +215,95 @@
                             </div>
                         </div>
 
+                        <div class="sanad-quality-panel mt-3">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                                <div>
+                                    <h5 class="font-weight-bold mb-1">Admin Quality Control</h5>
+                                    <span class="text-muted">Final checks before delivery approval, rework, or rejection</span>
+                                </div>
+                                @if($qualityControl['is_ready_for_approval'])
+                                    <span class="badge badge-success">Ready for approval</span>
+                                @else
+                                    <span class="badge badge-warning">Needs review</span>
+                                @endif
+                            </div>
+                            <div class="row">
+                                <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                    <div class="sanad-quality-item {{ $qualityControl['pending_documents'] > 0 ? 'is-warning' : '' }}">
+                                        <span>Pending Docs</span>
+                                        <strong>{{ $qualityControl['pending_documents'] }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                    <div class="sanad-quality-item {{ $qualityControl['rejected_documents'] > 0 ? 'is-danger' : '' }}">
+                                        <span>Rejected Docs</span>
+                                        <strong>{{ $qualityControl['rejected_documents'] }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                    <div class="sanad-quality-item {{ $qualityControl['payment_status'] !== 'paid' ? 'is-warning' : '' }}">
+                                        <span>Payment</span>
+                                        <strong>{{ Str::headline($qualityControl['payment_status']) }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                    <div class="sanad-quality-item {{ ! $qualityControl['has_assignment'] ? 'is-warning' : '' }}">
+                                        <span>Assignment</span>
+                                        <strong>{{ $qualityControl['has_assignment'] ? 'Ready' : 'Open' }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                    <div class="sanad-quality-item {{ $qualityControl['open_buzz'] > 0 ? 'is-warning' : '' }}">
+                                        <span>Open Buzz</span>
+                                        <strong>{{ $qualityControl['open_buzz'] }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-6 mb-3">
+                                    <div class="sanad-quality-item {{ $qualityControl['open_chat'] > 0 ? 'is-warning' : '' }}">
+                                        <span>Open Chat</span>
+                                        <strong>{{ $qualityControl['open_chat'] }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if($qualityControl['latest_decision'])
+                                <div class="sanad-quality-decision mb-3">
+                                    <strong>Latest Decision: {{ Str::headline($qualityControl['latest_decision']->action) }}</strong>
+                                    <span>{{ optional($qualityControl['latest_decision']->created_at)->diffForHumans() }} by {{ optional($qualityControl['latest_decision']->actor)->display_name ?: Str::headline($qualityControl['latest_decision']->actor_role ?: 'admin') }}</span>
+                                    @if($qualityControl['latest_decision']->reason)
+                                        <small>Reason: {{ $qualityControl['latest_decision']->reason }}</small>
+                                    @endif
+                                </div>
+                            @endif
+
+                            @if(auth()->user()->hasAnyRole(['admin', 'demo_admin']))
+                                <form method="POST" action="{{ route('sanad.requests.actions.store', $bookingdata->id) }}">
+                                    @csrf
+                                    <div class="row align-items-end">
+                                        <div class="col-lg-3 col-md-6 mb-3">
+                                            <label class="form-control-label">QC Decision</label>
+                                            <select name="action" class="form-control" required>
+                                                <option value="quality_approve">Approve Quality</option>
+                                                <option value="quality_rework">Send For Rework</option>
+                                                <option value="quality_reject">Reject Quality</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-lg-4 col-md-6 mb-3">
+                                            <label class="form-control-label">Reason</label>
+                                            <input type="text" name="reason" class="form-control" placeholder="Required for rework or rejection">
+                                        </div>
+                                        <div class="col-lg-3 col-md-6 mb-3">
+                                            <label class="form-control-label">Internal Note</label>
+                                            <input type="text" name="internal_note" class="form-control" placeholder="QC note">
+                                        </div>
+                                        <div class="col-lg-2 col-md-6 mb-3">
+                                            <button type="submit" class="btn btn-primary w-100">Save QC</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            @endif
+                        </div>
+
                         <div class="sanad-billing-panel mt-3">
                             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                                 <div>
@@ -493,6 +582,50 @@
             .sanad-action-item small {
                 display: block;
                 color: #6c757d;
+            }
+
+            .sanad-quality-panel {
+                padding: 16px;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                border-radius: 8px;
+                background: #fff;
+            }
+
+            .sanad-quality-item {
+                min-height: 78px;
+                padding: 14px;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                border-radius: 8px;
+                background: #f8f9fa;
+            }
+
+            .sanad-quality-item span,
+            .sanad-quality-decision span,
+            .sanad-quality-decision small {
+                display: block;
+                color: #6c757d;
+            }
+
+            .sanad-quality-item strong {
+                display: block;
+                overflow-wrap: anywhere;
+            }
+
+            .sanad-quality-item.is-warning {
+                border-color: #f2c94c;
+                background: #fff9e8;
+            }
+
+            .sanad-quality-item.is-danger {
+                border-color: #eb5757;
+                background: #fff1f1;
+            }
+
+            .sanad-quality-decision {
+                padding: 12px;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                border-radius: 8px;
+                background: #f8f9fa;
             }
 
             .sanad-billing-panel {
