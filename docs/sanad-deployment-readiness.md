@@ -19,11 +19,12 @@ This note records the current Dokploy deployment target and the remaining releas
 | Dokploy compose path | `./docker-compose.yml` |
 | Dokploy status | `done` |
 
-## Current Sanad Branches
+## Current Sanad Branches And PRs
 
 | Application | Branch | PR |
 | --- | --- | --- |
-| Backend and dashboards | `codex/sanad-phase-1-foundation` | https://github.com/Wattlesol/backup_kangoo/pull/1 |
+| Backend and dashboards into `main` | `codex/sanad-phase-1-foundation` | https://github.com/Wattlesol/backup_kangoo/pull/1 |
+| Backend and dashboards into Dokploy `prod` | `codex/sanad-phase-1-foundation` | https://github.com/Wattlesol/backup_kangoo/pull/2 |
 | Customer mobile app | `codex/sanad-phase-1-foundation` | https://github.com/Wattlesol/handyman_user_flutter_v11.13.2/pull/1 |
 | Admin/provider mobile app | `codex/sanad-phase-1-foundation` | https://github.com/Wattlesol/handyman_admin_flutter_app-v3.9.0/pull/1 |
 
@@ -32,6 +33,8 @@ This note records the current Dokploy deployment target and the remaining releas
 | Target | PR |
 | --- | --- |
 | Backend Sanad branch into Dokploy `prod` branch | https://github.com/Wattlesol/backup_kangoo/pull/2 |
+
+PR #2 is the deployment-gating PR for UAT because Dokploy deploys the `prod` branch. PR #1 remains the backend PR toward `main`.
 
 ## Deployment Decision
 
@@ -56,7 +59,10 @@ scripts/sanad_web_sql_qa.sh
 After deployment, run:
 
 ```bash
-BASE_URL=https://kangoo.sa/api SANAD_TEST_EMAIL=<uat-admin-email> SANAD_TEST_PASSWORD=<uat-admin-password> scripts/sanad_integrated_qa.sh
+BASE_URL=https://kangoo.sa/api \
+SANAD_TEST_EMAIL=<uat-admin-email> \
+SANAD_TEST_PASSWORD=<uat-admin-password> \
+scripts/sanad_integrated_qa.sh
 ```
 
 Then complete the role acceptance checks in `docs/sanad-uat-checklist.md`.
