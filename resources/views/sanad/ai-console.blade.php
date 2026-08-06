@@ -1,3 +1,13 @@
+@php
+    $sanadRoleLabels = [
+        'admin' => 'Admin',
+        'provider' => 'Partner',
+        'handyman' => 'Employee',
+        'user' => 'Customer',
+    ];
+    $sanadRoleLabel = fn ($role) => $sanadRoleLabels[$role] ?? Str::headline($role ?: 'role');
+@endphp
+
 <x-master-layout>
     <div class="container-fluid">
         <div class="row">
@@ -98,7 +108,7 @@
                                                 @foreach(config('sanad.document_visibility', []) as $role)
                                                     <label>
                                                         <input type="checkbox" name="visible_to[]" value="{{ $role }}" checked>
-                                                        {{ Str::headline($role) }}
+                                                        {{ $sanadRoleLabel($role) }}
                                                     </label>
                                                 @endforeach
                                             </div>

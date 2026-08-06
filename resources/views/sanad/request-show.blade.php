@@ -1,3 +1,14 @@
+@php
+    $sanadRoleLabels = [
+        'admin' => 'Admin',
+        'provider' => 'Partner',
+        'handyman' => 'Employee',
+        'user' => 'Customer',
+    ];
+    $sanadRoleLabel = fn ($role) => $sanadRoleLabels[$role] ?? Str::headline($role ?: 'role');
+    $sanadRoleList = fn ($roles) => collect($roles ?: [])->map(fn ($role) => $sanadRoleLabel($role))->implode(', ');
+@endphp
+
 <x-master-layout>
     <div class="container-fluid">
         <div class="row">
@@ -101,7 +112,7 @@
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="sanad-detail-box">
-                                    <span>Booking Status</span>
+                                    <span>Request Status</span>
                                     <strong>{{ Str::headline($bookingdata->status ?: 'pending') }}</strong>
                                 </div>
                             </div>
@@ -394,7 +405,7 @@
                             </div>
                             <div class="sanad-checkbox-row mb-3">
                                 @foreach(config('sanad.document_visibility', []) as $role)
-                                    <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" {{ $role === 'admin' ? 'checked' : '' }}> {{ Str::headline($role) }}</label>
+                                    <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" {{ $role === 'admin' ? 'checked' : '' }}> {{ $sanadRoleLabel($role) }}</label>
                                 @endforeach
                             </div>
                             <button type="submit" class="btn btn-primary">Add Document</button>
@@ -406,7 +417,7 @@
                                     <div>
                                         <strong>{{ Str::headline($document->document_type) }}</strong>
                                         <span>{{ $document->file_name ?: $document->file_path ?: 'No file reference' }}</span>
-                                        <small>Visible to: {{ implode(', ', $document->visible_to ?: []) ?: '-' }}</small>
+                                        <small>Visible to: {{ $sanadRoleList($document->visible_to) ?: '-' }}</small>
                                     </div>
                                     <div class="sanad-list-actions">
                                         <span class="badge badge-light">{{ Str::headline($document->verification_status) }}</span>
@@ -439,7 +450,7 @@
                                     <label class="form-control-label">Recipient Role</label>
                                     <select name="recipient_role" class="form-control">
                                         @foreach(config('sanad.document_visibility', []) as $role)
-                                            <option value="{{ $role }}">{{ Str::headline($role) }}</option>
+                                            <option value="{{ $role }}">{{ $sanadRoleLabel($role) }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -468,7 +479,7 @@
                                     <div>
                                         <strong>{{ Str::headline($alert->priority) }} buzz</strong>
                                         <span>{{ $alert->message ?: '-' }}</span>
-                                        <small>To: {{ Str::headline($alert->recipient_role ?: 'role') }}</small>
+                                        <small>To: {{ $sanadRoleLabel($alert->recipient_role) }}</small>
                                     </div>
                                     <div class="sanad-list-actions">
                                         <span class="badge badge-light">{{ Str::headline($alert->status) }}</span>
@@ -498,11 +509,11 @@
                             @forelse($chatMessages as $message)
                                 <div class="sanad-chat-message">
                                     <div class="d-flex justify-content-between gap-2 flex-wrap">
-                                        <strong>{{ Str::headline($message->sender_role ?: 'system') }}</strong>
+                                        <strong>{{ $message->sender_role === 'system' ? 'System' : $sanadRoleLabel($message->sender_role) }}</strong>
                                         <small>{{ optional($message->created_at)->diffForHumans() }}</small>
                                     </div>
                                     <p class="mb-1">{{ $message->message }}</p>
-                                    <small>Visible to: {{ implode(', ', $message->visible_to ?: []) ?: '-' }}</small>
+                                    <small>Visible to: {{ $sanadRoleList($message->visible_to) ?: '-' }}</small>
                                 </div>
                             @empty
                                 <div class="sanad-empty-state">No messages yet</div>
@@ -515,7 +526,7 @@
                             <textarea name="message" class="form-control mb-3" rows="3" required></textarea>
                             <div class="sanad-checkbox-row mb-3">
                                 @foreach(config('sanad.document_visibility', []) as $role)
-                                    <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" checked> {{ Str::headline($role) }}</label>
+                                    <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" checked> {{ $sanadRoleLabel($role) }}</label>
                                 @endforeach
                             </div>
                             <button type="submit" class="btn btn-primary">Send Message</button>

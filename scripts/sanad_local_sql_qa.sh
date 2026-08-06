@@ -28,7 +28,7 @@ echo "Project: ${PROJECT_NAME}"
 echo "API: ${BASE_URL}"
 echo "MySQL: 127.0.0.1:${MYSQL_PUBLIC_PORT}/${DB_DATABASE}"
 
-APP_NAME="Kangoo Sanad QA" \
+APP_NAME="Sanad Solutions QA" \
 APP_ENV=local \
 APP_KEY="${APP_KEY}" \
 APP_DEBUG=true \
@@ -70,6 +70,37 @@ for attempt in $(seq 1 90); do
 
   sleep 2
 done
+
+echo "Applying Sanad local branding settings..."
+docker compose -p "${PROJECT_NAME}" -f docker-compose.yml exec -T mysql \
+  mysql -u"${DB_USERNAME}" -p"${DB_PASSWORD}" "${DB_DATABASE}" <<'SQL'
+UPDATE app_settings
+SET
+  site_name = 'Sanad Solutions',
+  site_description = 'Sanad Solutions platform for government and business service requests.',
+  site_copyright = 'Copyright © 2026 Sanad Solutions. All rights reserved.'
+WHERE id = 1;
+
+UPDATE settings
+SET value = JSON_SET(
+  COALESCE(NULLIF(value, ''), '{}'),
+  '$.site_name', 'Sanad Solutions',
+  '$.site_description', 'Sanad Solutions platform for government and business service requests.',
+  '$.inquriy_email', 'support@sanad.local',
+  '$.helpline_number', '+966000000000',
+  '$.website', 'https://sanad.local',
+  '$.address', 'Sanad Operations'
+)
+WHERE type = 'general-setting' AND `key` = 'general-setting';
+
+UPDATE users
+SET
+  first_name = 'Employee',
+  last_name = 'Demo',
+  display_name = 'Employee Demo',
+  email = 'demo@employee.com'
+WHERE email = 'demo@handyman.com';
+SQL
 
 echo "Seeding local QA request data..."
 docker compose -p "${PROJECT_NAME}" -f docker-compose.yml exec -T mysql \
