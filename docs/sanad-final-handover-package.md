@@ -83,6 +83,7 @@ php artisan route:list --name=wallet --columns=method,uri,name,action
 php artisan route:list --name=providerpayout --columns=method,uri,name,action
 git diff --check
 BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PASSWORD=12345678 scripts/sanad_api_smoke_test.sh
+BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PASSWORD=12345678 scripts/sanad_integrated_qa.sh
 PATH=/Users/xain/development/flutter/bin:$PATH flutter analyze lib/screens/sanad/my_sanad_screen.dart lib/model/sanad_models.dart lib/network/rest_apis.dart
 PATH=/Users/xain/development/flutter/bin:$PATH flutter analyze lib/screens/sanad/sanad_operations_screen.dart lib/model/sanad_models.dart lib/networks/rest_apis.dart
 ```
@@ -102,6 +103,27 @@ The following local smoke checks passed against `http://127.0.0.1:8091/api`:
 | Payment list/payment gateways | Passed |
 | Wallet history/wallet balance/wallet top-up | Passed |
 | Government verification create/list/approve | Passed |
+
+## Integrated QA Result
+
+The integrated QA script passed locally against `http://127.0.0.1:8091/api`:
+
+```bash
+BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PASSWORD=12345678 scripts/sanad_integrated_qa.sh
+```
+
+| Integrated Area | Result |
+| --- | --- |
+| Authenticated API session | Passed |
+| Foundation role, terminology, lifecycle, privacy, and AI metadata | Passed |
+| Request list mobile contract and lifecycle update | Passed |
+| Buzz create and acknowledge workflow | Passed |
+| Document vault privacy metadata and admin verification | Passed |
+| Secure chat thread/message workflow | Passed |
+| AI knowledge/ask workflow | Passed |
+| Payment and wallet API contracts | Passed |
+| Customer mobile source and Android debug APK artifact contract | Passed |
+| Admin/provider/employee mobile source and Android debug APK artifact contract | Passed |
 
 ## Mobile Build Results
 
@@ -137,12 +159,12 @@ php artisan migrate --force
 
 ## Remaining QA Gates
 
-The backend, web dashboards, API smoke tests, and Android debug APK test builds are complete on the local environment. Release signing/store packaging is intentionally deferred until after system testing. The active QA gates are now integrated runtime review and client UAT:
+The backend, web dashboards, API smoke tests, integrated QA script, and Android debug APK test builds are complete on the local environment. Release signing/store packaging is intentionally deferred until after system testing. The active QA gate is now client UAT:
 
 | Gate | Status | Reason |
 | --- | --- | --- |
 | Client UAT acceptance | Ready for QA | Final sign-off requires client review of the deployed environment and Android debug test builds. |
-| Cross-platform runtime synchronization | Ready for QA | API contracts are verified and mobile source is wired to the shared endpoints. Needs integrated runtime testing across backend, dashboards, and mobile test builds. |
+| Cross-platform runtime synchronization | Passed | API contracts, backend runtime workflows, mobile source wiring, and Android debug APK artifacts passed integrated QA. |
 
 ## Deferred Release Prep
 
