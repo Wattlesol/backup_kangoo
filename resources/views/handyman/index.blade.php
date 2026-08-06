@@ -129,9 +129,11 @@
                         title: "{{__('messages.contact_number')}}"
                     },
                     {
-                        data: 'address',
-                        name: 'address',
-                        title: "{{__('messages.address')}}"
+                        data: 'sanad_profile',
+                        name: 'sanad_profile',
+                        title: "Employee Profile",
+                        orderable: false,
+                        searchable: false,
                     },
                     {
                         data: 'status',

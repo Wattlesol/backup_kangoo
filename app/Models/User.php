@@ -27,7 +27,9 @@ class User extends Authenticatable implements HasMedia
         'display_name', 'providertype_id' , 'is_featured' , 'time_zone' ,'last_notification_seen' ,
         'login_type','service_address_id' , 'uid','is_subscribe',
         'social_image','is_available','designation','last_online_time',
-        'known_languages','skills','description','why_choose_me','is_email_verified','language'
+        'known_languages','skills','description','why_choose_me','is_email_verified','language',
+        'sanad_job_title','sanad_department','sanad_employee_status','sanad_permissions',
+        'sanad_working_hours','sanad_daily_capacity'
     ];
 
     /**
@@ -60,7 +62,9 @@ class User extends Authenticatable implements HasMedia
         'is_subscribe'            => 'integer',
         'is_available'            => 'integer',
         'slots_for_all_services' => 'integer',
-        'is_email_verified'    => 'integer'
+        'is_email_verified'    => 'integer',
+        'sanad_permissions'    => 'array',
+        'sanad_daily_capacity' => 'integer',
     ];
 
     protected static function boot(){

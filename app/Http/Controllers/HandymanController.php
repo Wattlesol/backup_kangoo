@@ -131,6 +131,9 @@ class HandymanController extends Controller
             ->editColumn('provider_id', function($query) {
             return view('handyman.provider', compact('query'));
             })
+            ->addColumn('sanad_profile', function($query) {
+                return view('handyman.sanad-profile', compact('query'))->render();
+            })
             ->editColumn('address', function($query) {
                 return ($query->address != null && isset($query->address)) ? $query->address : '-';
             })
@@ -145,7 +148,7 @@ class HandymanController extends Controller
                 return view('handyman.action',compact('handyman'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['check','display_name','action','status'])
+            ->rawColumns(['check','display_name','action','status','sanad_profile'])
             ->toJson();
     }
 
@@ -230,6 +233,12 @@ class HandymanController extends Controller
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $data['skills'] = $this->linesToString($request->skills);
+        $data['sanad_permissions'] = array_values(array_filter($request->sanad_permissions ?: []));
+        $data['sanad_employee_status'] = $request->sanad_employee_status ?: 'available';
+        if (!$request->filled('designation') && $request->filled('sanad_job_title')) {
+            $data['designation'] = $request->sanad_job_title;
+        }
         if(auth()->user()->hasAnyRole(['provider'])){
             $auth_user = authSession();
             $user_id = $auth_user->id;
@@ -468,5 +477,23 @@ class HandymanController extends Controller
         }
         $pageTitle = __('messages.view_form_title',['form'=> __('messages.provider')]);
         return view('handyman.detail', compact('pageTitle' ,'handymandata' ,'auth_user' ));
+    }
+
+    private function linesToString($value)
+    {
+        if (is_array($value)) {
+            return implode(',', array_filter($value));
+        }
+
+        if (empty($value)) {
+            return null;
+        }
+
+        return collect(preg_split('/\r\n|\r|\n|,/', $value))
+            ->map(function ($line) {
+                return trim($line);
+            })
+            ->filter()
+            ->implode(',');
     }
 }
