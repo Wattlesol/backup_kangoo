@@ -50,6 +50,7 @@ Additional role accounts should be confirmed from the target deployment seed dat
 9. Open customer and admin/provider mobile apps and validate Sanad screens against the same API base URL.
 
 Use `docs/sanad-uat-checklist.md` for the final client acceptance pass across admin, partner, employee, and customer experiences.
+Use `docs/sanad-deployment-readiness.md` for the Dokploy target, branch alignment, and post-deploy UAT verification steps.
 
 ## Verified Coverage
 
@@ -138,17 +139,23 @@ The following Android debug builds passed locally using Flutter `3.27.4`, Java `
 
 ## Deployment Notes
 
-1. Deploy the backend branch `codex/sanad-phase-1-foundation` after PR review.
-2. Run Laravel migrations on the target database:
+1. Review `docs/sanad-deployment-readiness.md` before deployment.
+2. Merge the backend Sanad branch into the Dokploy deployment branch, or temporarily point Dokploy to the Sanad branch for UAT.
+3. Redeploy the Dokploy compose target after the branch decision is complete.
+4. Run Laravel migrations on the target database:
 
 ```bash
 php artisan migrate --force
 ```
 
-3. Confirm seed/demo users exist for admin, partner, employee, and customer demo flows.
-4. Configure the mobile apps to the deployed API base URL.
-5. Rebuild Android/iOS apps after API base URL confirmation.
-6. Run the smoke script against the deployed API URL before client handover.
+5. Confirm seed/demo users exist for admin, partner, employee, and customer demo flows.
+6. Configure the mobile apps to the deployed API base URL.
+7. Rebuild Android/iOS apps after API base URL confirmation.
+8. Run the integrated QA script against the deployed API URL before client handover:
+
+```bash
+BASE_URL=https://kangoo.sa/api SANAD_TEST_EMAIL=<uat-admin-email> SANAD_TEST_PASSWORD=<uat-admin-password> scripts/sanad_integrated_qa.sh
+```
 
 ## Known Local Notes
 
