@@ -74,6 +74,7 @@ Use `docs/sanad-local-sql-qa.md` to run full local SQL QA before deploying anyth
 ```bash
 scripts/sanad_local_sql_qa.sh
 scripts/sanad_web_sql_qa.sh
+scripts/sanad_dokploy_deploy_and_qa.sh
 php -l app/Http/Controllers/API/SanadController.php
 php -l app/Http/Controllers/SanadWebController.php
 php -l app/Http/Controllers/PaymentController.php

@@ -60,3 +60,17 @@ BASE_URL=https://kangoo.sa/api SANAD_TEST_EMAIL=<uat-admin-email> SANAD_TEST_PAS
 ```
 
 Then complete the role acceptance checks in `docs/sanad-uat-checklist.md`.
+
+## Guarded Dokploy Deploy
+
+After PR #2 is reviewed and merged into `prod`, use the guarded deployment runner:
+
+```bash
+DOKPLOY_API_KEY=<dokploy-api-key> \
+SANAD_EXPECTED_COMMIT=<merged-sanad-commit-sha> \
+SANAD_TEST_EMAIL=<uat-admin-email> \
+SANAD_TEST_PASSWORD=<uat-admin-password> \
+scripts/sanad_dokploy_deploy_and_qa.sh
+```
+
+The runner will not deploy unless `origin/prod` contains `SANAD_EXPECTED_COMMIT` and the Dokploy compose target still points to `Wattlesol/backup_kangoo:prod`.
