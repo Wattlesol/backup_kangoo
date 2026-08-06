@@ -61,20 +61,9 @@ class FrontendController extends Controller
                 if (isset($sections[$key])) {
                     $data = json_decode($sections[$key]->value, true);
 
-                    // Fix section_1 provider_id issue - limit to prevent hanging
                     if ($key === 'section_1' && isset($data['provider_id']) && is_array($data['provider_id'])) {
-                        // Limit to maximum 3 providers to prevent performance issues
-                        $data['provider_id'] = array_slice($data['provider_id'], 0, 3);
-
-                        // Just validate provider IDs exist, don't pre-load complex data
-                        $validProviders = [];
-                        foreach ($data['provider_id'] as $providerId) {
-                            $provider = User::where('id', $providerId)->where('user_type', 'provider')->where('status', 1)->first();
-                            if ($provider) {
-                                $validProviders[] = $providerId;
-                            }
-                        }
-                        $data['provider_id'] = $validProviders;
+                        $data['provider_id'] = [];
+                        $data['enable_popular_provider'] = 0;
                     }
 
                     $sectionData[$key] = $data;
@@ -127,11 +116,7 @@ class FrontendController extends Controller
     }
 
     public function serviceList(Request $request){
-        if($request->provider_id){
-            $id = $request->provider_id;
-            $type = "provider-service";
-        }
-        else if($request->subcategory_id){
+        if($request->subcategory_id){
             $id = $request->subcategory_id;
             $type = 'subcategory-service';
         }
@@ -161,7 +146,7 @@ class FrontendController extends Controller
     }
 
     public function providerList(Request $request){
-        return view('landing-page.provider');
+        return redirect()->route('service.list');
     }
 
     public function blogList(Request $request){
@@ -214,7 +199,7 @@ class FrontendController extends Controller
     }
 
     public function postJobList(Request $request){
-        return view('landing-page.post-job');
+        return redirect()->route('service.list');
     }
 
     public function relatedService(Request $request){
@@ -251,62 +236,13 @@ class FrontendController extends Controller
     }
 
     public function providerDetail(Request $request){
-        $provider_id = $request->id;
-        $userController = app(UserController::class);
-        $apiRequest = new Request(['id' => $provider_id]);
-        $providerData = $userController->userDetail($apiRequest);
-        $providerData = json_decode($providerData->content(), true);
-        $why_choose_me = json_decode($providerData['data']['why_choose_me'], true);
-
-        $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-        $datetime = json_decode($sitesetup->value);
-
-        $completed_services = Booking::where('provider_id', $providerData['data']['id'])->where('status', 'completed')->count();
-
-        $servicerating = Service::where('provider_id', $providerData['data']['id'])->with('serviceRating')->get();
-        $allRatings = $servicerating->flatMap(function ($service) {
-            return $service->serviceRating->filter(function ($rating){
-                return in_array($rating->rating, [4,5]);
-            });
-        });
-        $satisfy_customers = $allRatings->pluck('customer_id')->unique()->count();
-
-        if(!empty(auth()->user()) && auth()->user()->hasRole('user')){
-            $auth_user_id=auth()->user()->id;
-            $favourite = UserFavouriteService::where('user_id',$auth_user_id)->get();
-         }
-         else{
-            $auth_user_id=null;
-            $favourite=null;
-         }
-        return view('landing-page.ProviderDetails', compact('providerData','why_choose_me','datetime','completed_services','satisfy_customers','auth_user_id','favourite'));
+        return redirect()->route('service.list');
     }
 
 
 
     public function handymanDetail(Request $request){
-        $handyman_id = $request->id;
-        $userController = app(UserController::class);
-        $apiRequest = new Request(['id' => $handyman_id]);
-        $handymanData = $userController->userDetail($apiRequest);
-        $handymanData = json_decode($handymanData->content(), true);
-        $why_choose_me = json_decode($handymanData['data']['why_choose_me'], true);
-
-        $handyman_rating = HandymanRating::where('handyman_id', $handymanData['data']['id'])->orderBy('created_at', 'desc')->get();
-        $total_handyman_rating = $handyman_rating->count();
-
-        $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-        $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
-
-        $completed_services = BookingHandymanMapping::whereHas('bookings', function($query){
-            $query->where('status', 'completed');
-        })->where('handyman_id', $handymanData['data']['id'])->count();
-
-        $satisfy_customers = $handyman_rating->filter(function ($rating) {
-           return in_array($rating->rating, [4, 5]);
-        })->pluck('customer_id')->unique()->count();
-
-        return view('landing-page.HandymanDetails', compact('handymanData','why_choose_me','handyman_rating','total_handyman_rating','datetime','completed_services','satisfy_customers'));
+        return redirect()->route('service.list');
     }
 
     public function serviceDetail(Request $request){
@@ -565,19 +501,13 @@ class FrontendController extends Controller
     }
 
     public function bookPostJobView(Request $request){
-        $user_id = Auth::id();
-        $post_job_id = $request->id;
-        $postJobController = app(PostJobRequestController::class);
-        $apiRequest = new Request(['post_request_id' => $post_job_id]);
-        $postJob = $postJobController->getPostRequestDetail($apiRequest);
-        return view('landing-page.BookPostJob',compact('postJob','user_id'));
+        return redirect()->route('service.list');
     }
 
 
     public function postJob()
     {
-        $user_id=Auth::id();
-        return view('landing-page.post-job-show',compact('user_id'));
+        return redirect()->route('service.list');
     }
 
     public function bookingDetail(Request $request){
@@ -596,11 +526,7 @@ class FrontendController extends Controller
     }
 
     public function postJobDetail(Request $request){
-        $post_job_id = $request->id;
-        $postJobController = app(PostJobRequestController::class);
-        $apiRequest = new Request(['post_request_id' => $post_job_id]);
-        $postJob = $postJobController->getPostRequestDetail($apiRequest);
-        return view('landing-page.post-job-detail',compact('postJob'));
+        return redirect()->route('service.list');
     }
 
     public function favouriteServiceList(Request $request){
@@ -885,6 +811,8 @@ class FrontendController extends Controller
 
     public function postJobDatatable(Datatables $datatable, Request $request)
     {
+        abort(404);
+
         $query = PostJobRequest::myPostJob()->whereIn('status',['requested','accepted','assigned']);
         $filter = $request->filter;
         if (isset($filter['search'])) {

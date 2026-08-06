@@ -45,19 +45,6 @@
                 <a class="nav-link {{ request()->routeIs('blog.*') ? 'active' : '' }}" href="{{ route('blog.list') }}">{{__('landingpage.blogs')}}</a>
             </li>
             @endif
-            @if($sectionData['provider'] == 1)
-            <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('frontend.provider.*') ? 'active' : '' }}" href="{{ route('frontend.provider') }}">{{__('landingpage.providers')}}</a>
-            </li>
-            @endif
-
-            <!-- Store Link -->
-            <li class="nav-item">
-                <a class="nav-link {{ request()->routeIs('store.unified') || request()->routeIs('products.*') || request()->routeIs('stores.*') ? 'active' : '' }}" href="{{ route('store.unified') }}">
-                    {{__('landingpage.store')}}
-                </a>
-            </li>
-
             @if(auth()->check() && auth()->user()->user_type == 'user' && $sectionData['bookings'] == 1)
                 <li class="nav-item">
                     <a class="nav-link {{ request()->routeIs('booking.*') ? 'active' : '' }}" href="{{ route('booking.list') }}">{{__('landingpage.bookings')}}</a>
