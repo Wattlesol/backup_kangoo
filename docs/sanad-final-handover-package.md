@@ -58,7 +58,7 @@ Additional role accounts should be confirmed from the target deployment seed dat
 | Employee Dashboard | Employee profile fields, permissions, assignment, capacity, operational status |
 | Customer Dashboard | Request list/detail, documents, Buzz, chat, payment visibility |
 | Customer Mobile App | Sanad customer workflow commit `44031df` and targeted Flutter analysis passed |
-| Admin/Provider Mobile App | Sanad operations workflow commit `16ed2d1` and targeted Flutter analysis passed |
+| Admin/Provider Mobile App | Sanad operations workflow commit `16ed2d1`, `nb_utils` compatibility pin, and targeted Flutter analysis passed |
 | Backend/API | Sanad foundation, Buzz, document vault, chat, AI, payment/wallet, document verification |
 | AI Features | AI knowledge and ask flow verified by live API smoke |
 | Privacy Rules | Role-scoped requests, Buzz visibility, document visibility, wallet scoping |
@@ -103,6 +103,15 @@ The following local smoke checks passed against `http://127.0.0.1:8091/api`:
 | Wallet history/wallet balance/wallet top-up | Passed |
 | Government verification create/list/approve | Passed |
 
+## Mobile Build Results
+
+The following Android debug builds passed locally using Flutter `3.27.4`, Java `17.0.19`, Android SDK `35.0.0`, and accepted Android SDK licenses:
+
+| Application | Command | Artifact |
+| --- | --- | --- |
+| Customer mobile app | `JAVA_HOME=/usr/local/opt/openjdk@17 PATH=/usr/local/opt/openjdk@17/bin:/Users/xain/development/flutter/bin:$PATH flutter build apk --debug` | `/Users/xain/Documents/kangoo/handyman_user_flutter_v11.13.2/build/app/outputs/flutter-apk/app-debug.apk` |
+| Admin/provider mobile app | `JAVA_HOME=/usr/local/opt/openjdk@17 PATH=/usr/local/opt/openjdk@17/bin:/Users/xain/development/flutter/bin:$PATH flutter build apk --debug` | `/Users/xain/Documents/kangoo/handyman_admin_flutter_app-v3.9.0/build/app/outputs/flutter-apk/app-debug.apk` |
+
 ## Deployment Notes
 
 1. Deploy the backend branch `codex/sanad-phase-1-foundation` after PR review.
@@ -122,9 +131,9 @@ php artisan migrate --force
 - Local backend smoke testing used `http://127.0.0.1:8091`.
 - Local generated Android files remain dirty in mobile repos and are not part of delivery commits.
 - Flutter is installed locally at `/Users/xain/development/flutter`, but it is not currently on the default shell `PATH`.
-- Android release builds are blocked in this workspace by Java 8 and pending Android SDK license acceptance. A Java 17-capable Android/Flutter environment is required for release APK/AAB builds.
+- Android debug APK builds now pass when `JAVA_HOME` is set to Homebrew OpenJDK 17 and `/Users/xain/development/flutter/bin` is added to `PATH`.
 - Xcode 26.6 and CocoaPods 1.16.2 are available locally. The customer iOS no-codesign build reached CocoaPods, but `pod install` was blocked by the local pod/spec installation state after a GoogleSignIn podspec cache error and subsequent repo update.
-- Full mobile APK/IPA release builds should be run in the final build environment with the required Flutter, Android, Java 17, Android licenses, CocoaPods, and iOS signing setup.
+- Full mobile release AAB/IPA builds should be run in the final build environment with the required release signing credentials, CocoaPods, and iOS signing setup.
 
 ## Remaining QA Gates
 
@@ -132,7 +141,7 @@ The backend, web dashboards, and API smoke tests are complete on the local envir
 
 | Gate | Status | Reason |
 | --- | --- | --- |
-| Customer Flutter APK/IPA build | QA | Targeted Sanad Flutter analysis passed with `/Users/xain/development/flutter`. Android release remains gated by Java 8/Android licenses. iOS no-codesign build reached CocoaPods but is blocked by the local pod/spec installation state. |
-| Admin/provider Flutter APK/IPA build | QA | Targeted Sanad Flutter analysis passed with `/Users/xain/development/flutter`. Full Android/iOS release builds remain gated by the same final mobile build environment requirements. |
+| Customer Flutter APK/IPA build | QA | Android debug APK build passed locally. Final release AAB/IPA still requires production signing configuration and final environment credentials. Customer iOS no-codesign build reached CocoaPods but is blocked by the local pod/spec installation state. |
+| Admin/provider Flutter APK/IPA build | QA | Android debug APK build passed locally after pinning `nb_utils` to `7.1.4`. Final release AAB/IPA still requires production signing configuration and final environment credentials. |
 | Client UAT acceptance | QA | Final sign-off requires client review of the deployed environment and mobile builds. |
 | Cross-platform runtime synchronization | QA | API contracts are verified and mobile source is wired to the shared endpoints, but full device/runtime validation requires the mobile build environment. |
