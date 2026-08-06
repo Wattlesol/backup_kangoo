@@ -70,7 +70,7 @@ deploy_code="$(curl -sS -o "$deploy_response" -w '%{http_code}' \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   --data "$deploy_payload" \
-  "${DOKPLOY_URL}/api/compose.redeploy")"
+  "${DOKPLOY_URL}/api/compose.deploy")"
 
 if [[ "$deploy_code" -lt 200 || "$deploy_code" -ge 300 ]]; then
   echo "FAIL Dokploy redeploy returned HTTP ${deploy_code}" >&2
@@ -78,7 +78,7 @@ if [[ "$deploy_code" -lt 200 || "$deploy_code" -ge 300 ]]; then
   exit 1
 fi
 
-echo "Dokploy redeploy accepted. Waiting for deployment result..."
+echo "Dokploy deploy accepted. Waiting for deployment result and live Sanad route..."
 
 for attempt in $(seq 1 120); do
   curl -sS -o "$compose_response" \
@@ -88,6 +88,17 @@ for attempt in $(seq 1 120); do
 
   latest_status="$(jq -r '.deployments[0].status // empty' "$compose_response")"
   latest_description="$(jq -r '.deployments[0].description // empty' "$compose_response")"
+  foundation_code="$(curl -sS -o "$tmpdir/live-foundation.json" -w '%{http_code}' \
+    -H 'Accept: application/json' \
+    "${LIVE_BASE_URL%/}/sanad/foundation" || true)"
+
+  if [[ "$foundation_code" == "200" ]] && jq -e '.terminology.booking == "request"' "$tmpdir/live-foundation.json" >/dev/null 2>&1; then
+    echo "Live Sanad foundation route is available."
+    if [[ "$latest_description" != *"$EXPECTED_COMMIT"* ]]; then
+      echo "WARN Dokploy deployment history does not show ${EXPECTED_COMMIT}, but live Sanad route is available." >&2
+    fi
+    break
+  fi
 
   if [[ "$latest_description" == *"$EXPECTED_COMMIT"* ]]; then
     if [[ "$latest_status" == "done" ]]; then

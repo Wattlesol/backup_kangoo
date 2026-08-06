@@ -80,3 +80,4 @@ scripts/sanad_dokploy_deploy_and_qa.sh
 ```
 
 The runner will not deploy unless `origin/prod` contains `SANAD_EXPECTED_COMMIT` and the Dokploy compose target still points to `Wattlesol/backup_kangoo:prod`.
+It uses Dokploy `compose.deploy` and verifies the live Sanad foundation route before running the broader integrated QA suite.
