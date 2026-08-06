@@ -50,6 +50,7 @@ Before any production deployment, run full local SQL QA:
 
 ```bash
 scripts/sanad_local_sql_qa.sh
+scripts/sanad_web_sql_qa.sh
 ```
 
 After deployment, run:

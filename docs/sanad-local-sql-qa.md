@@ -12,6 +12,7 @@ The runner `scripts/sanad_local_sql_qa.sh` creates an isolated Docker Compose pr
 4. Runs Laravel migrations against that local SQL database.
 5. Seeds a local QA Sanad request when the restored dump has no bookings.
 6. Runs `scripts/sanad_integrated_qa.sh` against `http://127.0.0.1:8092/api` with request lifecycle verification required.
+7. Runs authenticated web route QA with `scripts/sanad_web_sql_qa.sh`.
 
 It does not edit the existing `.env`, and it does not connect to production.
 
@@ -19,6 +20,7 @@ It does not edit the existing `.env`, and it does not connect to production.
 
 ```bash
 scripts/sanad_local_sql_qa.sh
+scripts/sanad_web_sql_qa.sh
 ```
 
 ## Default Local Connection
@@ -55,6 +57,12 @@ The full local SQL QA gate passed against `http://127.0.0.1:8092/api`.
 | Payment and wallet API contracts | Passed |
 | Customer mobile source and Android debug APK artifact contract | Passed |
 | Admin/provider/employee mobile source and Android debug APK artifact contract | Passed |
+| Authenticated web login | Passed |
+| Sanad dashboard web route | Passed |
+| Sanad request queue web route | Passed |
+| Sanad request detail web route | Passed |
+| Sanad AI console web route | Passed |
+| Payment/Financial Center web route | Passed |
 
 ## Optional Overrides
 

@@ -73,6 +73,7 @@ Use `docs/sanad-local-sql-qa.md` to run full local SQL QA before deploying anyth
 
 ```bash
 scripts/sanad_local_sql_qa.sh
+scripts/sanad_web_sql_qa.sh
 php -l app/Http/Controllers/API/SanadController.php
 php -l app/Http/Controllers/SanadWebController.php
 php -l app/Http/Controllers/PaymentController.php
@@ -132,7 +133,7 @@ BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PA
 
 ## Local SQL QA Result
 
-The full local SQL QA gate passed against `http://127.0.0.1:8092/api` using a fresh MySQL restore from `database/dumps/kangoo_sa.sql.gz`, Laravel migrations, a seeded QA Sanad request, and required request lifecycle verification. See `docs/sanad-local-sql-qa.md`.
+The full local SQL QA gate passed against `http://127.0.0.1:8092/api` using a fresh MySQL restore from `database/dumps/kangoo_sa.sql.gz`, Laravel migrations, a seeded QA Sanad request, and required request lifecycle verification. Authenticated web SQL QA also passed for login, Sanad dashboard, Sanad request queue, Sanad request detail, Sanad AI console, and Payment/Financial Center routes. See `docs/sanad-local-sql-qa.md`.
 
 ## Mobile Build Results
 
