@@ -120,3 +120,14 @@ php artisan migrate --force
 - Local backend smoke testing used `http://127.0.0.1:8091`.
 - Local generated Android files remain dirty in mobile repos and are not part of delivery commits.
 - Full mobile APK/IPA release builds should be run in the final build environment with the required Flutter, Android, Java, and iOS signing setup.
+
+## Remaining QA Gates
+
+The backend, web dashboards, and API smoke tests are complete on the local environment. The following items remain in QA because they require a mobile build/release or client UAT environment rather than code changes in this workspace:
+
+| Gate | Status | Reason |
+| --- | --- | --- |
+| Customer Flutter APK/IPA build | QA | Flutter is not available on the current PATH and the local Java runtime is Java 8. Android release builds require a Java 17-capable Android/Flutter environment. |
+| Admin/provider Flutter APK/IPA build | QA | Same local build-environment gate as above. Targeted Flutter source analysis was previously completed for the Sanad files. |
+| Client UAT acceptance | QA | Final sign-off requires client review of the deployed environment and mobile builds. |
+| Cross-platform runtime synchronization | QA | API contracts are verified and mobile source is wired to the shared endpoints, but full device/runtime validation requires the mobile build environment. |
