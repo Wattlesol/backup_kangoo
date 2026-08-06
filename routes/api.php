@@ -97,6 +97,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('sanad/buzz/{id}/acknowledge', [ API\SanadController::class, 'acknowledgeBuzz' ]);
     Route::get('sanad/document-vault', [ API\SanadController::class, 'documentVault' ]);
     Route::post('sanad/document-vault', [ API\SanadController::class, 'storeDocumentVault' ]);
+    Route::post('sanad/document-vault/{id}/verify', [ API\SanadController::class, 'verifyDocumentVaultItem' ]);
     Route::get('sanad/chat-threads', [ API\SanadController::class, 'chatThreads' ]);
     Route::post('sanad/chat-messages', [ API\SanadController::class, 'storeChatMessage' ]);
     Route::post('sanad/ai/ask', [ API\SanadController::class, 'aiAsk' ]);

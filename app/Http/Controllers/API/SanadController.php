@@ -177,12 +177,12 @@ class SanadController extends Controller
         return $query;
     }
 
-    public function documentVault(Request $request)
+    private function visibleDocumentVaultQuery()
     {
         $user = auth()->user();
         $role = optional($user)->user_type;
+        $query = SanadDocumentVaultItem::query();
 
-        $query = SanadDocumentVaultItem::query()->latest();
         if (!$user->hasRole('admin') && !$user->hasRole('demo_admin')) {
             $query->where(function ($q) use ($user, $role) {
                 $q->where('owner_id', $user->id)
@@ -193,23 +193,44 @@ class SanadController extends Controller
             });
         }
 
+        return $query;
+    }
+
+    public function documentVault(Request $request)
+    {
+        $query = $this->visibleDocumentVaultQuery()->latest();
+
+        if ($request->filled('booking_id')) {
+            $query->where('booking_id', $request->booking_id);
+        }
+
+        if ($request->filled('verification_status')) {
+            $query->where('verification_status', $request->verification_status);
+        }
+
         return comman_custom_response(['data' => $query->paginate($request->per_page ?: 15)]);
     }
 
     public function storeDocumentVault(Request $request)
     {
         $request->validate([
-            'document_type' => 'required|string',
+            'document_type' => 'required|string|max:255',
             'booking_id' => 'nullable|integer',
             'owner_id' => 'nullable|integer',
             'visible_to' => 'nullable|array',
-            'file_name' => 'nullable|string',
-            'file_path' => 'nullable|string',
+            'visible_to.*' => 'string',
+            'file_name' => 'nullable|string|max:255',
+            'file_path' => 'nullable|string|max:255',
         ]);
+
+        $booking = null;
+        if ($request->filled('booking_id')) {
+            $booking = Booking::myBooking()->findOrFail($request->booking_id);
+        }
 
         $item = SanadDocumentVaultItem::create([
             'booking_id' => $request->booking_id,
-            'owner_id' => $request->owner_id ?: optional(auth()->user())->id,
+            'owner_id' => $request->owner_id ?: optional($booking)->customer_id ?: optional(auth()->user())->id,
             'uploaded_by' => optional(auth()->user())->id,
             'document_type' => $request->document_type,
             'visible_to' => $request->visible_to ?: ['admin'],
@@ -218,6 +239,31 @@ class SanadController extends Controller
         ]);
 
         $this->audit($request, 'sanad.document.created', $item);
+
+        return comman_custom_response(['data' => $item]);
+    }
+
+    public function verifyDocumentVaultItem(Request $request, $id)
+    {
+        if (!auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            return comman_message_response('Only admins can verify Sanad government documents.', 403);
+        }
+
+        $request->validate([
+            'verification_status' => 'required|string|in:approved,rejected,pending',
+        ]);
+
+        $item = SanadDocumentVaultItem::findOrFail($id);
+        $previousStatus = $item->verification_status;
+        $item->verification_status = $request->verification_status;
+        $item->approved_at = $request->verification_status === 'approved' ? now() : null;
+        $item->approved_by = $request->verification_status === 'approved' ? optional(auth()->user())->id : null;
+        $item->save();
+
+        $this->audit($request, 'sanad.document.verification_updated', $item, [
+            'previous_status' => $previousStatus,
+            'current_status' => $item->verification_status,
+        ]);
 
         return comman_custom_response(['data' => $item]);
     }
