@@ -51,6 +51,7 @@ Additional role accounts should be confirmed from the target deployment seed dat
 
 Use `docs/sanad-uat-checklist.md` for the final client acceptance pass across admin, partner, employee, and customer experiences.
 Use `docs/sanad-deployment-readiness.md` for the Dokploy target, branch alignment, and post-deploy UAT verification steps.
+Use `docs/sanad-local-sql-qa.md` to run full local SQL QA before deploying anything to production.
 
 ## Verified Coverage
 
@@ -71,6 +72,7 @@ Use `docs/sanad-deployment-readiness.md` for the Dokploy target, branch alignmen
 ## Verification Commands
 
 ```bash
+scripts/sanad_local_sql_qa.sh
 php -l app/Http/Controllers/API/SanadController.php
 php -l app/Http/Controllers/SanadWebController.php
 php -l app/Http/Controllers/PaymentController.php
@@ -127,6 +129,10 @@ BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PA
 | Payment and wallet API contracts | Passed |
 | Customer mobile source and Android debug APK artifact contract | Passed |
 | Admin/provider/employee mobile source and Android debug APK artifact contract | Passed |
+
+## Local SQL QA Result
+
+The full local SQL QA gate passed against `http://127.0.0.1:8092/api` using a fresh MySQL restore from `database/dumps/kangoo_sa.sql.gz`, Laravel migrations, a seeded QA Sanad request, and required request lifecycle verification. See `docs/sanad-local-sql-qa.md`.
 
 ## Mobile Build Results
 

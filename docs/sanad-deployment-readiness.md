@@ -46,6 +46,12 @@ The safer path is to merge/review first, then redeploy the configured branch.
 
 ## Post-Deploy UAT Verification
 
+Before any production deployment, run full local SQL QA:
+
+```bash
+scripts/sanad_local_sql_qa.sh
+```
+
 After deployment, run:
 
 ```bash

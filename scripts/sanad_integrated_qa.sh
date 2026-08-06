@@ -6,6 +6,7 @@ EMAIL="${SANAD_TEST_EMAIL:-demo@admin.com}"
 PASSWORD="${SANAD_TEST_PASSWORD:-12345678}"
 USER_APP_DIR="${SANAD_USER_APP_DIR:-/Users/xain/Documents/kangoo/handyman_user_flutter_v11.13.2}"
 ADMIN_APP_DIR="${SANAD_ADMIN_APP_DIR:-/Users/xain/Documents/kangoo/handyman_admin_flutter_app-v3.9.0}"
+REQUIRE_REQUEST="${SANAD_REQUIRE_REQUEST:-false}"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required for this QA check." >&2
@@ -107,6 +108,10 @@ if [[ -n "$request_id" ]]; then
   jq -e '.data.sanad_stage == "quality_review" and .data.sanad_priority == "high"' "$lifecycle" >/dev/null
   echo "PASS request lifecycle update"
 else
+  if [[ "$REQUIRE_REQUEST" = "true" ]]; then
+    echo "FAIL request lifecycle update: no visible request found for demo account" >&2
+    exit 1
+  fi
   echo "SKIP request lifecycle update: no visible request found for demo account"
 fi
 
