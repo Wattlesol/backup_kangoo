@@ -32,6 +32,14 @@ class UserRequest extends FormRequest
                 'email'             => 'required|email|max:255|unique:users,email,'.$id,
                 'contact_number'    => 'nullable', //unique:users,contact_number,'.$id,
                 'profile_image'     => 'mimetypes:image/jpeg,image/png,image/jpg,image/gif',
+                'sanad_job_title'   => 'nullable|string|max:255',
+                'sanad_department'  => 'nullable|string|max:255',
+                'sanad_employee_status' => 'nullable|string|in:available,busy,offline,on_leave,training',
+                'sanad_permissions' => 'nullable|array',
+                'sanad_permissions.*' => 'string',
+                'sanad_working_hours' => 'nullable|string|max:255',
+                'sanad_daily_capacity' => 'nullable|integer|min:0|max:100',
+                'skills' => 'nullable|string',
         ];
     }
 

@@ -36,7 +36,15 @@ class Booking extends Model
         'final_total_tax',
         'final_sub_total',
         'final_discount_amount',
-        'final_coupon_discount_amount'
+        'final_coupon_discount_amount',
+        'sanad_reference',
+        'sanad_stage',
+        'sanad_priority',
+        'sla_due_at',
+        'assigned_by',
+        'assigned_at',
+        'escalated_at',
+        'closed_at'
     ];
 
     protected $casts = [
@@ -57,6 +65,11 @@ class Booking extends Model
         'final_sub_total'=> 'double',
         'final_discount_amount'=> 'double',
         'final_coupon_discount_amount'=> 'double',
+        'assigned_by' => 'integer',
+        'sla_due_at' => 'datetime',
+        'assigned_at' => 'datetime',
+        'escalated_at' => 'datetime',
+        'closed_at' => 'datetime',
     ];
     public function customer(){
         return $this->belongsTo(User::class,'customer_id', 'id')->withTrashed();
@@ -96,6 +109,22 @@ class Booking extends Model
     
     public function bookingActivity(){
         return $this->hasMany(BookingActivity::class,'booking_id','id');
+    }
+
+    public function sanadChatThreads(){
+        return $this->hasMany(SanadChatThread::class, 'booking_id', 'id');
+    }
+
+    public function sanadDocuments(){
+        return $this->hasMany(SanadDocumentVaultItem::class, 'booking_id', 'id');
+    }
+
+    public function sanadBuzzAlerts(){
+        return $this->hasMany(SanadBuzzAlert::class, 'booking_id', 'id');
+    }
+
+    public function sanadRequestActions(){
+        return $this->hasMany(SanadRequestAction::class, 'booking_id', 'id');
     }
 
     public function scopeMyBooking($query){

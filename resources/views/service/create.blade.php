@@ -19,10 +19,16 @@
                     <div class="card-body">
                         {{ Form::model($servicedata,['method' => 'POST','route'=>'service.store', 'enctype'=>'multipart/form-data', 'data-toggle'=>"validator" ,'id'=>'service'] ) }}
                         {{ Form::hidden('id') }}
+                        @php
+                            $isPartnerServiceEditor = auth()->user()->hasRole('provider') && !empty($servicedata->id);
+                            $sanadReadOnly = $isPartnerServiceEditor ? ['readonly' => true] : [];
+                            $requiredDocumentsText = old('required_documents', is_array($servicedata->required_documents) ? implode("\n", $servicedata->required_documents) : $servicedata->required_documents);
+                            $requiredSkillsText = old('required_employee_skills', is_array($servicedata->required_employee_skills) ? implode("\n", $servicedata->required_employee_skills) : $servicedata->required_employee_skills);
+                        @endphp
                         <div class="row">
                             <div class="form-group col-md-4">
                                 {{ Form::label('name', __('messages.name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name', old('name'), ['placeholder' => __('messages.name'), 'class' => 'form-control', 'title' => 'Please enter alphabetic characters and spaces only']) }}
+                                {{ Form::text('name', old('name'), array_merge(['placeholder' => __('messages.name'), 'class' => 'form-control', 'title' => 'Please enter alphabetic characters and spaces only'], $sanadReadOnly)) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
@@ -87,7 +93,7 @@
                             </div>
                             <div class="form-group col-md-4" id="price_div">
                                 {{ Form::label('price',__('messages.price').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                {{ Form::text('price',null, [ 'min' => 1, 'step' => 'any' , 'placeholder' => __('messages.price'),'class' =>'form-control', 'required','id' => 'price',  'pattern' => '^\\d+(\\.\\d{1,2})?$' ]) }}
+                                {{ Form::text('price',null, array_merge([ 'min' => 1, 'step' => 'any' , 'placeholder' => __('messages.price'),'class' =>'form-control', 'required','id' => 'price',  'pattern' => '^\\d+(\\.\\d{1,2})?$' ], $sanadReadOnly)) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
@@ -186,7 +192,66 @@
                         <div class="row">
                             <div class="form-group col-md-12">
                                 {{ Form::label('description',__('messages.description'), ['class' => 'form-control-label']) }}
-                                {{ Form::textarea('description', null, ['class'=>"form-control textarea" , 'rows'=>3  , 'placeholder'=> __('messages.description') ]) }}
+                                {{ Form::textarea('description', null, array_merge(['class'=>"form-control textarea" , 'rows'=>3  , 'placeholder'=> __('messages.description') ], $sanadReadOnly)) }}
+                            </div>
+                            <div class="form-group col-md-12">
+                                <div class="sanad-service-master-data">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                        <div>
+                                            <h5 class="font-weight-bold mb-1">Sanad Service Master Data</h5>
+                                            <span class="text-muted">Centralized government-service metadata used by web dashboards and mobile apps</span>
+                                        </div>
+                                        @if($isPartnerServiceEditor)
+                                            <span class="badge badge-light">Partner pricing and public details are read-only</span>
+                                        @endif
+                                    </div>
+                                    <div class="row">
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('name_en', 'English Name', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('name_en', null, array_merge(['class' => 'form-control', 'placeholder' => 'Service name in English'], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('name_ar', 'Arabic Name', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('name_ar', null, array_merge(['class' => 'form-control', 'placeholder' => 'Service name in Arabic'], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('government_entity', 'Government Entity', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('government_entity', null, array_merge(['class' => 'form-control', 'placeholder' => 'Ministry or authority'], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('estimated_completion_time', 'Estimated Completion Time', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('estimated_completion_time', null, array_merge(['class' => 'form-control', 'placeholder' => 'Example: 3 business days'], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('government_fee', 'Government Fee', ['class' => 'form-control-label']) }}
+                                            {{ Form::number('government_fee', null, array_merge(['class' => 'form-control', 'min' => 0, 'step' => 'any'], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('service_fee', 'Sanad Service Fee', ['class' => 'form-control-label']) }}
+                                            {{ Form::number('service_fee', null, array_merge(['class' => 'form-control', 'min' => 0, 'step' => 'any'], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            {{ Form::label('required_documents', 'Required Documents', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('required_documents', $requiredDocumentsText, array_merge(['class' => 'form-control', 'rows' => 5, 'placeholder' => "One document per line"], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            {{ Form::label('service_instructions', 'Service Instructions', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('service_instructions', null, array_merge(['class' => 'form-control', 'rows' => 5, 'placeholder' => 'Internal and customer-facing instructions'], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            {{ Form::label('terms_and_conditions', 'Terms and Conditions', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('terms_and_conditions', null, array_merge(['class' => 'form-control', 'rows' => 4], $sanadReadOnly)) }}
+                                        </div>
+                                        <div class="form-group col-md-6">
+                                            {{ Form::label('required_employee_skills', 'Required Employee Skills', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('required_employee_skills', $requiredSkillsText, ['class' => 'form-control', 'rows' => 4, 'placeholder' => "One skill per line"]) }}
+                                        </div>
+                                        <div class="form-group col-md-12">
+                                            {{ Form::label('partner_availability_notes', 'Partner Internal Notes / Availability', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('partner_availability_notes', null, ['class' => 'form-control', 'rows' => 3, 'placeholder' => 'Execution notes, availability, capacity, or partner-only comments']) }}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             @if(!empty( $slotservice) && $slotservice == 1)
                             <div class="form-group col-md-3">
@@ -241,6 +306,17 @@
     $data = $servicedata->providerServiceAddress->pluck('provider_address_id')->implode(',');
     @endphp
     @section('bottom_script')
+    <style>
+        .sanad-service-master-data {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            background: #f8f9fb;
+            padding: 16px;
+        }
+        .sanad-service-master-data .gap-2 {
+            gap: 8px;
+        }
+    </style>
     <script type="text/javascript">
     var discountInput = document.getElementById('discount');
     var discountError = document.getElementById('discount-error');

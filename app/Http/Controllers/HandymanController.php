@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Booking;
 use App\Models\User;
+use App\Models\SanadBuzzAlert;
+use App\Models\SanadDocumentVaultItem;
 use App\Http\Requests\UserRequest;
 use Yajra\DataTables\DataTables;
 use Hash;
@@ -31,7 +34,40 @@ class HandymanController extends Controller
         $auth_user = authSession();
         $assets = ['datatable'];
         $list_status = $request->status;
-        return view('handyman.index', compact('list_status','pageTitle','auth_user','assets','filter'));
+        $sanadEmployeeSummary = $this->sanadEmployeeSummary();
+        return view('handyman.index', compact('list_status','pageTitle','auth_user','assets','filter','sanadEmployeeSummary'));
+    }
+
+    private function sanadEmployeeSummary()
+    {
+        $employeeQuery = User::where('user_type', 'handyman');
+        if (auth()->user()->hasRole('provider')) {
+            $employeeQuery->where('provider_id', auth()->id());
+        }
+
+        $requestQuery = Booking::myBooking()->whereNotNull('sanad_stage');
+
+        return [
+            'total_employees' => (clone $employeeQuery)->count(),
+            'active_employees' => (clone $employeeQuery)->where('status', 1)->count(),
+            'pending_employees' => (clone $employeeQuery)->where('status', 0)->count(),
+            'assigned_tasks' => (clone $requestQuery)->whereHas('handymanAdded')->count(),
+            'unassigned_tasks' => (clone $requestQuery)->whereDoesntHave('handymanAdded')->count(),
+            'in_progress_tasks' => (clone $requestQuery)->where('sanad_stage', 'in_progress')->count(),
+            'review_tasks' => (clone $requestQuery)->where('sanad_stage', 'awaiting_quality_review')->count(),
+            'pending_evidence' => SanadDocumentVaultItem::whereIn('booking_id', (clone $requestQuery)->pluck('id'))
+                ->where('verification_status', 'pending')
+                ->count(),
+            'unread_buzz' => SanadBuzzAlert::whereIn('booking_id', (clone $requestQuery)->pluck('id'))
+                ->where('status', 'unread')
+                ->count(),
+            'paid_tasks' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })->count(),
+            'pending_payment_tasks' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->whereIn('payment_status', ['pending', 'advanced_paid', 'pending_by_admin', 'failed']);
+            })->count(),
+        ];
     }
 
     public function index_data(DataTables $datatable,Request $request)
@@ -95,6 +131,9 @@ class HandymanController extends Controller
             ->editColumn('provider_id', function($query) {
             return view('handyman.provider', compact('query'));
             })
+            ->addColumn('sanad_profile', function($query) {
+                return view('handyman.sanad-profile', compact('query'))->render();
+            })
             ->editColumn('address', function($query) {
                 return ($query->address != null && isset($query->address)) ? $query->address : '-';
             })
@@ -109,7 +148,7 @@ class HandymanController extends Controller
                 return view('handyman.action',compact('handyman'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['check','display_name','action','status'])
+            ->rawColumns(['check','display_name','action','status','sanad_profile'])
             ->toJson();
     }
 
@@ -194,6 +233,12 @@ class HandymanController extends Controller
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $data['skills'] = $this->linesToString($request->skills);
+        $data['sanad_permissions'] = array_values(array_filter($request->sanad_permissions ?: []));
+        $data['sanad_employee_status'] = $request->sanad_employee_status ?: 'available';
+        if (!$request->filled('designation') && $request->filled('sanad_job_title')) {
+            $data['designation'] = $request->sanad_job_title;
+        }
         if(auth()->user()->hasAnyRole(['provider'])){
             $auth_user = authSession();
             $user_id = $auth_user->id;
@@ -432,5 +477,23 @@ class HandymanController extends Controller
         }
         $pageTitle = __('messages.view_form_title',['form'=> __('messages.provider')]);
         return view('handyman.detail', compact('pageTitle' ,'handymandata' ,'auth_user' ));
+    }
+
+    private function linesToString($value)
+    {
+        if (is_array($value)) {
+            return implode(',', array_filter($value));
+        }
+
+        if (empty($value)) {
+            return null;
+        }
+
+        return collect(preg_split('/\r\n|\r|\n|,/', $value))
+            ->map(function ($line) {
+                return trim($line);
+            })
+            ->filter()
+            ->implode(',');
     }
 }

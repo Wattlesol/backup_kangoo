@@ -307,7 +307,11 @@ trait NotificationTrait
             \App\Models\WalletHistory::create($data);
         }
         $generalsetting = \App\Models\Setting::where('type','general-setting')->where('key', 'general-setting')->first();
-        $generalsetting = json_decode($generalsetting->value);
+        $generalsetting = $generalsetting ? json_decode($generalsetting->value) : null;
+        $companyContactInfo = implode('', array_filter([
+            optional($generalsetting)->helpline_number ? optional($generalsetting)->helpline_number.PHP_EOL : null,
+            optional($generalsetting)->inquriy_email,
+        ]));
         $notification_data = [
             'id'   => $id,
             'type' => $data['activity_type'],
@@ -318,10 +322,7 @@ trait NotificationTrait
             'logged_in_user_fullname' => $admin ? $admin['display_name'] ?: default_user_name(): '',
             'logged_in_user_role' => $admin ? ucfirst($admin->user_type) ?? '-' : '',
             'company_name' => env('APP_NAME'),
-            'company_contact_info' => implode('', [
-                $generalsetting->helpline_number.PHP_EOL,
-                $generalsetting->inquriy_email,
-            ]),
+            'company_contact_info' => $companyContactInfo,
         ];
         if (isset($booking)) {
             $booking_datetime = $booking->date;

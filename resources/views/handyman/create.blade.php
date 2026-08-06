@@ -20,6 +20,27 @@
                         {{ Form::model($handymandata,['method' => 'POST','route'=>'handyman.store', 'enctype'=>'multipart/form-data', 'data-toggle'=>"validator" ,'id'=>'handyman'] ) }}
                         {{ Form::hidden('id') }}
                         {{ Form::hidden('user_type','handyman') }}
+                        @php
+                            $sanadSkillsText = old('skills', str_replace(',', "\n", (string) $handymandata->skills));
+                            $sanadPermissions = old('sanad_permissions', $handymandata->sanad_permissions ?: []);
+                            $permissionOptions = [
+                                'view_orders' => 'View Orders',
+                                'upload_documents' => 'Upload Documents',
+                                'customer_chat' => 'Customer Chat',
+                                'government_submission' => 'Government Submission',
+                                'close_stage' => 'Close Stage',
+                                'approve_stage' => 'Approve Stage',
+                                'view_financial_data' => 'View Financial Data',
+                                'manage_employees' => 'Manage Employees',
+                            ];
+                            $employeeStatuses = [
+                                'available' => 'Available',
+                                'busy' => 'Busy',
+                                'offline' => 'Offline',
+                                'on_leave' => 'On Leave',
+                                'training' => 'Training',
+                            ];
+                        @endphp
                         <div class="row">
                             <div class="form-group col-md-4">
                                 {{ Form::label('first_name',__('messages.first_name').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
@@ -81,7 +102,6 @@
                                 {{ Form::select('service_address_id', [], old('service_address_id'), [
                                         'class' => 'select2js form-group service_address_id',
                                         'id' =>'service_address_id',
-                                        'required',
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.provider_address') ]),
                                     ]) }}
                             </div>
@@ -91,7 +111,6 @@
                                 <br />
                                 {{ Form::select('country_id', [optional($handymandata->country)->id => optional($handymandata->country)->name], optional($handymandata->country)->id, [
                                         'class' => 'select2js form-group country',
-                                        'required',
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.country') ]),
                                         'data-ajax--url' => route('ajax-list', ['type' => 'country']),
                                     ]) }}
@@ -102,7 +121,6 @@
                                 <br />
                                 {{ Form::select('state_id', [], [
                                         'class' => 'select2js form-group state_id',
-                                        'required',
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.state') ]),
                                     ]) }}
                             </div>
@@ -112,7 +130,6 @@
                                 <br />
                                 {{ Form::select('city_id', [], old('city_id'), [
                                         'class' => 'select2js form-group city_id',
-                                        'required',
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.city') ]),
                                     ]) }}
                             </div>
@@ -129,6 +146,54 @@
                             <div class="form-group col-md-4">
                                 {{ Form::label('status',__('messages.status').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                 {{ Form::select('status',['1' => __('messages.active') , '0' => __('messages.inactive') ],old('status'),[ 'class' =>'form-control select2js','required']) }}
+                            </div>
+
+                            <div class="form-group col-md-12">
+                                <div class="sanad-employee-operations">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                        <div>
+                                            <h5 class="font-weight-bold mb-1">Sanad Employee Operations</h5>
+                                            <span class="text-muted">Operational profile, permissions, working hours, capacity, and employee status</span>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('sanad_job_title', 'Job Title', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('sanad_job_title', old('sanad_job_title', $handymandata->sanad_job_title), ['class' => 'form-control', 'placeholder' => 'Operations Specialist']) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('sanad_department', 'Department', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('sanad_department', old('sanad_department', $handymandata->sanad_department), ['class' => 'form-control', 'placeholder' => 'Legal, Accounting, Government Relations']) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('sanad_employee_status', 'Employee Status', ['class' => 'form-control-label']) }}
+                                            {{ Form::select('sanad_employee_status', $employeeStatuses, old('sanad_employee_status', $handymandata->sanad_employee_status ?: 'available'), ['class' => 'form-control select2js']) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('sanad_working_hours', 'Working Hours', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('sanad_working_hours', old('sanad_working_hours', $handymandata->sanad_working_hours), ['class' => 'form-control', 'placeholder' => 'Sun-Thu, 9:00-18:00']) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('sanad_daily_capacity', 'Daily Capacity', ['class' => 'form-control-label']) }}
+                                            {{ Form::number('sanad_daily_capacity', old('sanad_daily_capacity', $handymandata->sanad_daily_capacity), ['class' => 'form-control', 'min' => 0, 'max' => 100, 'placeholder' => 'Orders per day']) }}
+                                        </div>
+                                        <div class="form-group col-md-4">
+                                            {{ Form::label('skills', 'Skills', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('skills', $sanadSkillsText, ['class' => 'form-control', 'rows' => 3, 'placeholder' => "One skill per line"]) }}
+                                        </div>
+                                        <div class="form-group col-md-12">
+                                            <label class="form-control-label">Permissions</label>
+                                            <div class="sanad-permission-grid">
+                                                @foreach($permissionOptions as $value => $label)
+                                                    <label>
+                                                        <input type="checkbox" name="sanad_permissions[]" value="{{ $value }}" {{ in_array($value, $sanadPermissions, true) ? 'checked' : '' }}>
+                                                        {{ $label }}
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="form-group col-md-4">
@@ -171,6 +236,29 @@
         </div>
     </div>
     @section('bottom_script')
+    <style>
+        .sanad-employee-operations {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            background: #f8f9fb;
+            padding: 16px;
+        }
+        .sanad-employee-operations .gap-2 {
+            gap: 8px;
+        }
+        .sanad-permission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 10px;
+        }
+        .sanad-permission-grid label {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            background: #fff;
+            padding: 10px 12px;
+            margin: 0;
+        }
+    </style>
     <script type="text/javascript">
     (function($) {
         "use strict";

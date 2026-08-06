@@ -5,6 +5,8 @@
 {{ Form::hidden('id',$bookingdata->id) }}
 
 <div class="card-body p-0">
+    @include('booking.partials.sanad-lifecycle')
+
     <div class="border-bottom pb-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
         <div>
             <h3 class="c1 mb-2">{{__('messages.book_id')}} {{ '#' . $bookingdata->id ?? '-'}}</h3>

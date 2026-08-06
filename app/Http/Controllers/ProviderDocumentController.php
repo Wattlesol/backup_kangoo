@@ -196,7 +196,22 @@ class ProviderDocumentController extends Controller
             return redirect(route('provider.index'))->withError($msg);
         }
 
-        return view('providerdocument.view', compact('pageTitle' ,'providerdata' ,'auth_user','assets','filter' ));
+        $sanadProviderVerificationSummary = $this->sanadProviderVerificationSummary($providerdata);
+
+        return view('providerdocument.view', compact('pageTitle' ,'providerdata' ,'auth_user','assets','filter','sanadProviderVerificationSummary' ));
+    }
+
+    private function sanadProviderVerificationSummary(User $provider)
+    {
+        $documents = ProviderDocument::where('provider_id', $provider->id);
+
+        return [
+            'total_documents' => (clone $documents)->count(),
+            'verified_documents' => (clone $documents)->where('is_verified', 1)->count(),
+            'pending_documents' => (clone $documents)->where('is_verified', 0)->count(),
+            'required_document_types' => \App\Models\Documents::where('status', 1)->where('is_required', 1)->count(),
+            'verification_status' => (clone $documents)->where('is_verified', 0)->exists() ? 'Pending Review' : 'Verified',
+        ];
     }
 
     /**

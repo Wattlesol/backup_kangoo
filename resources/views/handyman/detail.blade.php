@@ -65,6 +65,47 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-lg-6">
+                            <div class="sanad-employee-detail-card">
+                                <h4>Sanad Employee Operations</h4>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <span>Job Title</span>
+                                        <strong>{{ $handymandata->sanad_job_title ?: $handymandata->designation ?: '-' }}</strong>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <span>Department</span>
+                                        <strong>{{ $handymandata->sanad_department ?: '-' }}</strong>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <span>Status</span>
+                                        <strong>{{ Str::headline($handymandata->sanad_employee_status ?: 'available') }}</strong>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <span>Daily Capacity</span>
+                                        <strong>{{ $handymandata->sanad_daily_capacity ?: '-' }}</strong>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <span>Working Hours</span>
+                                        <strong>{{ $handymandata->sanad_working_hours ?: '-' }}</strong>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <span>Skills</span>
+                                        <strong>{{ $handymandata->skills ? str_replace(',', ', ', $handymandata->skills) : '-' }}</strong>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span>Permissions</span>
+                                    <div class="sanad-permission-tags">
+                                        @forelse($handymandata->sanad_permissions ?: [] as $permission)
+                                            <small>{{ Str::headline($permission) }}</small>
+                                        @empty
+                                            <small>None assigned</small>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -73,4 +114,39 @@
 </main>
 {{ Form::close() }}
 
+<style>
+    .sanad-employee-detail-card {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 8px;
+        background: #fff;
+        padding: 18px;
+        height: 100%;
+    }
+    .sanad-employee-detail-card h4 {
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+    .sanad-employee-detail-card span {
+        display: block;
+        color: #6c757d;
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+    .sanad-employee-detail-card strong {
+        display: block;
+        overflow-wrap: anywhere;
+    }
+    .sanad-permission-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+    }
+    .sanad-permission-tags small {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 14px;
+        background: #f8f9fb;
+        padding: 5px 9px;
+    }
+</style>
 </x-master-layout>

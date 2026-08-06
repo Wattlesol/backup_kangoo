@@ -3,6 +3,8 @@ $extraValue = 0;
 $sitesetup = App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
 $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
 @endphp
+@include('booking.partials.sanad-lifecycle')
+
 <div class="border-bottom pb-3">
     <div class="row pb-1 gy-2">
         <div class="col-6 col-lg-3">

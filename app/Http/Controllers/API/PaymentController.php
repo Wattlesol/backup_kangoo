@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\Wallet;
 use App\Models\PaymentHistory;
 use App\Models\PaymentGateway;
+use App\Models\Setting;
 use App\Http\Resources\API\PaymentResource;
 use App\Http\Resources\API\PaymentHistoryResource;
 use App\Http\Resources\API\GetCashPaymentHistoryResource;
@@ -311,6 +312,6 @@ class PaymentController extends Controller
         $payment = PaymentGateway::where('status',1)->where('type', '!=', 'razorPayX')->get();
         $payment = PaymentGatewayResource::collection($payment);
 
-        return comman_custom_response($payment);
+        return comman_custom_response(['data' => $payment]);
     }
 }

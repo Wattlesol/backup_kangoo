@@ -24,6 +24,18 @@ class FixProviderPermissionsSeeder extends Seeder
 
         // Define required permissions for providers
         $requiredPermissions = [
+            'service list',
+            'service add',
+            'service edit',
+            'service delete',
+            'servicepackage list',
+            'servicepackage add',
+            'servicepackage edit',
+            'servicepackage delete',
+            'service add on list',
+            'service add on add',
+            'service add on edit',
+            'service add on delete',
             'product_category list',
             'product list',
             'product add',

@@ -14,7 +14,8 @@ class WalletController extends Controller
 {
     use NotificationTrait;
     public function getHistory(Request $request){
-        $user_id = $request->user_id ?? auth()->user()->id;
+        $user = auth()->user();
+        $user_id = $user->hasAnyRole(['admin', 'demo_admin']) && $request->filled('user_id') ? $request->user_id : $user->id;
         $wallet_history = WalletHistory::where('user_id',$user_id);
         $per_page = config('constant.PER_PAGE_LIMIT');
 
@@ -53,47 +54,56 @@ class WalletController extends Controller
     public function walletTopup(Request $request){
 
         $request->validate([
-            'amount' => 'required|integer',
+            'amount' => 'required|numeric|min:1',
         ]);
 
-        $user_id = $request->user_id ?? auth()->user()->id;
+        $user = auth()->user();
+        $user_id = $user->hasAnyRole(['admin', 'demo_admin']) && $request->filled('user_id') ? $request->user_id : $user->id;
 
-        $wallet = Wallet::where('user_id', $user_id)->first();
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $user_id],
+            [
+                'title' => __('messages.wallet'),
+                'amount' => 0,
+                'status' => 1,
+            ]
+        );
 
-        if($wallet){
+        $wallet->amount += $request->amount;
+        $wallet->save();
 
-            $wallet->amount += $request->amount;
-            $wallet->save();
+        $activity_data = [
 
-            $activity_data = [
+            'activity_type' => 'wallet_top_up',
+            'wallet' => $wallet,
+            'top_up_amount' =>$request->amount,
+            'transaction_type'=>$request->transcation_type,
+            'transaction_id'=>$request->transcation_id,
 
-                'activity_type' => 'wallet_top_up',
-                'wallet' => $wallet,
-                'top_up_amount' =>$request->amount,
-                'transaction_type'=>$request->transcation_type,
-                'transaction_id'=>$request->transcation_id,
-
-            ];
-            $this->sendNotification($activity_data);
+        ];
+        $this->sendNotification($activity_data);
 
 
-            $response = [
-                'message'=>  trans('messages.wallet_top_up', ['value' => getPriceFormat($wallet->amount)]),
-                'data' => $wallet,
-            ];
+        $response = [
+            'message'=>  trans('messages.wallet_top_up', ['value' => getPriceFormat($wallet->amount)]),
+            'data' => $wallet,
+        ];
 
-          return comman_custom_response($response);
-
-          }
+        return comman_custom_response($response);
 
     }
 
     public function getwalletlist(Request $request){
+        $user = auth()->user();
         $wallet = Wallet::query();
+
+        if(!$user->hasAnyRole(['admin', 'demo_admin'])){
+            $wallet->where('user_id', $user->id);
+        }
 
         if($request->has('status') && !empty($request->status)){
 
-            $wallet = $wallet->where('status',$status);
+            $wallet = $wallet->where('status',$request->status);
         }
 
         $per_page = config('constant.PER_PAGE_LIMIT');

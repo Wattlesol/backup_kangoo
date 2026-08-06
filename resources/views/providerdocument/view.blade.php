@@ -5,6 +5,7 @@
     </head>
     <div class="container-fluid">
     @include('partials._provider')
+    @include('providerdocument.partials.sanad-provider-verification-summary')
         <div class="row">
             <div class="col-lg-12">
                 <div class="card card-block card-stretch">
