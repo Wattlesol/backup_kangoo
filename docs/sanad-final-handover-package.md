@@ -133,15 +133,23 @@ php artisan migrate --force
 - Flutter is installed locally at `/Users/xain/development/flutter`, but it is not currently on the default shell `PATH`.
 - Android debug APK builds now pass when `JAVA_HOME` is set to Homebrew OpenJDK 17 and `/Users/xain/development/flutter/bin` is added to `PATH`.
 - Xcode 26.6 and CocoaPods 1.16.2 are available locally. The customer iOS no-codesign build reached CocoaPods, but `pod install` was blocked by the local pod/spec installation state after a GoogleSignIn podspec cache error and subsequent repo update.
-- Full mobile release AAB/IPA builds should be run in the final build environment with the required release signing credentials, CocoaPods, and iOS signing setup.
+- Full mobile release AAB/IPA builds are deferred until after system testing/UAT, when production release signing credentials, CocoaPods, and iOS signing setup are finalized.
 
 ## Remaining QA Gates
 
-The backend, web dashboards, and API smoke tests are complete on the local environment. The following items remain in QA because they require a mobile build/release or client UAT environment rather than code changes in this workspace:
+The backend, web dashboards, API smoke tests, and Android debug APK test builds are complete on the local environment. Release signing/store packaging is intentionally deferred until after system testing. The active QA gates are now integrated runtime review and client UAT:
 
 | Gate | Status | Reason |
 | --- | --- | --- |
-| Customer Flutter APK/IPA build | QA | Android debug APK build passed locally. Final release AAB/IPA still requires production signing configuration and final environment credentials. Customer iOS no-codesign build reached CocoaPods but is blocked by the local pod/spec installation state. |
-| Admin/provider Flutter APK/IPA build | QA | Android debug APK build passed locally after pinning `nb_utils` to `7.1.4`. Final release AAB/IPA still requires production signing configuration and final environment credentials. |
-| Client UAT acceptance | QA | Final sign-off requires client review of the deployed environment and mobile builds. |
-| Cross-platform runtime synchronization | QA | API contracts are verified and mobile source is wired to the shared endpoints, but full device/runtime validation requires the mobile build environment. |
+| Client UAT acceptance | Ready for QA | Final sign-off requires client review of the deployed environment and Android debug test builds. |
+| Cross-platform runtime synchronization | Ready for QA | API contracts are verified and mobile source is wired to the shared endpoints. Needs integrated runtime testing across backend, dashboards, and mobile test builds. |
+
+## Deferred Release Prep
+
+These items are not blockers for current system testing and should be handled after UAT approval:
+
+| Release Item | Deferred Reason |
+| --- | --- |
+| Customer Android release APK/AAB | Requires production keystore. Current `key.properties` points to `/Users/apple/upload-keystore.jks`, which is not present in this workspace. |
+| Admin/provider Android release APK/AAB | Debug APK builds pass. Release build cleanup can be handled with final release signing/versioning work after system testing. |
+| iOS IPA builds | Require final Apple signing/team setup and clean CocoaPods install in the release environment. |
