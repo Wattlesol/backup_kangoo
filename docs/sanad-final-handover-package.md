@@ -49,6 +49,8 @@ Additional role accounts should be confirmed from the target deployment seed dat
 8. Open the AI console at `/sanad/ai`, add knowledge, and ask a Sanad support question.
 9. Open customer and admin/provider mobile apps and validate Sanad screens against the same API base URL.
 
+Use `docs/sanad-uat-checklist.md` for the final client acceptance pass across admin, partner, employee, and customer experiences.
+
 ## Verified Coverage
 
 | Requirement Area | Evidence |
@@ -165,6 +167,8 @@ The backend, web dashboards, API smoke tests, integrated QA script, and Android 
 | --- | --- | --- |
 | Client UAT acceptance | Ready for QA | Final sign-off requires client review of the deployed environment and Android debug test builds. |
 | Cross-platform runtime synchronization | Passed | API contracts, backend runtime workflows, mobile source wiring, and Android debug APK artifacts passed integrated QA. |
+
+The client UAT checklist is available at `docs/sanad-uat-checklist.md`.
 
 ## Deferred Release Prep
 
