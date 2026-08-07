@@ -23,6 +23,7 @@ The following implementation-side gates have passed locally and should be used a
 | --- | --- | --- |
 | Web role UAT | `scripts/sanad_web_role_uat.sh` | Passed |
 | Request detail frontend sign-off gate | `scripts/sanad_request_detail_frontend_qa.sh` | Passed |
+| Web action workflow gate | `scripts/sanad_web_action_qa.sh` | Passed |
 | Customer request frontend sign-off gate | `scripts/sanad_customer_frontend_qa.sh` | Passed |
 | Service catalog frontend sign-off gate | `scripts/sanad_service_catalog_frontend_qa.sh` | Passed |
 | Visible terminology and branding | `scripts/sanad_visible_terminology_qa.sh` | Passed |
@@ -56,8 +57,8 @@ The following implementation-side gates have passed locally and should be used a
 | Open request detail | Admin can review customer, partner, employee, document, billing, quality, Buzz, and chat sections | Passed locally; client sign-off pending |
 | Update request lifecycle | Request stage and priority update successfully | Passed locally; client sign-off pending |
 | Assign employee/team | Assignment saves and appears on the request detail | Passed locally; client sign-off pending |
-| Review document vault | Admin can view and approve/verify submitted documents | Passed locally; client sign-off pending |
-| Use Buzz alerts | Admin can create and acknowledge Buzz alerts | Passed locally; client sign-off pending |
+| Review document vault | Admin can view, create, and approve/verify submitted documents | Passed locally with action QA; client sign-off pending |
+| Use Buzz alerts | Admin can create and acknowledge Buzz alerts | Passed locally with action QA; client sign-off pending |
 | Use AI console | Admin can add knowledge and ask an AI support question | Passed locally; client sign-off pending |
 | Review Financial Center | Payments, wallet, VAT, commission, refunds, invoices, and settlement data are accessible | Passed locally; client sign-off pending |
 

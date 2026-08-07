@@ -176,6 +176,7 @@ The latest frontend and policy gates passed locally:
 | Customer-facing partner visibility | Passed |
 | Local web role UAT | Passed |
 | Request detail frontend sign-off gate | Passed admin, partner, and employee request detail section/role-control checks |
+| Web action workflow gate | Passed Buzz create/acknowledge and document create/approve action checks from the rendered request detail UI |
 | Customer request frontend sign-off gate | Passed customer request detail terminology, privacy, payment summary, and forbidden-label checks |
 | Service catalog frontend sign-off gate | Passed admin service catalog, Sanad master data, partner terminology, and partner service catalog checks |
 | Document retention/download-before-deletion policy | Passed source-level policy, PHP syntax, and rendered route checks |

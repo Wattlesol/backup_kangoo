@@ -40,6 +40,7 @@ Production deployment is still not a valid acceptance environment because Dokplo
 | Authenticated web routes | Passed locally | `scripts/sanad_web_sql_qa.sh` passed login, dashboard, requests, request detail, AI, and payment pages |
 | Local web role UAT | Passed locally | `scripts/sanad_web_role_uat.sh` passed Admin, Partner, Employee, and Customer route/content checks |
 | Request detail frontend sign-off gate | Passed locally | `scripts/sanad_request_detail_frontend_qa.sh` verifies admin, partner, and employee request detail sections, role controls, Buzz, documents, chat, billing, lifecycle, and privacy markers |
+| Web action workflow gate | Passed locally | `scripts/sanad_web_action_qa.sh` submits Buzz alerts, acknowledges Buzz alerts, creates documents, approves documents, and verifies the rendered request detail UI after each action |
 | Customer request frontend sign-off gate | Passed locally | `scripts/sanad_customer_frontend_qa.sh` verifies customer request detail Sanad terminology, operations/privacy messaging, payment summary markers, and absence of direct partner/employee profile labels |
 | Service catalog frontend sign-off gate | Passed locally | `scripts/sanad_service_catalog_frontend_qa.sh` verifies admin service catalog, Sanad bilingual/government metadata fields, partner terminology, and partner service catalog visibility |
 | Visible web terminology | Passed locally | `scripts/sanad_visible_terminology_qa.sh` passed against `http://127.0.0.1:8092` |
@@ -133,8 +134,8 @@ Evidence:
 | Partner services | Partners enable/disable Sanad services under Sanad rules | Implemented locally with partner service catalog frontend QA | Manual partner permission and service publishing review |
 | Staff portal | Employee dashboard/tasks/documents/checklist/chat/Buzz | Implemented locally; local role-UAT passed | Manual employee reviewer sign-off |
 | Customer portal | Requests, documents, payments, AI, privacy | Implemented locally; local role-UAT passed | Manual customer reviewer sign-off |
-| Buzz | Normal/Urgent/Critical notifications and acknowledgement | Implemented foundation | Full UI seen/opened/action-completed behavior review |
-| Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented locally with 48-hour retention default and download-before-deletion UI guidance | Manual document lifecycle reviewer sign-off |
+| Buzz | Normal/Urgent/Critical notifications and acknowledgement | Implemented locally with action-level web QA for create and acknowledge behavior | Manual reviewer sign-off |
+| Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented locally with 48-hour retention default, download-before-deletion UI guidance, and action-level web QA for create and approve behavior | Manual document lifecycle reviewer sign-off |
 | AI | Knowledge base, request summaries, status explanation, escalation | Implemented locally with fallback-to-human UI guidance and low-confidence escalation QA | Manual proactive AI scenario reviewer sign-off |
 | Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally with role-scope finance UI and permission QA | Manual financial reviewer sign-off |
 | Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates and walkthrough artifacts | Manual device/emulator role walkthrough sign-off |
@@ -229,6 +230,16 @@ The following Notion tasks now reflect current QA evidence:
 | Partner service list | Shows Sanad Service Catalog and catalog readiness for partner service review |
 | Visible terminology | Service list/form use Partner and Partner Address wording instead of visible Provider/Provider Address labels |
 | `scripts/sanad_service_catalog_frontend_qa.sh` | Passed against local QA at `http://127.0.0.1:8092` |
+
+## Web Action Workflow QA Evidence
+
+| Evidence | Result |
+| --- | --- |
+| Buzz create action | Admin submits a Buzz alert from the request detail page and the new alert renders in the Buzz Alerts list |
+| Buzz acknowledge action | Admin acknowledges a visible Buzz alert and the request detail page renders the Acknowledged status |
+| Document create action | Admin adds a request document with admin visibility, file reference, and visible retention/download guidance |
+| Document approve action | Admin approves a visible document and the request detail page renders the Approved status |
+| `scripts/sanad_web_action_qa.sh` | Passed against local QA at `http://127.0.0.1:8092` |
 
 ## Recommended Next Work Order
 
