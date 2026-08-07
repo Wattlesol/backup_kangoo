@@ -155,6 +155,27 @@ FROM
 WHERE NOT EXISTS (
   SELECT 1 FROM bookings WHERE sanad_reference = 'SANAD-LOCAL-QA-000001'
 );
+
+INSERT INTO booking_handyman_mappings (
+  booking_id,
+  handyman_id,
+  created_at,
+  updated_at
+)
+SELECT
+  booking.id,
+  employee.id,
+  NOW(),
+  NOW()
+FROM
+  (SELECT id FROM bookings WHERE sanad_reference = 'SANAD-LOCAL-QA-000001' LIMIT 1) booking
+  JOIN (SELECT id FROM users WHERE email = 'demo@employee.com' LIMIT 1) employee
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM booking_handyman_mappings mapping
+  WHERE mapping.booking_id = booking.id
+    AND mapping.handyman_id = employee.id
+);
 SQL
 
 echo "Running Sanad integrated QA against local SQL database..."
