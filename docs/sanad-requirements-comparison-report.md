@@ -133,7 +133,7 @@ Evidence:
 | Buzz | Normal/Urgent/Critical notifications and acknowledgement | Implemented foundation | Full UI seen/opened/action-completed behavior review |
 | Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented locally with 48-hour retention default and download-before-deletion UI guidance | Manual document lifecycle reviewer sign-off |
 | AI | Knowledge base, request summaries, status explanation, escalation | Implemented locally with fallback-to-human UI guidance and low-confidence escalation QA | Manual proactive AI scenario reviewer sign-off |
-| Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally | Role-specific financial permission UAT |
+| Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally with role-scope finance UI and permission QA | Manual financial reviewer sign-off |
 | Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates | Manual device/emulator role walkthrough |
 | Cross-platform sync | Same statuses, workflow, chat, docs, payments, AI across web/mobile | Implemented foundation | End-to-end role scenario testing |
 | Branding | Final system reflects Sanad, not Kangoo | Passed locally for audited web/mobile source gates | Production deployment and manual UAT confirmation |
@@ -175,11 +175,21 @@ The following Notion tasks now reflect current QA evidence:
 | API low-confidence question | Returns `requires_escalation=true`, `status=escalated`, and support-team fallback answer |
 | `scripts/sanad_ai_escalation_qa.sh` | Passed source, API, and rendered AI console checks against local QA after syncing the image-based container view |
 
+## Finance Permission Evidence
+
+| Evidence | Result |
+| --- | --- |
+| Financial Center frontend | Shows admin, partner, employee, or customer finance scope text based on signed-in role |
+| Admin payment page | Shows admin finance scope and bulk management enabled |
+| Partner payment page | Shows partner finance scope, scoped view only, and hides admin bulk action controls |
+| Provider payout scoping | Non-admin/non-partner fallback returns no settlement rows |
+| `scripts/sanad_finance_permissions_qa.sh` | Passed source, PHP syntax, admin rendered page, and partner rendered page checks against local QA |
+
 ## Recommended Next Work Order
 
 1. Run manual reviewer sign-off for Admin, Partner, Employee, and Customer roles using the local role-UAT evidence as the baseline.
 2. Run manual device/emulator walkthroughs for the customer and operations mobile apps.
-3. Verify deeper policy scenarios: role-specific finance permissions and cross-platform lifecycle sync.
+3. Verify deeper policy scenarios: cross-platform lifecycle sync.
 4. Keep production deployment on hold until Dokploy applies the merged production code and live Sanad routes return 200.
 5. After deployment is fixed, run the same Sanad QA gates against the deployed environment before client-facing UAT.
 

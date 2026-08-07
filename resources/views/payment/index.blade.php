@@ -21,6 +21,7 @@
     <div class="card">
         <div class="card-body">
         <div class="row justify-content-between">
+            @if(($sanadPaymentSummary['role_scope']['can_bulk_manage'] ?? false) === true)
             <div>
                 <div class="col-md-12">
                   <form action="{{ route('payment.bulk-action') }}" id="quick-action-form" class="form-disabled d-flex gap-3 align-items-center">
@@ -42,6 +43,7 @@
           
             </form>
           </div>
+          @endif
               <div class="d-flex justify-content-end">
               <div class="datatable-filter ml-auto">
                   <select class="select2 form-control" data-filter="select" id="statusSelect" style="width: 100%">
@@ -63,6 +65,12 @@
             </div>
         </div>
     </div>
+    @php
+        $canBulkManagePayments = ($sanadPaymentSummary['role_scope']['can_bulk_manage'] ?? false) === true;
+        $bulkPaymentHeader = $canBulkManagePayments
+            ? '<input type="checkbox" class="form-check-input" name="select_all_table" id="select-all-table" onclick="selectAllTable(this)">'
+            : '';
+    @endphp
     <script>
         document.addEventListener('DOMContentLoaded', (event) => {
 
@@ -88,7 +96,7 @@
                     {
                         name: 'check',
                         data: 'check',
-                        title: '<input type="checkbox" class="form-check-input" name="select_all_table" id="select-all-table" onclick="selectAllTable(this)">',
+                        title: @json($bulkPaymentHeader),
                         exportable: false,
                         orderable: false,
                         searchable: false,

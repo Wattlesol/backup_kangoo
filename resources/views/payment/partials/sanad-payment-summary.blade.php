@@ -1,5 +1,10 @@
 @php
     $summary = $sanadPaymentSummary ?? [];
+    $roleScope = $summary['role_scope'] ?? [
+        'label' => 'Sanad finance scope',
+        'description' => 'Financial information is scoped by the signed-in user role.',
+        'can_bulk_manage' => false,
+    ];
 @endphp
 
 <div class="col-lg-12">
@@ -20,6 +25,16 @@
             </div>
         </div>
         <div class="card-body">
+            <div class="sanad-finance-scope mb-3">
+                <div>
+                    <strong>{{ $roleScope['label'] }}</strong>
+                    <span>{{ $roleScope['description'] }}</span>
+                </div>
+                <span class="badge {{ ($roleScope['can_bulk_manage'] ?? false) ? 'badge-success' : 'badge-light' }}">
+                    {{ ($roleScope['can_bulk_manage'] ?? false) ? 'Bulk management enabled' : 'Scoped view only' }}
+                </span>
+            </div>
+
             <div class="row">
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
@@ -225,6 +240,27 @@
             border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 8px;
             background: #fff;
+        }
+
+        .sanad-finance-scope {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .sanad-finance-scope strong,
+        .sanad-finance-scope span {
+            display: block;
+        }
+
+        .sanad-finance-scope div span {
+            color: #6c757d;
+            font-size: 13px;
         }
 
         .sanad-finance-table th {

@@ -32,6 +32,7 @@ class PaymentController extends Controller
 
     private function sanadPaymentSummary()
     {
+        $user = auth()->user();
         $paymentQuery = Payment::query()->myPayment();
         $paidPaymentQuery = (clone $paymentQuery)->where('payment_status', 'paid');
         $pendingStatuses = ['pending', 'advanced_paid', 'pending_by_admin'];
@@ -40,8 +41,8 @@ class PaymentController extends Controller
         $payoutQuery = ProviderPayout::query()->myPayout();
         $walletQuery = Wallet::query();
 
-        if (! auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
-            $walletQuery->where('user_id', auth()->id());
+        if (! $this->isSanadFinanceAdmin($user)) {
+            $walletQuery->where('user_id', $user->id);
         }
 
         $paidAmount = $paidPayments->sum('total_amount');
@@ -77,7 +78,56 @@ class PaymentController extends Controller
             'upcoming_settlement' => $pendingSettlement,
             'recent_settlements' => (clone $payoutQuery)->with('providers')->orderBy('id', 'desc')->take(5)->get(),
             'recent_transactions' => (clone $paymentQuery)->with('customer', 'booking.service')->orderBy('id', 'desc')->take(5)->get(),
+            'role_scope' => $this->sanadFinanceRoleScope($user),
         ];
+    }
+
+    private function sanadFinanceRoleScope($user)
+    {
+        if ($this->isSanadFinanceAdmin($user)) {
+            return [
+                'label' => 'Admin finance scope',
+                'description' => 'Admins can review all customer payments, invoices, refunds, wallet balances, partner settlements, VAT, and platform commission. Admin-only bulk actions are enabled.',
+                'can_bulk_manage' => true,
+            ];
+        }
+
+        if ($this->isSanadFinancePartner($user)) {
+            return [
+                'label' => 'Partner finance scope',
+                'description' => 'Partners see only payments and settlements connected to their assigned Sanad requests. Admin-only delete and bulk actions are hidden.',
+                'can_bulk_manage' => false,
+            ];
+        }
+
+        if ($this->isSanadFinanceEmployee($user)) {
+            return [
+                'label' => 'Employee finance scope',
+                'description' => 'Employees see only payment context for assigned Sanad work when finance access is granted. Partner settlement and admin wallet controls are not exposed.',
+                'can_bulk_manage' => false,
+            ];
+        }
+
+        return [
+            'label' => 'Customer finance scope',
+            'description' => 'Customers see only their own Sanad payment, invoice, refund, and wallet context. Internal partner settlement and commission data are not exposed.',
+            'can_bulk_manage' => false,
+        ];
+    }
+
+    private function isSanadFinanceAdmin($user)
+    {
+        return $user->hasAnyRole(['admin', 'demo_admin']) || in_array($user->user_type, ['admin', 'demo_admin'], true);
+    }
+
+    private function isSanadFinancePartner($user)
+    {
+        return $user->hasRole('provider') || $user->user_type === 'provider';
+    }
+
+    private function isSanadFinanceEmployee($user)
+    {
+        return $user->hasRole('handyman') || $user->user_type === 'handyman';
     }
 
     private function sanadPlatformCommissionAmount($payments)
@@ -163,6 +213,10 @@ class PaymentController extends Controller
 
         return $datatable->eloquent($query)
             ->addColumn('check', function ($row) {
+                if (! $this->isSanadFinanceAdmin(auth()->user())) {
+                    return '';
+                }
+
                 return '<input type="checkbox" class="form-check-input select-table-row"  id="datatable-row-'.$row->id.'"  name="datatable_ids[]" value="'.$row->id.'" onclick="dataTableRowCheck('.$row->id.')">';
             })
             ->editColumn('id', function($payment) {
