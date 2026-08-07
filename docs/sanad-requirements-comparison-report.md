@@ -39,6 +39,7 @@ Production deployment is still not a valid acceptance environment because Dokplo
 | Payment/wallet contracts | Passed locally | Integrated QA checks payment list, gateways, wallet history, top-up, and balance |
 | Authenticated web routes | Passed locally | `scripts/sanad_web_sql_qa.sh` passed login, dashboard, requests, request detail, AI, and payment pages |
 | Local web role UAT | Passed locally | `scripts/sanad_web_role_uat.sh` passed Admin, Partner, Employee, and Customer route/content checks |
+| Request detail frontend sign-off gate | Passed locally | `scripts/sanad_request_detail_frontend_qa.sh` verifies admin, partner, and employee request detail sections, role controls, Buzz, documents, chat, billing, lifecycle, and privacy markers |
 | Visible web terminology | Passed locally | `scripts/sanad_visible_terminology_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer-facing partner visibility | Passed locally | `scripts/sanad_partner_visibility_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer mobile source/build QA | Passed source/build gate | Customer app commit `bc9ff79`; Dart analyze passed with one pre-existing map deprecation info; Android debug APK built |
@@ -194,6 +195,18 @@ The following Notion tasks now reflect current QA evidence:
 | Customer mobile app | Reads Sanad foundation/request APIs and displays `sanad_stage` from the shared API payload |
 | Operations mobile app | Updates lifecycle through `sanad/requests/{id}/lifecycle` and uses only configured backend stages |
 | `scripts/sanad_cross_platform_lifecycle_qa.sh` | Passed source-level web/customer mobile/operations mobile lifecycle contract checks |
+
+## Request Detail Frontend QA Evidence
+
+| Evidence | Result |
+| --- | --- |
+| Admin request detail | Shows operational monitoring, lifecycle, employee assignment, partner actions, admin quality control, billing, document vault, Buzz, and secure chat markers |
+| Partner request detail | Shows shared request workflow, partner order actions, documents, Buzz, chat, and billing while hiding admin-only quality-control controls |
+| Employee request detail | Shows shared request workflow, documents, Buzz, chat, and billing while hiding admin-only quality-control controls |
+| Document policy fallback states | Retention and Download before deletion guidance stay visible even when no documents exist yet |
+| Buzz fallback states | Buzz acknowledgement guidance stays visible even when no open alerts exist |
+| Privacy controls | Document and chat role visibility controls are explicitly labelled with Visible to |
+| `scripts/sanad_request_detail_frontend_qa.sh` | Passed against the rebuilt local SQL QA environment at `http://127.0.0.1:8092` |
 
 ## Recommended Next Work Order
 

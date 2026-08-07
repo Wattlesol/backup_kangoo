@@ -22,6 +22,7 @@ The following implementation-side gates have passed locally and should be used a
 | Gate | Evidence | Status |
 | --- | --- | --- |
 | Web role UAT | `scripts/sanad_web_role_uat.sh` | Passed |
+| Request detail frontend sign-off gate | `scripts/sanad_request_detail_frontend_qa.sh` | Passed |
 | Visible terminology and branding | `scripts/sanad_visible_terminology_qa.sh` | Passed |
 | Customer-facing partner visibility | `scripts/sanad_partner_visibility_qa.sh` | Passed |
 | Document retention/download policy | `scripts/sanad_document_policy_qa.sh` | Passed |

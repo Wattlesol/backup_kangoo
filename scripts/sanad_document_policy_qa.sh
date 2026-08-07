@@ -27,8 +27,9 @@ assert_route_contains() {
   local cookie_jar="$3"
 
   body="$(curl -fsS -b "$cookie_jar" "${WEB_BASE_URL}${path}")"
+  body_text="$(perl -0777 -pe 's/<script.*?<\/script>//gs; s/<style.*?<\/style>//gs; s/<[^>]+>/\n/g; s/&nbsp;/ /g; s/&amp;/\&/g; s/[ \t]+/ /g; s/\n{2,}/\n/g' <<<"$body")"
 
-  grep -Fq "$text" <<<"$body" || fail "${path} missing expected text: $text"
+  grep -Fq "$text" <<<"$body_text" || fail "${path} missing expected text: $text"
   pass "${path} contains: $text"
 }
 

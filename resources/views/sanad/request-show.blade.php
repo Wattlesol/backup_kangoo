@@ -370,6 +370,8 @@
 
                                 @if($bookingdata->payment_id !== null || $bookingdata->payment)
                                     <a href="{{ route('invoice_pdf', $bookingdata->id) }}" class="btn btn-light" target="_blank">Open Invoice</a>
+                                @else
+                                    <span class="text-muted">Invoice visibility starts after a payment record is linked.</span>
                                 @endif
                             </div>
                         </div>
@@ -385,7 +387,7 @@
                     <div class="card-body">
                         <div class="alert alert-light border mb-4">
                             <strong>Sanad document policy:</strong>
-                            documents default to a 48-hour retention window when no date is selected. Customers must download required files before the retention date; expired items should be removed during document cleanup.
+                            documents default to a 48-hour retention window when no date is selected. Customers must download required files before the retention date; Download before deletion guidance stays visible for every retained document.
                         </div>
                         <form method="POST" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="mb-4">
                             @csrf
@@ -407,6 +409,7 @@
                                     <input type="date" name="retention_until" class="form-control">
                                 </div>
                             </div>
+                            <label class="form-control-label">Visible to:</label>
                             <div class="sanad-checkbox-row mb-3">
                                 @foreach(config('sanad.document_visibility', []) as $role)
                                     <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" {{ $role === 'admin' ? 'checked' : '' }}> {{ $sanadRoleLabel($role) }}</label>
@@ -502,7 +505,7 @@
                                     </div>
                                 </div>
                             @empty
-                                <div class="sanad-empty-state">No Buzz alerts yet</div>
+                                <div class="sanad-empty-state">No Buzz alerts awaiting acknowledgement yet</div>
                             @endforelse
                         </div>
                     </div>
@@ -534,6 +537,7 @@
                             @csrf
                             <label class="form-control-label">Message</label>
                             <textarea name="message" class="form-control mb-3" rows="3" required></textarea>
+                            <label class="form-control-label">Visible to:</label>
                             <div class="sanad-checkbox-row mb-3">
                                 @foreach(config('sanad.document_visibility', []) as $role)
                                     <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" checked> {{ $sanadRoleLabel($role) }}</label>
