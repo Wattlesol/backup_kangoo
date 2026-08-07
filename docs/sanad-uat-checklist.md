@@ -31,6 +31,8 @@ The following implementation-side gates have passed locally and should be used a
 | Cross-platform lifecycle contract | `scripts/sanad_cross_platform_lifecycle_qa.sh` | Passed |
 | Customer mobile QA gate | `handyman_user_flutter_v11.13.2/scripts/sanad_mobile_qa.sh` | Passed |
 | Operations mobile QA gate | `handyman_admin_flutter_app-v3.9.0/scripts/sanad_mobile_qa.sh` | Passed |
+| Customer mobile walkthrough artifact | `handyman_user_flutter_v11.13.2/docs/sanad-customer-mobile-walkthrough.md` | Ready for device sign-off |
+| Operations mobile walkthrough artifact | `handyman_admin_flutter_app-v3.9.0/docs/sanad-operations-mobile-walkthrough.md` | Ready for device sign-off |
 
 ## Pre-UAT Checks
 

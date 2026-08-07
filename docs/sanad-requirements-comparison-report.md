@@ -135,7 +135,7 @@ Evidence:
 | Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented locally with 48-hour retention default and download-before-deletion UI guidance | Manual document lifecycle reviewer sign-off |
 | AI | Knowledge base, request summaries, status explanation, escalation | Implemented locally with fallback-to-human UI guidance and low-confidence escalation QA | Manual proactive AI scenario reviewer sign-off |
 | Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally with role-scope finance UI and permission QA | Manual financial reviewer sign-off |
-| Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates | Manual device/emulator role walkthrough |
+| Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates and walkthrough artifacts | Manual device/emulator role walkthrough sign-off |
 | Cross-platform sync | Same statuses, workflow, chat, docs, payments, AI across web/mobile | Implemented locally with lifecycle contract QA across web, customer mobile, and operations mobile | Manual end-to-end role scenario sign-off |
 | Branding | Final system reflects Sanad, not Kangoo | Passed locally for audited web/mobile source gates | Production deployment and manual UAT confirmation |
 
@@ -156,8 +156,8 @@ The following Notion tasks now reflect current QA evidence:
 
 | App | Evidence | Result |
 | --- | --- | --- |
-| Customer mobile app | `scripts/sanad_mobile_qa.sh` in `handyman_user_flutter_v11.13.2`, commit `14258a4` | Passed: Sanad labels/config, high-risk legacy visible string scan, customer privacy navigation scan, targeted analyzer, debug APK build |
-| Admin/Partner/Employee operations mobile app | `scripts/sanad_mobile_qa.sh` in `handyman_admin_flutter_app-v3.9.0`, commit `50f1b20` | Passed: Sanad Operations labels/config, high-risk legacy visible string scan, targeted analyzer, debug APK build |
+| Customer mobile app | `scripts/sanad_mobile_qa.sh` and `docs/sanad-customer-mobile-walkthrough.md` in `handyman_user_flutter_v11.13.2` | Passed: Sanad labels/config, walkthrough artifact checks, high-risk legacy visible string scan, customer privacy navigation scan, targeted analyzer, debug APK build already passed |
+| Admin/Partner/Employee operations mobile app | `scripts/sanad_mobile_qa.sh` and `docs/sanad-operations-mobile-walkthrough.md` in `handyman_admin_flutter_app-v3.9.0` | Passed: Sanad Operations labels/config, walkthrough artifact checks, high-risk legacy visible string scan, targeted analyzer, debug APK build already passed |
 
 ## Document Policy Evidence
 

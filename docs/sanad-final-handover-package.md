@@ -119,10 +119,12 @@ Run the Flutter app-level QA gates from each mobile repository:
 # Customer mobile app
 cd /Users/xain/Documents/kangoo/handyman_user_flutter_v11.13.2
 scripts/sanad_mobile_qa.sh
+open docs/sanad-customer-mobile-walkthrough.md
 
 # Admin/partner/employee operations mobile app
 cd /Users/xain/Documents/kangoo/handyman_admin_flutter_app-v3.9.0
 scripts/sanad_mobile_qa.sh
+open docs/sanad-operations-mobile-walkthrough.md
 ```
 
 ## Live Smoke Results
@@ -176,6 +178,7 @@ The latest frontend and policy gates passed locally:
 | AI fallback escalation | Passed source, API, and rendered AI console checks |
 | Finance role permissions | Passed source, PHP syntax, admin rendered page, and partner rendered page checks |
 | Cross-platform lifecycle sync | Passed source-level web/customer mobile/operations mobile lifecycle contract checks |
+| Mobile walkthrough artifacts | Passed QA-script checks for customer and operations role walkthrough documents |
 
 ## Local SQL QA Result
 
