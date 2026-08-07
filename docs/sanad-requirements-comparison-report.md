@@ -134,7 +134,7 @@ Evidence:
 | Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented foundation | 48-hour deletion and customer download-before-deletion policy review |
 | AI | Knowledge base, request summaries, status explanation, escalation | Implemented foundation | Proactive AI and fallback-to-human scenario review |
 | Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally | Role-specific financial permission UAT |
-| Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed | Manual device/emulator role walkthrough |
+| Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates | Manual device/emulator role walkthrough |
 | Cross-platform sync | Same statuses, workflow, chat, docs, payments, AI across web/mobile | Implemented foundation | End-to-end role scenario testing |
 | Branding | Final system reflects Sanad, not Kangoo | Passed locally for audited web/mobile source gates | Production deployment and manual UAT confirmation |
 
@@ -150,6 +150,13 @@ The following Notion tasks now reflect current QA evidence:
 | Align Provider terminology and visibility with Partner portal rules | Done / QA Passed |
 | Add automated visible terminology QA gate | Done / QA Passed |
 | Mobile app branding and terminology audit against Sanad docs | Review / Ready for QA |
+
+## Mobile QA Evidence
+
+| App | Evidence | Result |
+| --- | --- | --- |
+| Customer mobile app | `scripts/sanad_mobile_qa.sh` in `handyman_user_flutter_v11.13.2`, commit `14258a4` | Passed: Sanad labels/config, high-risk legacy visible string scan, customer privacy navigation scan, targeted analyzer, debug APK build |
+| Admin/Partner/Employee operations mobile app | `scripts/sanad_mobile_qa.sh` in `handyman_admin_flutter_app-v3.9.0`, commit `50f1b20` | Passed: Sanad Operations labels/config, high-risk legacy visible string scan, targeted analyzer, debug APK build |
 
 ## Recommended Next Work Order
 
