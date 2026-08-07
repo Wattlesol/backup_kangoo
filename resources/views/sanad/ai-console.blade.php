@@ -52,6 +52,10 @@
                             <div class="col-lg-6 mb-3 mb-lg-0">
                                 <div class="sanad-ai-panel">
                                     <h5 class="font-weight-bold mb-3">Ask Sanad AI</h5>
+                                    <div class="sanad-ai-policy mb-3">
+                                        <strong>Fallback to human support:</strong>
+                                        low-confidence answers are automatically marked as escalated and routed to the Sanad support team for review.
+                                    </div>
                                     <form method="POST" action="{{ route('sanad.ai.ask') }}">
                                         @csrf
                                         <div class="form-group">
@@ -71,6 +75,9 @@
                                                 <div>
                                                     <strong>{{ Str::limit($interaction->question, 76) }}</strong>
                                                     <span>{{ Str::limit($interaction->answer, 110) }}</span>
+                                                    @if($interaction->requires_escalation)
+                                                        <small class="sanad-ai-escalation-note">Needs human review by Sanad support</small>
+                                                    @endif
                                                 </div>
                                                 <div class="sanad-ai-status">
                                                     <span class="badge {{ $interaction->requires_escalation ? 'badge-warning' : 'badge-success' }}">{{ Str::headline($interaction->status) }}</span>
@@ -167,6 +174,7 @@
             .sanad-ai-kpi span,
             .sanad-ai-list-item span,
             .sanad-ai-status small,
+            .sanad-ai-escalation-note,
             .sanad-ai-empty {
                 color: #6c757d;
                 font-size: 13px;
@@ -181,6 +189,15 @@
             .sanad-ai-panel {
                 min-height: 100%;
                 padding: 16px;
+            }
+
+            .sanad-ai-policy {
+                border: 1px solid rgba(255, 193, 7, 0.45);
+                border-radius: 8px;
+                background: #fff8e1;
+                color: #6c5200;
+                padding: 12px;
+                font-size: 13px;
             }
 
             .sanad-ai-list-item {
@@ -201,7 +218,8 @@
             }
 
             .sanad-ai-list-item strong,
-            .sanad-ai-list-item span {
+            .sanad-ai-list-item span,
+            .sanad-ai-escalation-note {
                 display: block;
                 overflow: hidden;
                 text-overflow: ellipsis;
