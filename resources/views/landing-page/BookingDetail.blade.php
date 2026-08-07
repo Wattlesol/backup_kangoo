@@ -54,7 +54,7 @@
 
                                 @if($bookingData['service']['is_enable_advance_payment']==0 && $bookingData['booking_detail']['status'] === 'pending' && ($bookingData['booking_detail']['payment_status'] !== 'failed' || $bookingData['booking_detail']['payment_status'] === 'pending' || $bookingData['booking_detail']['payment_status'] === 'advanced_paid') || $bookingData['booking_detail']['status'] === 'accept')
                                     <div class="mt-5">
-                                        <button type="button" data-bs-toggle="modal" data-bs-target="#cancelModal" class="btn btn-primary text-capitalize">{{__('landingpage.cancel_booking')}}</button>
+                                        <button type="button" data-bs-toggle="modal" data-bs-target="#cancelModal" class="btn btn-primary text-capitalize">Cancel Request</button>
                                     </div>
                                 @endif
 
@@ -569,7 +569,7 @@ Status Modal
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content overflow-visible">
             <div class="modal-header border-bottom-0 gap-2">
-                <h5 class="modal-title text-capitalize" id="statusModalLabel">{{__('landingpage.booking_history')}}</h5>
+                <h5 class="modal-title text-capitalize" id="statusModalLabel">Request History</h5>
                 <span class="text-primary custom-btn-close" data-bs-dismiss="modal" aria-label="Close">
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="41" viewBox="0 0 40 41" fill="none">
                         <rect x="12" y="11.8381" width="17" height="17" fill="white"></rect>

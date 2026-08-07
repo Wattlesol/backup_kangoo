@@ -40,6 +40,7 @@ Production deployment is still not a valid acceptance environment because Dokplo
 | Authenticated web routes | Passed locally | `scripts/sanad_web_sql_qa.sh` passed login, dashboard, requests, request detail, AI, and payment pages |
 | Local web role UAT | Passed locally | `scripts/sanad_web_role_uat.sh` passed Admin, Partner, Employee, and Customer route/content checks |
 | Request detail frontend sign-off gate | Passed locally | `scripts/sanad_request_detail_frontend_qa.sh` verifies admin, partner, and employee request detail sections, role controls, Buzz, documents, chat, billing, lifecycle, and privacy markers |
+| Customer request frontend sign-off gate | Passed locally | `scripts/sanad_customer_frontend_qa.sh` verifies customer request detail Sanad terminology, operations/privacy messaging, payment summary markers, and absence of direct partner/employee profile labels |
 | Visible web terminology | Passed locally | `scripts/sanad_visible_terminology_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer-facing partner visibility | Passed locally | `scripts/sanad_partner_visibility_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer mobile source/build QA | Passed source/build gate | Customer app commit `bc9ff79`; Dart analyze passed with one pre-existing map deprecation info; Android debug APK built |
@@ -207,6 +208,16 @@ The following Notion tasks now reflect current QA evidence:
 | Buzz fallback states | Buzz acknowledgement guidance stays visible even when no open alerts exist |
 | Privacy controls | Document and chat role visibility controls are explicitly labelled with Visible to |
 | `scripts/sanad_request_detail_frontend_qa.sh` | Passed against the rebuilt local SQL QA environment at `http://127.0.0.1:8092` |
+
+## Customer Frontend QA Evidence
+
+| Evidence | Result |
+| --- | --- |
+| Customer request detail | Shows Sanad Operations, Request Assigned, Assigned Support, customer price details, total amount, and request history markers |
+| Customer privacy | Page explains Sanad coordinates partner and employee execution internally instead of exposing direct profile/contact controls |
+| Customer terminology | Replaced inherited visible Booking History and Cancel Booking labels with Request History and Cancel Request on the audited customer detail page |
+| Customer forbidden labels | QA blocks Kangoo, Provider Demo, Handyman Demo, About Provider, About Handyman, Provider Profile, Handyman Profile, Booking History, and Cancel Booking on `/booking-detail/1` |
+| `scripts/sanad_customer_frontend_qa.sh` | Passed against the rebuilt local SQL QA environment at `http://127.0.0.1:8092` |
 
 ## Recommended Next Work Order
 
