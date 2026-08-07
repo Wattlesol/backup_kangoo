@@ -38,6 +38,7 @@ Production deployment is still not a valid acceptance environment because Dokplo
 | Sanad AI foundation | Passed locally | Integrated QA creates knowledge items and asks AI |
 | Payment/wallet contracts | Passed locally | Integrated QA checks payment list, gateways, wallet history, top-up, and balance |
 | Authenticated web routes | Passed locally | `scripts/sanad_web_sql_qa.sh` passed login, dashboard, requests, request detail, AI, and payment pages |
+| Local web role UAT | Passed locally | `scripts/sanad_web_role_uat.sh` passed Admin, Partner, Employee, and Customer route/content checks |
 | Visible web terminology | Passed locally | `scripts/sanad_visible_terminology_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer-facing partner visibility | Passed locally | `scripts/sanad_partner_visibility_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer mobile source/build QA | Passed source/build gate | Customer app commit `bc9ff79`; Dart analyze passed with one pre-existing map deprecation info; Android debug APK built |
@@ -122,13 +123,13 @@ Evidence:
 
 | Requirement Area | Client Requirement | Current Result | Remaining Verification |
 | --- | --- | --- | --- |
-| Admin dashboard | Operational summary, requests, partners, employees, payments, alerts, pending actions | Implemented locally | Manual admin UAT walkthrough |
-| Admin orders | View, filter, inspect, assign, update, monitor all customer requests | Implemented locally | Manual admin lifecycle UAT |
+| Admin dashboard | Operational summary, requests, partners, employees, payments, alerts, pending actions | Implemented locally; local role-UAT passed | Manual admin reviewer sign-off |
+| Admin orders | View, filter, inspect, assign, update, monitor all customer requests | Implemented locally; local role-UAT passed | Manual admin lifecycle sign-off |
 | Service catalog | Categories, services, packages, add-ons, pricing inputs, availability | Implemented locally using Kangoo structures | Manual service-management UAT; deeper bilingual/government-field review |
-| Partner dashboard | Partner operations, assigned orders, employees, workload, finance | Implemented locally | Manual partner UAT |
+| Partner dashboard | Partner operations, assigned orders, employees, workload, finance | Implemented locally; local role-UAT passed | Manual partner reviewer sign-off |
 | Partner services | Partners enable/disable Sanad services under Sanad rules | Implemented/partially verified | Manual partner permission and service publishing review |
-| Staff portal | Employee dashboard/tasks/documents/checklist/chat/Buzz | Implemented locally | Manual employee UAT |
-| Customer portal | Requests, documents, payments, AI, privacy | Implemented locally | Manual customer UAT |
+| Staff portal | Employee dashboard/tasks/documents/checklist/chat/Buzz | Implemented locally; local role-UAT passed | Manual employee reviewer sign-off |
+| Customer portal | Requests, documents, payments, AI, privacy | Implemented locally; local role-UAT passed | Manual customer reviewer sign-off |
 | Buzz | Normal/Urgent/Critical notifications and acknowledgement | Implemented foundation | Full UI seen/opened/action-completed behavior review |
 | Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented foundation | 48-hour deletion and customer download-before-deletion policy review |
 | AI | Knowledge base, request summaries, status explanation, escalation | Implemented foundation | Proactive AI and fallback-to-human scenario review |
@@ -152,7 +153,7 @@ The following Notion tasks now reflect current QA evidence:
 
 ## Recommended Next Work Order
 
-1. Run a manual local web UAT walkthrough for Admin, Partner, Employee, and Customer roles.
+1. Run manual reviewer sign-off for Admin, Partner, Employee, and Customer roles using the local role-UAT evidence as the baseline.
 2. Run manual device/emulator walkthroughs for the customer and operations mobile apps.
 3. Verify deeper policy scenarios: document retention/download behavior, proactive AI/fallback escalation, role-specific finance permissions, and cross-platform lifecycle sync.
 4. Keep production deployment on hold until Dokploy applies the merged production code and live Sanad routes return 200.
@@ -160,6 +161,6 @@ The following Notion tasks now reflect current QA evidence:
 
 ## Current Decision
 
-The current local implementation is ready for structured internal UAT. It is not yet ready to be accepted as production-complete because production deployment remains blocked and manual role/device UAT still needs to be completed.
+The current local implementation is ready for structured internal UAT. Automated local web role-UAT now passes for Admin, Partner, Employee, and Customer. It is not yet ready to be accepted as production-complete because production deployment remains blocked and manual reviewer/device UAT still needs to be completed.
 
 The frontend web cleanup requested by the previous comparison report is complete in local QA according to the current automated evidence.
