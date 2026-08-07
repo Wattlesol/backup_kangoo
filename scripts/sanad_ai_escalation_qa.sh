@@ -44,7 +44,7 @@ else
   token="$(jq -r '.api_token // .data.api_token // empty' "$login_response")"
   [[ -n "$token" ]] || fail "API login did not return api_token"
 
-  unique_question="Sanad escalation qa unmatched $(date +%s%N)"
+  unique_question="zyxwvutsrq plmoknijb qatest$(date +%s%N)"
   ai_code="$(curl -sS -o "$ai_response" -w "%{http_code}" -X POST "$BASE_URL/sanad/ai/ask" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \

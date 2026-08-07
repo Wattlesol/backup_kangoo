@@ -36,6 +36,7 @@ Production deployment is still not a valid acceptance environment because Dokplo
 | Document vault | Passed locally | Integrated QA creates and verifies document vault items |
 | Secure chat | Passed locally | Integrated QA creates chat thread/messages and validates role-aware access |
 | Sanad AI foundation | Passed locally | Integrated QA creates knowledge items and asks AI |
+| Sanad AI web action gate | Passed locally | `scripts/sanad_ai_web_action_qa.sh` creates knowledge, asks a matching question, and verifies low-confidence escalation from the rendered AI console |
 | Payment/wallet contracts | Passed locally | Integrated QA checks payment list, gateways, wallet history, top-up, and balance |
 | Authenticated web routes | Passed locally | `scripts/sanad_web_sql_qa.sh` passed login, dashboard, requests, request detail, AI, and payment pages |
 | Local web role UAT | Passed locally | `scripts/sanad_web_role_uat.sh` passed Admin, Partner, Employee, and Customer route/content checks |
@@ -136,7 +137,7 @@ Evidence:
 | Customer portal | Requests, documents, payments, AI, privacy | Implemented locally; local role-UAT passed | Manual customer reviewer sign-off |
 | Buzz | Normal/Urgent/Critical notifications and acknowledgement | Implemented locally with action-level web QA for create and acknowledge behavior | Manual reviewer sign-off |
 | Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented locally with 48-hour retention default, download-before-deletion UI guidance, and action-level web QA for create and approve behavior | Manual document lifecycle reviewer sign-off |
-| AI | Knowledge base, request summaries, status explanation, escalation | Implemented locally with fallback-to-human UI guidance and low-confidence escalation QA | Manual proactive AI scenario reviewer sign-off |
+| AI | Knowledge base, request summaries, status explanation, escalation | Implemented locally with web action QA for knowledge creation, answered questions, fallback-to-human UI guidance, and low-confidence escalation | Manual proactive AI scenario reviewer sign-off |
 | Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally with role-scope finance UI and permission QA | Manual financial reviewer sign-off |
 | Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates and walkthrough artifacts | Manual device/emulator role walkthrough sign-off |
 | Cross-platform sync | Same statuses, workflow, chat, docs, payments, AI across web/mobile | Implemented locally with lifecycle contract QA across web, customer mobile, and operations mobile | Manual end-to-end role scenario sign-off |
@@ -178,6 +179,7 @@ The following Notion tasks now reflect current QA evidence:
 | AI console frontend | Shows fallback-to-human support policy and human-review note for escalated interactions |
 | API low-confidence question | Returns `requires_escalation=true`, `status=escalated`, and support-team fallback answer |
 | `scripts/sanad_ai_escalation_qa.sh` | Passed source, API, and rendered AI console checks against local QA after syncing the image-based container view |
+| `scripts/sanad_ai_web_action_qa.sh` | Passed rendered admin AI console actions for knowledge creation, matched answer history, and low-confidence escalation history |
 
 ## Finance Permission Evidence
 
