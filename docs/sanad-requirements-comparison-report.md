@@ -41,6 +41,7 @@ Production deployment is still not a valid acceptance environment because Dokplo
 | Local web role UAT | Passed locally | `scripts/sanad_web_role_uat.sh` passed Admin, Partner, Employee, and Customer route/content checks |
 | Request detail frontend sign-off gate | Passed locally | `scripts/sanad_request_detail_frontend_qa.sh` verifies admin, partner, and employee request detail sections, role controls, Buzz, documents, chat, billing, lifecycle, and privacy markers |
 | Customer request frontend sign-off gate | Passed locally | `scripts/sanad_customer_frontend_qa.sh` verifies customer request detail Sanad terminology, operations/privacy messaging, payment summary markers, and absence of direct partner/employee profile labels |
+| Service catalog frontend sign-off gate | Passed locally | `scripts/sanad_service_catalog_frontend_qa.sh` verifies admin service catalog, Sanad bilingual/government metadata fields, partner terminology, and partner service catalog visibility |
 | Visible web terminology | Passed locally | `scripts/sanad_visible_terminology_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer-facing partner visibility | Passed locally | `scripts/sanad_partner_visibility_qa.sh` passed against `http://127.0.0.1:8092` |
 | Customer mobile source/build QA | Passed source/build gate | Customer app commit `bc9ff79`; Dart analyze passed with one pre-existing map deprecation info; Android debug APK built |
@@ -127,9 +128,9 @@ Evidence:
 | --- | --- | --- | --- |
 | Admin dashboard | Operational summary, requests, partners, employees, payments, alerts, pending actions | Implemented locally; local role-UAT passed | Manual admin reviewer sign-off |
 | Admin orders | View, filter, inspect, assign, update, monitor all customer requests | Implemented locally; local role-UAT passed | Manual admin lifecycle sign-off |
-| Service catalog | Categories, services, packages, add-ons, pricing inputs, availability | Implemented locally using Kangoo structures | Manual service-management UAT; deeper bilingual/government-field review |
+| Service catalog | Categories, services, packages, add-ons, pricing inputs, availability | Implemented locally with Sanad frontend metadata QA for bilingual/government fields | Manual service-management UAT |
 | Partner dashboard | Partner operations, assigned orders, employees, workload, finance | Implemented locally; local role-UAT passed | Manual partner reviewer sign-off |
-| Partner services | Partners enable/disable Sanad services under Sanad rules | Implemented/partially verified | Manual partner permission and service publishing review |
+| Partner services | Partners enable/disable Sanad services under Sanad rules | Implemented locally with partner service catalog frontend QA | Manual partner permission and service publishing review |
 | Staff portal | Employee dashboard/tasks/documents/checklist/chat/Buzz | Implemented locally; local role-UAT passed | Manual employee reviewer sign-off |
 | Customer portal | Requests, documents, payments, AI, privacy | Implemented locally; local role-UAT passed | Manual customer reviewer sign-off |
 | Buzz | Normal/Urgent/Critical notifications and acknowledgement | Implemented foundation | Full UI seen/opened/action-completed behavior review |
@@ -218,6 +219,16 @@ The following Notion tasks now reflect current QA evidence:
 | Customer terminology | Replaced inherited visible Booking History and Cancel Booking labels with Request History and Cancel Request on the audited customer detail page |
 | Customer forbidden labels | QA blocks Kangoo, Provider Demo, Handyman Demo, About Provider, About Handyman, Provider Profile, Handyman Profile, Booking History, and Cancel Booking on `/booking-detail/1` |
 | `scripts/sanad_customer_frontend_qa.sh` | Passed against the rebuilt local SQL QA environment at `http://127.0.0.1:8092` |
+
+## Service Catalog Frontend QA Evidence
+
+| Evidence | Result |
+| --- | --- |
+| Admin service list | Shows Sanad Service Catalog, Active Services, Packages, Add-ons, Catalog Readiness, and Partner terminology |
+| Admin service form | Shows Sanad Service Master Data, English Name, Arabic Name, Government Entity, Required Documents, Sanad Service Fee, Required Employee Skills, and Partner Internal Notes / Availability |
+| Partner service list | Shows Sanad Service Catalog and catalog readiness for partner service review |
+| Visible terminology | Service list/form use Partner and Partner Address wording instead of visible Provider/Provider Address labels |
+| `scripts/sanad_service_catalog_frontend_qa.sh` | Passed against local QA at `http://127.0.0.1:8092` |
 
 ## Recommended Next Work Order
 

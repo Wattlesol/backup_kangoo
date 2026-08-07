@@ -89,6 +89,7 @@ scripts/sanad_partner_visibility_qa.sh
 scripts/sanad_web_role_uat.sh
 scripts/sanad_request_detail_frontend_qa.sh
 scripts/sanad_customer_frontend_qa.sh
+scripts/sanad_service_catalog_frontend_qa.sh
 scripts/sanad_document_policy_qa.sh
 scripts/sanad_ai_escalation_qa.sh
 scripts/sanad_finance_permissions_qa.sh
@@ -176,6 +177,7 @@ The latest frontend and policy gates passed locally:
 | Local web role UAT | Passed |
 | Request detail frontend sign-off gate | Passed admin, partner, and employee request detail section/role-control checks |
 | Customer request frontend sign-off gate | Passed customer request detail terminology, privacy, payment summary, and forbidden-label checks |
+| Service catalog frontend sign-off gate | Passed admin service catalog, Sanad master data, partner terminology, and partner service catalog checks |
 | Document retention/download-before-deletion policy | Passed source-level policy, PHP syntax, and rendered route checks |
 | AI fallback escalation | Passed source, API, and rendered AI console checks |
 | Finance role permissions | Passed source, PHP syntax, admin rendered page, and partner rendered page checks |

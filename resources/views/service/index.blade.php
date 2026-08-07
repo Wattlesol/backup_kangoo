@@ -113,7 +113,7 @@
                     {
                         data:'provider_id',
                         name:'provider_id',
-                        title:"{{ __('messages.provider') }}"
+                        title:"Partner"
                     },
                     {
                         data:'category_id',
