@@ -135,7 +135,7 @@ Evidence:
 | AI | Knowledge base, request summaries, status explanation, escalation | Implemented locally with fallback-to-human UI guidance and low-confidence escalation QA | Manual proactive AI scenario reviewer sign-off |
 | Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally with role-scope finance UI and permission QA | Manual financial reviewer sign-off |
 | Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates | Manual device/emulator role walkthrough |
-| Cross-platform sync | Same statuses, workflow, chat, docs, payments, AI across web/mobile | Implemented foundation | End-to-end role scenario testing |
+| Cross-platform sync | Same statuses, workflow, chat, docs, payments, AI across web/mobile | Implemented locally with lifecycle contract QA across web, customer mobile, and operations mobile | Manual end-to-end role scenario sign-off |
 | Branding | Final system reflects Sanad, not Kangoo | Passed locally for audited web/mobile source gates | Production deployment and manual UAT confirmation |
 
 ## Notion Status Alignment
@@ -185,11 +185,21 @@ The following Notion tasks now reflect current QA evidence:
 | Provider payout scoping | Non-admin/non-partner fallback returns no settlement rows |
 | `scripts/sanad_finance_permissions_qa.sh` | Passed source, PHP syntax, admin rendered page, and partner rendered page checks against local QA |
 
+## Cross-Platform Lifecycle Sync Evidence
+
+| Evidence | Result |
+| --- | --- |
+| Backend lifecycle source | `config/sanad.php` defines the canonical Sanad request lifecycle and API rejects invalid stages |
+| Web lifecycle frontend | Request detail lifecycle form reads stages from backend Sanad config |
+| Customer mobile app | Reads Sanad foundation/request APIs and displays `sanad_stage` from the shared API payload |
+| Operations mobile app | Updates lifecycle through `sanad/requests/{id}/lifecycle` and uses only configured backend stages |
+| `scripts/sanad_cross_platform_lifecycle_qa.sh` | Passed source-level web/customer mobile/operations mobile lifecycle contract checks |
+
 ## Recommended Next Work Order
 
 1. Run manual reviewer sign-off for Admin, Partner, Employee, and Customer roles using the local role-UAT evidence as the baseline.
 2. Run manual device/emulator walkthroughs for the customer and operations mobile apps.
-3. Verify deeper policy scenarios: cross-platform lifecycle sync.
+3. Run final manual cross-platform role scenario sign-off.
 4. Keep production deployment on hold until Dokploy applies the merged production code and live Sanad routes return 200.
 5. After deployment is fixed, run the same Sanad QA gates against the deployed environment before client-facing UAT.
 
