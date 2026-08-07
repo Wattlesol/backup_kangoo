@@ -131,7 +131,7 @@ Evidence:
 | Staff portal | Employee dashboard/tasks/documents/checklist/chat/Buzz | Implemented locally; local role-UAT passed | Manual employee reviewer sign-off |
 | Customer portal | Requests, documents, payments, AI, privacy | Implemented locally; local role-UAT passed | Manual customer reviewer sign-off |
 | Buzz | Normal/Urgent/Critical notifications and acknowledgement | Implemented foundation | Full UI seen/opened/action-completed behavior review |
-| Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented foundation | 48-hour deletion and customer download-before-deletion policy review |
+| Documents | Request docs, personal vault, privacy, approval, audit behavior | Implemented locally with 48-hour retention default and download-before-deletion UI guidance | Manual document lifecycle reviewer sign-off |
 | AI | Knowledge base, request summaries, status explanation, escalation | Implemented foundation | Proactive AI and fallback-to-human scenario review |
 | Payments | Invoices, payment status, refunds, wallet-compatible structure | Implemented locally | Role-specific financial permission UAT |
 | Mobile apps | Customer/admin/partner/employee apps aligned with dashboards | Source/build QA passed with repeatable mobile gates | Manual device/emulator role walkthrough |
@@ -158,11 +158,20 @@ The following Notion tasks now reflect current QA evidence:
 | Customer mobile app | `scripts/sanad_mobile_qa.sh` in `handyman_user_flutter_v11.13.2`, commit `14258a4` | Passed: Sanad labels/config, high-risk legacy visible string scan, customer privacy navigation scan, targeted analyzer, debug APK build |
 | Admin/Partner/Employee operations mobile app | `scripts/sanad_mobile_qa.sh` in `handyman_admin_flutter_app-v3.9.0`, commit `50f1b20` | Passed: Sanad Operations labels/config, high-risk legacy visible string scan, targeted analyzer, debug APK build |
 
+## Document Policy Evidence
+
+| Evidence | Result |
+| --- | --- |
+| API document vault create | Defaults `retention_until` to 48 hours when no date is supplied |
+| Web request detail document form | Defaults `retention_until` to 48 hours when no date is supplied |
+| Document Vault frontend | Shows Sanad document retention policy, retention date, and download-before-deletion guidance |
+| `scripts/sanad_document_policy_qa.sh` | Passed source-level policy and PHP syntax checks; route-render check is enabled when a local request row is available |
+
 ## Recommended Next Work Order
 
 1. Run manual reviewer sign-off for Admin, Partner, Employee, and Customer roles using the local role-UAT evidence as the baseline.
 2. Run manual device/emulator walkthroughs for the customer and operations mobile apps.
-3. Verify deeper policy scenarios: document retention/download behavior, proactive AI/fallback escalation, role-specific finance permissions, and cross-platform lifecycle sync.
+3. Verify deeper policy scenarios: proactive AI/fallback escalation, role-specific finance permissions, and cross-platform lifecycle sync.
 4. Keep production deployment on hold until Dokploy applies the merged production code and live Sanad routes return 200.
 5. After deployment is fixed, run the same Sanad QA gates against the deployed environment before client-facing UAT.
 

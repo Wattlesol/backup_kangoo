@@ -502,7 +502,7 @@ class SanadWebController extends Controller
             'visible_to' => $request->visible_to ?: ['admin'],
             'file_name' => $request->file_name,
             'file_path' => $request->file_path,
-            'retention_until' => $request->retention_until,
+            'retention_until' => $request->retention_until ?: now()->addHours(48),
         ]);
 
         $this->audit($request, 'sanad.document.created', $document);

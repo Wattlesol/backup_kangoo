@@ -383,6 +383,10 @@
                         <h5 class="font-weight-bold mb-0">Document Vault</h5>
                     </div>
                     <div class="card-body">
+                        <div class="alert alert-light border mb-4">
+                            <strong>Sanad document policy:</strong>
+                            documents default to a 48-hour retention window when no date is selected. Customers must download required files before the retention date; expired items should be removed during document cleanup.
+                        </div>
                         <form method="POST" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="mb-4">
                             @csrf
                             <div class="row">
@@ -418,6 +422,12 @@
                                         <strong>{{ Str::headline($document->document_type) }}</strong>
                                         <span>{{ $document->file_name ?: $document->file_path ?: 'No file reference' }}</span>
                                         <small>Visible to: {{ $sanadRoleList($document->visible_to) ?: '-' }}</small>
+                                        <small>Retention until: {{ optional($document->retention_until)->format('d M Y H:i') ?: '48 hours after upload' }}</small>
+                                        @if($document->file_path)
+                                            <a href="{{ $document->file_path }}" target="_blank" rel="noopener" class="small">Download before deletion</a>
+                                        @else
+                                            <small>Download before deletion once a file URL is available</small>
+                                        @endif
                                     </div>
                                     <div class="sanad-list-actions">
                                         <span class="badge badge-light">{{ Str::headline($document->verification_status) }}</span>

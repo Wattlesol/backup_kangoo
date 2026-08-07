@@ -221,6 +221,7 @@ class SanadController extends Controller
             'visible_to.*' => 'string',
             'file_name' => 'nullable|string|max:255',
             'file_path' => 'nullable|string|max:255',
+            'retention_until' => 'nullable|date',
         ]);
 
         $booking = null;
@@ -236,6 +237,7 @@ class SanadController extends Controller
             'visible_to' => $request->visible_to ?: ['admin'],
             'file_name' => $request->file_name,
             'file_path' => $request->file_path,
+            'retention_until' => $request->retention_until ?: now()->addHours(48),
         ]);
 
         $this->audit($request, 'sanad.document.created', $item);
