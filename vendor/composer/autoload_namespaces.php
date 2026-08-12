@@ -6,6 +6,7 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'Smalot\\PdfParser\\' => array($vendorDir . '/smalot/pdfparser/src'),
     'Orangehill\\Iseed' => array($vendorDir . '/orangehill/iseed/src'),
     'Lavary\\Menu\\' => array($vendorDir . '/lavary/laravel-menu/src'),
     'HTMLPurifier' => array($vendorDir . '/ezyang/htmlpurifier/library'),

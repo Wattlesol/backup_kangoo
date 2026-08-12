@@ -19,15 +19,21 @@
                         {{ Form::model($categorydata,['method' => 'POST','route'=>'category.store', 'enctype'=>'multipart/form-data', 'data-toggle'=>"validator" ,'id'=>'category'] ) }}
                         {{ Form::hidden('id') }}
                         <div class="row">
-                        <div class="form-group col-md-4">
-                                {{ Form::label('name', __('messages.name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name', old('name'), ['placeholder' => __('messages.name'), 'class' => 'form-control', 'required', 'title' => 'Please enter alphabetic characters and spaces only']) }}
+                            <div class="form-group col-md-4">
+                                {{ Form::label('name_en', 'English Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_en', old('name_en', $categorydata->name_en ?: $categorydata->name), ['placeholder' => 'English Name', 'class' => 'form-control', 'required']) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
                             <div class="form-group col-md-4">
-                                {{ Form::label('color',trans('messages.color'), ['class' => 'form-control-label']) }}
-                                {{ Form::color('color',null, ['placeholder' => trans('messages.color'),'class' =>'form-control' ,'id' => 'color']) }}
+                                {{ Form::label('name_ar', 'Arabic Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_ar', old('name_ar'), ['placeholder' => 'Arabic Name', 'class' => 'form-control', 'required', 'dir' => 'rtl']) }}
+                                <small class="help-block with-errors text-danger"></small>
+                            </div>
+
+                            <div class="form-group col-md-4">
+                                {{ Form::label('display_order', 'Display Order', ['class' => 'form-control-label']) }}
+                                {{ Form::number('display_order', old('display_order'), ['placeholder' => 'Display Order', 'class' =>'form-control', 'min' => 0]) }}
                             </div>
 
                             <div class="form-group col-md-4">
@@ -36,9 +42,21 @@
                             </div>
 
                             <div class="form-group col-md-4">
+                                <label class="form-control-label" for="category_icon">Icon</label>
+                                <div class="custom-file">
+                                    <input type="file" name="category_icon" class="custom-file-input" onchange="previewCategoryIcon(event)" accept="image/*" >
+                                    @if($categorydata && getMediaFileExit($categorydata, 'category_icon'))
+                                    <label class="custom-file-label upload-label">{{ $categorydata->getFirstMedia('category_icon')->file_name }}</label>
+                                    @else
+                                    <label class="custom-file-label upload-label">{{ __('messages.choose_file',['file' => 'Icon' ]) }}</label>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="form-group col-md-4">
                                 <label class="form-control-label" for="category_image">{{ __('messages.image') }} <span class="text-danger">*</span></label>
                                 <div class="custom-file">
-                                    <input type="file" name="category_image" class="custom-file-input" onchange="preview()" accept="image/*" >
+                                    <input type="file" name="category_image" class="custom-file-input" onchange="previewCategoryImage(event)" accept="image/*" >
                                     @if($categorydata && getMediaFileExit($categorydata, 'category_image'))
                                     <label class="custom-file-label upload-label">{{ $categorydata->getFirstMedia('category_image')->file_name }}</label>
                                     @else
@@ -46,6 +64,18 @@
                                     @endif
                                 </div>
                             </div>
+                            @if(getMediaFileExit($categorydata, 'category_icon'))
+                            <div class="col-md-2 mb-2">
+                                <img id="category_icon_preview" src="{{getSingleMedia($categorydata,'category_icon')}}" alt="#" class="attachment-image mt-1">
+                                <a class="text-danger remove-file" href="{{ route('remove.file', ['id' => $categorydata->id, 'type' => 'category_icon']) }}" data--submit="confirm_form" data--confirmation='true' data--ajax="true" title='{{ __("messages.remove_file_title" , ["name" =>  "Icon" ]) }}' data-title='{{ __("messages.remove_file_title" , ["name" =>  "Icon" ]) }}' data-message='{{ __("messages.remove_file_msg") }}'>
+                                    <i class="ri-close-circle-line"></i>
+                                </a>
+                            </div>
+                            @else
+                            <div class="col-md-2 mb-2">
+                                <img id="category_icon_preview" src="" width="80px" />
+                            </div>
+                            @endif
                             @if(getMediaFileExit($categorydata, 'category_image'))
                             <div class="col-md-2 mb-2">
                                 @php
@@ -56,15 +86,11 @@
                                     <i class="ri-close-circle-line"></i>
                                 </a>
                             </div>
-                            @endif
-                            <img id="category_image_preview" src="" width="150px" />
-
-
-
-                            <div class="form-group col-md-12">
-                                {{ Form::label('description',trans('messages.description'), ['class' => 'form-control-label']) }}
-                                {{ Form::textarea('description', null, ['class'=>"form-control textarea" , 'rows'=>3  , 'placeholder'=> __('messages.description') ]) }}
+                            @else
+                            <div class="col-md-2 mb-2">
+                                <img id="category_image_preview" src="" width="150px" />
                             </div>
+                            @endif
                         </div>
                         <div class="row">
                             <div class="form-group col-md-6">
@@ -86,8 +112,12 @@
         </div>
     </div>
     <script>
-        function preview() {
+        function previewCategoryImage(event) {
             category_image_preview.src = URL.createObjectURL(event.target.files[0]);
+        }
+
+        function previewCategoryIcon(event) {
+            category_icon_preview.src = URL.createObjectURL(event.target.files[0]);
         }
     </script>
 </x-master-layout>

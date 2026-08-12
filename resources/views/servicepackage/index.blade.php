@@ -9,8 +9,8 @@
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
-                            <a href="{{ route('servicepackage.create') }}" class="float-right mr-1 btn btn-sm btn-primary "><i class="fa fa-plus-circle"></i> {{ __('messages.add_form_title',['form' => __('messages.service_package')  ]) }}</a>
+                            <h5 class="font-weight-bold">Service Bundles</h5>
+                            <a href="{{ route('servicepackage.create') }}" class="float-right mr-1 btn btn-sm btn-primary "><i class="fa fa-plus-circle"></i> Create Service Bundle</a>
                         </div>
                         
                     </div>

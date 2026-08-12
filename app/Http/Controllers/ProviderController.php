@@ -12,6 +12,7 @@ use App\Models\ProviderPayout;
 use App\Models\ProviderSubscription;
 use App\Models\PaymentGateway;
 use App\Models\ProviderDocument;
+use App\Models\Documents;
 use Carbon\Carbon;
 use Yajra\DataTables\DataTables;
 use Hash;
@@ -29,9 +30,9 @@ class ProviderController extends Controller
         $filter = [
             'status' => $request->status,
         ];
-        $pageTitle = __('messages.list_form_title',['form' => __('messages.provider')] );
+        $pageTitle = 'Partners';
         if($request->status === 'pending'){
-            $pageTitle = __('messages.pending_list_form_title',['form' => __('messages.provider')] );
+            $pageTitle = 'Pending Partners';
         }
         if($request->status === 'subscribe'){
             $pageTitle = __('messages.list_form_title',['form' => __('messages.subscribe')] );
@@ -115,6 +116,33 @@ class ProviderController extends Controller
                 : $query->created_at;
                 return $formattedDate;
             })
+            ->addColumn('active_orders', function ($provider) {
+                return Booking::where('provider_id', $provider->id)
+                    ->whereNotIn('sanad_stage', ['completed', 'closed'])
+                    ->where('status', '!=', 'cancelled')->count();
+            })
+            ->addColumn('completed_orders', function ($provider) {
+                return Booking::where('provider_id', $provider->id)
+                    ->whereIn('sanad_stage', ['completed', 'closed'])->count();
+            })
+            ->addColumn('capacity', function ($provider) {
+                return $provider->sanad_daily_capacity ?? '-';
+            })
+            ->addColumn('sla_compliance', function ($provider) {
+                return $provider->sanad_sla_compliance_rate !== null ? $provider->sanad_sla_compliance_rate.'%' : '-';
+            })
+            ->addColumn('partner_score', function ($provider) {
+                return $provider->sanad_quality_score !== null ? $provider->sanad_quality_score : '-';
+            })
+            ->addColumn('acceptance_rate', function ($provider) {
+                return $provider->sanad_acceptance_rate;
+            })
+            ->addColumn('cancellation_rate', function ($provider) {
+                return $provider->sanad_cancellation_rate;
+            })
+            ->addColumn('average_completion', function ($provider) {
+                return $provider->sanad_average_completion_minutes;
+            })
 
             ->filterColumn('providertype_id',function($query,$keyword){
                 $query->whereHas('providertype',function ($q) use($keyword){
@@ -178,15 +206,17 @@ class ProviderController extends Controller
         $id = $request->id;
         $auth_user = authSession();
 
-        $providerdata = User::with('Region')->find($id);
+        $providerdata = User::with(['Region', 'providerDocument'])->find($id);
         $pageTitle = __('messages.update_form_title',['form'=> __('messages.provider')]);
+        $partnerVerificationDocuments = Documents::where('status', 1)->orderBy('name')->get();
+        $selectedVerificationDocumentIds = $providerdata ? $providerdata->providerDocument->pluck('document_id')->all() : $partnerVerificationDocuments->where('is_required', 1)->pluck('id')->all();
 
         if($providerdata == null){
             $pageTitle = __('messages.add_button_form',['form' => __('messages.provider')]);
             $providerdata = new User;
         }
 
-        return view('provider.create', compact('pageTitle' ,'providerdata' ,'auth_user' ));
+        return view('provider.create', compact('pageTitle' ,'providerdata' ,'auth_user', 'partnerVerificationDocuments', 'selectedVerificationDocumentIds' ));
     }
 
     /**
@@ -261,6 +291,12 @@ class ProviderController extends Controller
                     'region_id' => $region
                 ]);
             }
+        }
+        foreach ($request->partner_verification_document_ids ?: [] as $documentId) {
+            ProviderDocument::withTrashed()->updateOrCreate(
+                ['provider_id' => $user->id, 'document_id' => $documentId],
+                ['is_verified' => 0, 'deleted_at' => null]
+            );
         }
         if($request->is('api/*')) {
             return comman_message_response($message);

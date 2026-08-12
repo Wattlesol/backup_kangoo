@@ -1,0 +1,9 @@
+<x-master-layout>
+@include('customer-portal.partials.styles')
+<div class="container-fluid sanad-page">
+    <div class="sanad-header"><div><h1 class="sanad-title">Billing</h1><div class="sanad-muted">Invoices, payments, refunds, VAT, and financial history.</div></div></div>
+    <div class="sanad-grid mb-3"><div class="sanad-card"><div class="sanad-card-body"><span class="sanad-muted">Paid</span><div class="sanad-kpi">{{ getPriceFormat($payments->where('payment_status','paid')->sum('total_amount')) }}</div></div></div><div class="sanad-card"><div class="sanad-card-body"><span class="sanad-muted">Pending</span><div class="sanad-kpi">{{ getPriceFormat($payments->where('payment_status','pending')->sum('total_amount')) }}</div></div></div><div class="sanad-card"><div class="sanad-card-body"><span class="sanad-muted">Refunds</span><div class="sanad-kpi">{{ getPriceFormat($payments->where('payment_status','refunded')->sum('total_amount')) }}</div></div></div></div>
+    <div class="sanad-card"><div class="sanad-card-body table-responsive"><table class="sanad-table"><thead><tr><th>Request</th><th>Service</th><th>Invoice</th><th>VAT</th><th>Total</th><th>Status</th></tr></thead><tbody>@forelse($requests as $request)<tr><td>{{ $request->sanad_reference ?? '#'.$request->id }}</td><td>{{ optional($request->service)->name_en ?? optional($request->service)->name }}</td><td>@if($request->payment)<a href="{{ route('invoice_pdf', $request->id) }}">Download</a>@else - @endif</td><td>{{ getPriceFormat($request->final_total_tax ?? 0) }}</td><td>{{ getPriceFormat(optional($request->payment)->total_amount ?? $request->total_amount ?? 0) }}</td><td><span class="sanad-badge">{{ optional($request->payment)->payment_status ?? 'pending' }}</span></td></tr>@empty<tr><td colspan="6">No billing records.</td></tr>@endforelse</tbody></table></div></div>
+    <div class="mt-3">{{ $requests->links() }}</div>
+</div>
+</x-master-layout>

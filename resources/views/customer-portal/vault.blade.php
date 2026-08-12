@@ -1,0 +1,8 @@
+<x-master-layout>
+@include('customer-portal.partials.styles')
+<div class="container-fluid sanad-page">
+    <div class="sanad-header"><div><h1 class="sanad-title">Document Vault</h1><div class="sanad-muted">Personal documents can be reused in future requests.</div></div></div>
+    <div class="sanad-card mb-3"><div class="sanad-card-body"><form method="post" action="{{ route('customer-portal.vault.store') }}" enctype="multipart/form-data">@csrf<div class="row"><div class="col-md-5"><input class="sanad-form-control" name="document_type" placeholder="Document type, e.g. National ID" required></div><div class="col-md-5"><input class="sanad-form-control" type="file" name="file" required></div><div class="col-md-2"><button class="sanad-btn w-100">Upload</button></div></div></form></div></div>
+    <div class="sanad-card"><div class="sanad-card-body table-responsive"><table class="sanad-table"><thead><tr><th>Document</th><th>Status</th><th>Uploaded File</th><th>Actions</th></tr></thead><tbody>@forelse($documents as $document)<tr><td>{{ $document->document_type }}</td><td><span class="sanad-badge ok">{{ Str::headline($document->verification_status) }}</span></td><td>{{ $document->file_name }} @if($document->getFirstMediaUrl('sanad_document'))<br><a href="{{ $document->getFirstMediaUrl('sanad_document') }}" target="_blank">Preview / Download</a>@endif</td><td><form method="post" action="{{ route('customer-portal.vault.delete', $document->id) }}">@csrf<button class="sanad-btn ghost" type="submit">Delete</button></form></td></tr>@empty<tr><td colspan="4">No vault documents.</td></tr>@endforelse</tbody></table></div></div>
+</div>
+</x-master-layout>

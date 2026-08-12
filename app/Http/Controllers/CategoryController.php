@@ -22,6 +22,11 @@ use App\Models\NotificationTemplate;
 
 class CategoryController extends Controller
 {
+    private function ensureSanadCatalogAdmin(): void
+    {
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -59,11 +64,17 @@ class CategoryController extends Controller
 
             ->editColumn('name', function($query){                
                 if (auth()->user()->can('category edit')) {
-                    $link = '<a class="btn-link btn-link-hover" href='.route('category.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                    $link = '<a class="btn-link btn-link-hover" href='.route('category.create', ['id' => $query->id]).'>'.($query->name_en ?: $query->name).'</a>';
                 } else {
-                    $link = $query->name; 
+                    $link = $query->name_en ?: $query->name;
                 }
                 return $link;
+            })
+            ->editColumn('name_ar', function($query){
+                return $query->name_ar ?: '-';
+            })
+            ->editColumn('display_order', function($query){
+                return $query->display_order ?? 0;
             })
            
             ->addColumn('action', function ($data) {
@@ -170,10 +181,13 @@ class CategoryController extends Controller
      */
     public function store(CategoryRequest $request)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $data['name'] = $request->name_en;
+        $data['display_order'] = $request->display_order ?? 0;
        
         $data['is_featured'] = 0;
         if($request->has('is_featured')){
@@ -189,6 +203,7 @@ class CategoryController extends Controller
         $result = Category::updateOrCreate(['id' => $data['id'] ],$data);
 
         storeMediaFile($result,$request->category_image, 'category_image');
+        storeMediaFile($result,$request->category_icon, 'category_icon');
 
         $message = trans('messages.update_form',['form' => trans('messages.category')]);
         if($result->wasRecentlyCreated){
@@ -219,7 +234,7 @@ class CategoryController extends Controller
      */
     public function edit($id)
     {
-        //
+        return redirect()->route('category.create', ['id' => $id]);
     }
 
     /**
@@ -231,7 +246,9 @@ class CategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->ensureSanadCatalogAdmin();
+        $request->merge(['id' => $id]);
+        return $this->store(app(CategoryRequest::class));
     }
 
     /**
@@ -242,6 +259,7 @@ class CategoryController extends Controller
      */
     public function destroy($id)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }

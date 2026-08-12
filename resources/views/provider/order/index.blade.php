@@ -3,102 +3,100 @@
         <div class="row">
             <div class="col-lg-12">
                 <div class="card card-block card-stretch">
-                    <div class="card-body p-0">
-                        <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? __('messages.my_orders') }}</h5>
-                            <div class="alert alert-info alert-sm mb-0">
-                                <i class="fas fa-info-circle"></i> {{ __('messages.orders_containing_your_products') }}
-                            </div>
+                    <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div>
+                            <h5 class="font-weight-bold mb-1">{{ $pageTitle }}</h5>
+                            <span class="text-muted">Only orders assigned by Sanad are visible here.</span>
                         </div>
+                        <a href="{{ route('provider.kanban.index') }}" class="btn btn-sm btn-primary"><i class="fas fa-columns"></i> Operations Board</a>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="row justify-content-between mb-3">
-                <div class="col-md-6">
-                    <div class="d-flex gap-3 align-items-center">
-                        <div class="form-group mb-0">
-                            <select class="form-control select2" id="column_status">
-                                <option value="">{{ __('messages.all') }} {{ __('messages.status') }}</option>
-                                <option value="pending" {{ $filter['status'] == 'pending' ? 'selected' : '' }}>{{ __('messages.pending') }}</option>
-                                <option value="confirmed" {{ $filter['status'] == 'confirmed' ? 'selected' : '' }}>{{ __('messages.confirmed') }}</option>
-                                <option value="processing" {{ $filter['status'] == 'processing' ? 'selected' : '' }}>{{ __('messages.processing') }}</option>
-                                <option value="shipped" {{ $filter['status'] == 'shipped' ? 'selected' : '' }}>{{ __('messages.shipped') }}</option>
-                                <option value="delivered" {{ $filter['status'] == 'delivered' ? 'selected' : '' }}>{{ __('messages.delivered') }}</option>
-                                <option value="cancelled" {{ $filter['status'] == 'cancelled' ? 'selected' : '' }}>{{ __('messages.cancelled') }}</option>
-                            </select>
-                        </div>
-                        <div class="form-group mb-0">
-                            <select class="form-control select2" id="column_payment_status">
-                                <option value="">{{ __('messages.all') }} {{ __('messages.payment_status') }}</option>
-                                <option value="pending" {{ $filter['payment_status'] == 'pending' ? 'selected' : '' }}>{{ __('messages.pending') }}</option>
-                                <option value="paid" {{ $filter['payment_status'] == 'paid' ? 'selected' : '' }}>{{ __('messages.paid') }}</option>
-                                <option value="failed" {{ $filter['payment_status'] == 'failed' ? 'selected' : '' }}>{{ __('messages.failed') }}</option>
-                                <option value="refunded" {{ $filter['payment_status'] == 'refunded' ? 'selected' : '' }}>{{ __('messages.refunded') }}</option>
-                            </select>
-                        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <select class="form-control select2" id="column_stage">
+                            <option value="">All stages</option>
+                            @foreach(config('sanad.request_lifecycle', []) as $stage)
+                                <option value="{{ $stage }}" {{ $filter['sanad_stage'] === $stage ? 'selected' : '' }}>{{ Str::headline($stage) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-control select2" id="column_priority">
+                            <option value="">All priorities</option>
+                            @foreach(['low','normal','high','urgent'] as $priority)
+                                <option value="{{ $priority }}" {{ $filter['sanad_priority'] === $priority ? 'selected' : '' }}>{{ ucfirst($priority) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-control select2" id="column_sla">
+                            <option value="">All SLA states</option>
+                            <option value="overdue" {{ $filter['sla_state'] === 'overdue' ? 'selected' : '' }}>Overdue</option>
+                        </select>
                     </div>
                 </div>
-            </div>
 
-            <div class="table-responsive">
-                <table id="datatable" class="table table-striped" data-toggle="data-table">
-                    <thead>
-                        <tr>
-                            <th>{{ __('messages.order_number') }}</th>
-                            <th>{{ __('messages.customer') }}</th>
-                            <th>{{ __('messages.your_items') }}</th>
-                            <th>{{ __('messages.your_total') }}</th>
-                            <th>{{ __('messages.order_total') }}</th>
-                            <th>{{ __('messages.status') }}</th>
-                            <th>{{ __('messages.payment_status') }}</th>
-                            <th>{{ __('messages.created_at') }}</th>
-                            <th>{{ __('messages.action') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
+                <div class="table-responsive">
+                    <table id="datatable" class="table table-striped" data-toggle="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Order</th>
+                                <th>Customer</th>
+                                <th>Service</th>
+                                <th>Priority</th>
+                                <th>Stage</th>
+                                <th>Assigned Employees</th>
+                                <th>SLA</th>
+                                <th>Updated</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
 @section('bottom_script')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        window.renderedDataTable = $('#datatable').DataTable({
-            processing: true,
-            serverSide: true,
-            ajax: {
-                url: "{{ route('provider.order.index_data') }}",
-                data: function(d) {
-                    d.filter = {
-                        status: $('#column_status').val(),
-                        payment_status: $('#column_payment_status').val()
-                    };
-                }
-            },
-            columns: [
-                {data: 'order_number', name: 'order_number'},
-                {data: 'customer', name: 'customer'},
-                {data: 'provider_items', name: 'provider_items', orderable: false},
-                {data: 'provider_total', name: 'provider_total', orderable: false},
-                {data: 'total_amount', name: 'total_amount'},
-                {data: 'status', name: 'status'},
-                {data: 'payment_status', name: 'payment_status'},
-                {data: 'created_at', name: 'created_at'},
-                {data: 'action', name: 'action', orderable: false, searchable: false}
-            ]
-        });
-
-        $('#column_status, #column_payment_status').on('change', function() {
-            window.renderedDataTable.ajax.reload();
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    window.renderedDataTable = $('#datatable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: "{{ route('provider.order.index_data') }}",
+            data: function(d) {
+                d.filter = {
+                    sanad_stage: $('#column_stage').val(),
+                    sanad_priority: $('#column_priority').val(),
+                    sla_state: $('#column_sla').val()
+                };
+            }
+        },
+        columns: [
+            {data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false},
+            {data: 'sanad_reference', name: 'sanad_reference'},
+            {data: 'customer', name: 'customer', orderable: false},
+            {data: 'service', name: 'service', orderable: false},
+            {data: 'sanad_priority', name: 'sanad_priority'},
+            {data: 'sanad_stage', name: 'sanad_stage'},
+            {data: 'assigned_employees', name: 'assigned_employees', orderable: false},
+            {data: 'sla', name: 'sla_due_at'},
+            {data: 'updated_at', name: 'updated_at'},
+            {data: 'action', name: 'action', orderable: false, searchable: false}
+        ]
     });
+
+    $('#column_stage, #column_priority, #column_sla').on('change', function() {
+        window.renderedDataTable.ajax.reload();
+    });
+});
 </script>
 @endsection
 </x-master-layout>

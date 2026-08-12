@@ -66,8 +66,8 @@
       @if(!empty($data->duration))
       @php
          $durationParts = explode(':', $data->duration);
-         $hours = intval($durationParts[0]);
-         $minutes = intval($durationParts[1]);
+         $hours = intval($durationParts[0] ?? 0);
+         $minutes = intval($durationParts[1] ?? 0);
       @endphp
       <li class="d-inline-block fw-500 position-relative service-price">
          <!-- ({{ $data->duration }} min) -->

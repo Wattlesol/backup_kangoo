@@ -389,7 +389,7 @@
                             <strong>Sanad document policy:</strong>
                             documents default to a 48-hour retention window when no date is selected. Customers must download required files before the retention date; Download before deletion guidance stays visible for every retained document.
                         </div>
-                        <form method="POST" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="mb-4">
+                        <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="mb-4">
                             @csrf
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -401,8 +401,8 @@
                                     <input type="text" name="file_name" class="form-control" placeholder="document.pdf">
                                 </div>
                                 <div class="col-md-8 mb-3">
-                                    <label class="form-control-label">File Path / URL</label>
-                                    <input type="text" name="file_path" class="form-control" placeholder="/storage/documents/document.pdf">
+                                    <label class="form-control-label">Upload File</label>
+                                    <input type="file" name="document" class="form-control" accept="image/*,.pdf,.doc,.docx">
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-control-label">Retention Until</label>
@@ -446,6 +446,14 @@
                                 <div class="sanad-empty-state">No documents yet</div>
                             @endforelse
                         </div>
+                        <hr>
+                        <h6>Structured Document Requests</h6>
+                        @forelse($bookingdata->sanadDocumentRequests()->latest()->get() as $documentRequest)
+                            <div class="border rounded p-2 mb-2"><strong>{{ $documentRequest->document_name }}</strong> <span class="badge badge-light">{{ Str::headline($documentRequest->status) }}</span><div class="small">Requested from {{ Str::headline($documentRequest->requested_from) }}: {{ $documentRequest->reason }}</div>@if($documentRequest->document)<a href="{{ $documentRequest->document->getFirstMediaUrl('document') }}" target="_blank">Open submission</a>@endif</div>
+                        @empty <div class="text-muted small">No structured document requests.</div> @endforelse
+                        @if(auth()->user()->hasAnyRole(['admin','demo_admin','employee','provider']))
+                            <form method="POST" action="{{ route('sanad.requests.document-requests.store', $bookingdata->id) }}" class="mt-3">@csrf<div class="form-row"><div class="col-md-3"><input name="document_name" class="form-control" placeholder="Document name" required></div><div class="col-md-2"><select name="requested_from" class="form-control"><option value="customer">Customer</option><option value="partner">Partner</option></select></div><div class="col-md-3"><input name="reason" class="form-control" placeholder="Reason" required></div><div class="col-md-2"><input name="due_at" type="date" class="form-control"></div><div class="col-md-2"><button class="btn btn-outline-primary">Request document</button></div></div></form>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -533,16 +541,12 @@
                             @endforelse
                         </div>
 
-                        <form method="POST" action="{{ route('sanad.requests.chat.store', $bookingdata->id) }}">
+                        <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.chat.store', $bookingdata->id) }}">
                             @csrf
+                            <select name="thread_type" class="form-control mb-2"><option value="shared">Shared with customer and Partner</option>@if(auth()->user()->hasAnyRole(['admin','demo_admin','employee']))<option value="internal">Internal Sanad team</option>@endif</select>
                             <label class="form-control-label">Message</label>
                             <textarea name="message" class="form-control mb-3" rows="3" required></textarea>
-                            <label class="form-control-label">Visible to:</label>
-                            <div class="sanad-checkbox-row mb-3">
-                                @foreach(config('sanad.document_visibility', []) as $role)
-                                    <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" checked> {{ $sanadRoleLabel($role) }}</label>
-                                @endforeach
-                            </div>
+                            <input type="file" name="attachment" class="form-control mb-3" accept="image/*,.pdf,.doc,.docx">
                             <button type="submit" class="btn btn-primary">Send Message</button>
                         </form>
                     </div>

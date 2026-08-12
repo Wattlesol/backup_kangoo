@@ -18,7 +18,7 @@ $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
                                                 <h4 class="mb-2 booking-text  font-weight-bold">{{ !empty($data['dashboard']['count_total_booking']) ? $data['dashboard']['count_total_booking']: 0 }} </h4>
                                                 <!-- <h4 class="mb-2 booking-text  font-weight-bold text-break"> 000000000000 </h4> -->
                                             </div>
-                                            <p class="mb-0 booking-text">{{ __('messages.total_name', ['name' => __('messages.bookings')]) }}</p>
+                                                <p class="mb-0 booking-text">Total Orders</p>
                                         </div>
                                         <div class="col-auto d-flex align-items-center flex-column">
                                             <div class="iq-card-icon iq-card-icon-booking icon-shape  rounded-circle shadow">
@@ -39,9 +39,9 @@ $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
                                     <div class="row">
                                         <div class="col">
                                             <div class="d-flex flex-wrap justify-content-start align-items-center">
-                                                <h4 class="mb-2 booking-text font-weight-bold">{{ !empty($data['dashboard']['count_total_service']) ? $data['dashboard']['count_total_service'] : 0 }}</h4>
+                                                <h4 class="mb-2 booking-text font-weight-bold">{{ !empty($data['dashboard']['count_active_service']) ? $data['dashboard']['count_active_service'] : 0 }}</h4>
                                             </div>
-                                            <p class="mb-0 booking-text">{{ __('messages.total_name', ['name' => __('messages.services')]) }}</p>
+                                            <p class="mb-0 booking-text">{{ __('messages.active_services') }}</p>
                                         </div>
                                         <div class="col-auto d-flex flex-column">
                                             <div class="iq-card-icon iq-card-icon-service icon-shape  text-white rounded-circle shadow">
@@ -65,7 +65,7 @@ $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
                                                 <h4 class="mb-2 booking-text font-weight-bold">{{ !empty($data['dashboard']['count_total_provider']) ? $data['dashboard']['count_total_provider'] : 0 }}</h4>
                                                 <p class="mb-0 ml-3 text-danger font-weight-bold"></p>
                                             </div>
-                                            <p class="mb-0 booking-text">{{ __('messages.total_name', ['name' => __('messages.providers')]) }}</p>
+                                            <p class="mb-0 booking-text">{{ __('messages.active_partners') }}</p>
                                         </div>
                                         <div class="col-auto d-flex flex-column">
                                             <div class="iq-card-icon iq-card-icon-provider icon-shape  text-white rounded-circle shadow">
@@ -103,6 +103,23 @@ $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
                             </div>
                         </a>
                     </div>
+                </div>
+            </div>
+            <div class="col-md-12 mb-3">
+                <div class="row">
+                    @foreach([
+                        ['label' => 'Pending Orders', 'key' => 'count_pending_orders'],
+                        ['label' => 'In Progress Orders', 'key' => 'count_in_progress_orders'],
+                        ['label' => 'Completed Orders', 'key' => 'count_completed_orders'],
+                        ['label' => 'Cancelled Orders', 'key' => 'count_cancelled_orders'],
+                    ] as $orderMetric)
+                        <div class="col-md-3 col-6 mb-2">
+                            <div class="card mb-0"><div class="card-body py-3">
+                                <small class="text-muted">{{ $orderMetric['label'] }}</small>
+                                <h4 class="mb-0">{{ $data['dashboard'][$orderMetric['key']] ?? 0 }}</h4>
+                            </div></div>
+                        </div>
+                    @endforeach
                 </div>
             </div>
             <div class="col-md-12">

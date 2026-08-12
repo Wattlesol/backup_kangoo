@@ -10,7 +10,10 @@
                 <h4 class="font-weight-bold mb-1">Partner Overview</h4>
                 <span class="text-muted">Assigned work, employee capacity, services, and payment visibility</span>
             </div>
-            <a href="{{ route('sanad.requests.index') }}" class="btn-link btn-link-hover"><u>{{ __('messages.view_all') }}</u></a>
+            <div class="d-flex align-items-center gap-3">
+                <a href="{{ route('sanad.partner-performance') }}" class="btn-link btn-link-hover"><u>Partner performance</u></a>
+                <a href="{{ route('sanad.requests.index') }}" class="btn-link btn-link-hover"><u>{{ __('messages.view_all') }}</u></a>
+            </div>
         </div>
         <div class="card-body">
             <div class="row">

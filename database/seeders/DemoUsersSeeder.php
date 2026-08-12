@@ -97,21 +97,23 @@ class DemoUsersSeeder extends Seeder
             $existingUser = User::where('email', $userData['email'])->first();
             
             if (!$existingUser) {
-                // Create the user
                 $user = User::create($userData);
-                
-                // Assign role based on user_type
-                $roleName = $userData['user_type'];
-                
-                // Check if role exists, if not create it
-                $role = Role::firstOrCreate(['name' => $roleName]);
-                
-                // Assign role to user
-                $user->assignRole($role);
-                
                 $this->command->info("Created demo user: {$userData['email']} ({$userData['user_type']})");
             } else {
+                $user = $existingUser;
                 $this->command->info("Demo user already exists: {$userData['email']}");
+            }
+
+            // The demo admin is a deliberate full-access QA account. Repair its
+            // role and permissions even when the account already exists.
+            if ($userData['email'] === 'demo@admin.com') {
+                $user->forceFill(['user_type' => 'demo_admin', 'status' => 1])->save();
+                $role = Role::firstOrCreate(['name' => 'demo_admin', 'guard_name' => 'web']);
+                $role->syncPermissions(\Spatie\Permission\Models\Permission::all());
+                $user->syncRoles([$role]);
+            } else {
+                $role = Role::firstOrCreate(['name' => $userData['user_type'], 'guard_name' => 'web']);
+                $user->syncRoles([$role]);
             }
         }
         

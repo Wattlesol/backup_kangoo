@@ -18,9 +18,15 @@ class ServiceResource extends JsonResource
         $image = getSingleMedia($this,'service_attachment', null);
         $file_extention = config('constant.IMAGE_EXTENTIONS');
         $extention = in_array(strtolower(imageExtention($image)),$file_extention);
+        $serviceInstructions = json_decode($this->service_instructions, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($serviceInstructions)) {
+            $serviceInstructions = $this->service_instructions;
+        }
         return [
             'id'            => $this->id,
             'name'          => $this->name,
+            'name_ar'       => $this->name_ar,
+            'name_en'       => $this->name_en ?: $this->name,
             'category_id'   => $this->category_id,
             'subcategory_id'=> $this->subcategory_id,
             'provider_id'   => $this->provider_id,
@@ -31,6 +37,13 @@ class ServiceResource extends JsonResource
             'duration'      => $this->duration,
             'status'        => $this->status,
             'description'   => $this->description,
+            'government_entity' => $this->government_entity,
+            'required_documents' => $this->required_documents,
+            'estimated_completion_time' => $this->estimated_completion_time,
+            'government_fee' => $this->government_fee,
+            'service_fee' => $this->service_fee,
+            'service_instructions' => $serviceInstructions,
+            'terms_and_conditions' => $this->terms_and_conditions,
             'is_featured'   => $this->is_featured,
             'provider_name' => optional($this->providers)->display_name,
             'provider_image' => optional($this->providers)->login_type != null ?  optional($this->providers)->social_image : getSingleMedia(optional($this->providers), 'profile_image',null),

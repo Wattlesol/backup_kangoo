@@ -11,10 +11,12 @@ use App\Models\SanadBuzzAlert;
 use App\Models\SanadChatMessage;
 use App\Models\SanadChatThread;
 use App\Models\SanadDocumentVaultItem;
+use App\Models\SanadDocumentRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Services\SanadAiRagService;
 
 class SanadController extends Controller
 {
@@ -65,6 +67,47 @@ class SanadController extends Controller
             ],
             'data' => $requests->items(),
         ]);
+    }
+
+    public function communication(Request $request, $id)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        $threads = SanadChatThread::where('booking_id', $booking->id)
+            ->where(function ($q) { $q->where('thread_type', 'shared')->orWhere('created_by', auth()->id()); })
+            ->with(['messages' => fn ($q) => $q->latest()->take(50)])->get();
+        return comman_custom_response(['data' => ['threads' => $threads, 'document_requests' => $booking->sanadDocumentRequests()->with('document')->latest()->get()]]);
+    }
+
+    public function sendCommunication(Request $request, $id)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        $request->validate(['message' => 'required|string|max:2000', 'thread_type' => 'nullable|in:shared,internal']);
+        $type = $request->thread_type ?: 'shared';
+        if ($type === 'internal' && !auth()->user()->hasAnyRole(['admin','demo_admin','employee'])) abort(403);
+        $thread = SanadChatThread::firstOrCreate(['booking_id' => $booking->id, 'thread_type' => $type], ['participant_roles' => $type === 'internal' ? ['admin','demo_admin','employee'] : ['admin','demo_admin','employee','provider','user'], 'created_by' => auth()->id()]);
+        $message = SanadChatMessage::create(['thread_id' => $thread->id, 'sender_id' => auth()->id(), 'sender_role' => auth()->user()->user_type, 'message' => $request->message, 'visible_to' => $thread->participant_roles, 'message_type' => 'text']);
+        $thread->update(['last_message_at' => now()]);
+        return comman_custom_response(['data' => $message]);
+    }
+
+    public function markCommunicationRead(Request $request, $id, $threadId)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        $thread = SanadChatThread::where('booking_id', $booking->id)->findOrFail($threadId);
+        abort_unless($thread->thread_type === 'shared' || auth()->user()->hasAnyRole(['admin','demo_admin','employee']), 403);
+        $thread->messages()->whereNull('read_at')->where('sender_id', '!=', auth()->id())->update(['read_at' => now()]);
+        return comman_custom_response(['message' => 'Conversation marked as read.']);
+    }
+
+    public function createDocumentRequest(Request $request, $id)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        if (!auth()->user()->hasAnyRole(['admin','demo_admin','employee','provider'])) abort(403);
+        $request->validate(['document_name'=>'required|string|max:255','requested_from'=>'required|in:customer,partner','reason'=>'required|string|max:2000','instructions'=>'nullable|string|max:4000','due_at'=>'nullable|date']);
+        if (auth()->user()->hasRole('provider') && (int)$booking->provider_id !== auth()->id()) abort(403);
+        $target = $request->requested_from === 'customer' ? $booking->customer_id : $booking->provider_id;
+        $item = SanadDocumentRequest::create(['booking_id'=>$booking->id,'service_id'=>$booking->service_id,'document_key'=>$request->document_key,'document_name'=>$request->document_name,'requested_from'=>$request->requested_from,'requested_from_user_id'=>$target,'requested_by'=>auth()->id(),'reason'=>$request->reason,'instructions'=>$request->instructions,'required'=>$request->boolean('required',true),'due_at'=>$request->due_at]);
+        return comman_custom_response(['data'=>$item]);
     }
 
     public function updateRequestLifecycle(Request $request, $id)
@@ -217,6 +260,7 @@ class SanadController extends Controller
             'document_type' => 'required|string|max:255',
             'booking_id' => 'nullable|integer',
             'owner_id' => 'nullable|integer',
+            'provider_id' => 'nullable|exists:users,id',
             'visible_to' => 'nullable|array',
             'visible_to.*' => 'string',
             'file_name' => 'nullable|string|max:255',
@@ -229,9 +273,17 @@ class SanadController extends Controller
             $booking = Booking::myBooking()->findOrFail($request->booking_id);
         }
 
+        $user = auth()->user();
+        $ownerId = optional($booking)->customer_id ?: optional($user)->id;
+        if ($user && $user->hasRole('provider')) {
+            $ownerId = $user->id;
+            if ($request->filled('provider_id') && (int) $request->provider_id !== $user->id) abort(403);
+        }
         $item = SanadDocumentVaultItem::create([
             'booking_id' => $request->booking_id,
-            'owner_id' => $request->owner_id ?: optional($booking)->customer_id ?: optional(auth()->user())->id,
+            'service_id' => optional($booking)->service_id,
+            'provider_id' => $request->provider_id ?: optional($booking)->provider_id,
+            'owner_id' => $ownerId,
             'uploaded_by' => optional(auth()->user())->id,
             'document_type' => $request->document_type,
             'visible_to' => $request->visible_to ?: ['admin'],
@@ -321,25 +373,32 @@ class SanadController extends Controller
         return comman_custom_response(['data' => $message->load('thread')]);
     }
 
-    public function aiAsk(Request $request)
+    public function aiAsk(Request $request, SanadAiRagService $rag)
     {
         $request->validate([
             'question' => 'required|string',
             'booking_id' => 'nullable|integer',
         ]);
 
-        $answer = $this->answerFromKnowledgeBase($request->question);
-        $confidence = $answer ? 0.75 : 0.25;
-        $requiresEscalation = $confidence < (float) config('sanad.ai.requires_escalation_when_confidence_below');
+        $booking = $request->booking_id ? Booking::myBooking()->find($request->booking_id) : null;
+        $answer = $rag->answer($request->question, $booking, optional(auth()->user())->user_type ?: 'user');
+        $confidence = $answer['confidence'];
+        $requiresEscalation = $answer['requires_escalation'];
 
         $interaction = SanadAiInteraction::create([
             'user_id' => optional(auth()->user())->id,
             'booking_id' => $request->booking_id,
             'question' => $request->question,
-            'answer' => $answer ?: 'Your question has been sent to the Sanad support team for review.',
+            'answer' => $answer['answer'],
             'confidence' => $confidence,
             'requires_escalation' => $requiresEscalation,
             'status' => $requiresEscalation ? 'escalated' : 'answered',
+            'metadata' => [
+                'sources' => $answer['sources'],
+                'live_context' => $answer['live_context'],
+                'provider' => $answer['provider_metadata'] ?? [],
+                'langsmith_run_id' => $answer['langsmith_run_id'] ?? null,
+            ],
         ]);
 
         $this->audit($request, 'sanad.ai.asked', $interaction);
@@ -347,7 +406,7 @@ class SanadController extends Controller
         return comman_custom_response(['data' => $interaction]);
     }
 
-    public function storeAiKnowledge(Request $request)
+    public function storeAiKnowledge(Request $request, SanadAiRagService $rag)
     {
         if (!auth()->user()->hasRole('admin') && !auth()->user()->hasRole('demo_admin')) {
             return comman_custom_response(['message' => 'Only admins can manage Sanad AI knowledge.'], 403);
@@ -369,6 +428,8 @@ class SanadController extends Controller
             'is_active' => $request->has('is_active') ? $request->is_active : true,
             'created_by' => optional(auth()->user())->id,
         ]);
+
+        $rag->indexKnowledgeItem($item);
 
         $this->audit($request, 'sanad.ai.knowledge_created', $item);
 

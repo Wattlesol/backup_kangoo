@@ -24,7 +24,7 @@
                         <div class="row">
                             <div class="col-sm-12 col-lg-12">
                             <ul class="nav flex-column nav-pills nav-fill tabslink" id="tabs-text" role="tablist">
-                                    @if(in_array( $page,['profile_form','password_form','time_slot']))
+                                    @if(in_array( $page,['profile_form','password_form','time_slot','partner_documents']))
                                         <li class="nav-item">
                                             <a href="javascript:void(0)" data-href="{{ route('layout_page') }}?page=profile_form" data-target=".paste_here" class="nav-link {{$page=='profile_form'?'active':''}}"  data-toggle="tabajax" rel="tooltip"> {{ __('messages.profile')}} </a>
                                         </li>
@@ -35,6 +35,9 @@
                                         @role('provider')
                                             <li class="nav-item">
                                                 <a href="javascript:void(0)" data-href="{{ route('layout_page') }}?page=time_slot" data-target=".paste_here" class="nav-link {{$page=='time_slot'?'active':''}}"  data-toggle="tabajax" rel="tooltip"> {{ __('messages.slot') }} </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a href="javascript:void(0)" data-href="{{ route('layout_page') }}?page=partner_documents" data-target=".paste_here" class="nav-link {{$page=='partner_documents'?'active':''}}"  data-toggle="tabajax" rel="tooltip"> Documents </a>
                                             </li>
                                         @endrole
                                     @else

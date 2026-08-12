@@ -39,6 +39,7 @@ use App\Http\Controllers\BankController;
 use App\Http\Controllers\PostJobRequestController;
 use App\Http\Controllers\ServicePackageController;
 use App\Http\Controllers\SanadWebController;
+use App\Http\Controllers\SanadCustomerPortalController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\BookingRatingController;
 use App\Http\Controllers\HandymanRatingController;
@@ -133,20 +134,58 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('sanad/dashboard', [SanadWebController::class, 'dashboard'])->name('sanad.dashboard');
+    Route::get('sanad/partner-performance', [SanadWebController::class, 'partnerPerformance'])->name('sanad.partner-performance');
     Route::get('sanad/ai', [SanadWebController::class, 'aiConsole'])->name('sanad.ai.index');
+    Route::get('sanad/knowledge-base', [SanadWebController::class, 'aiConsole'])->name('sanad.knowledge.index');
+    Route::get('sanad/ai/escalations', [SanadWebController::class, 'aiEscalations'])->name('sanad.ai.escalations.index');
+    Route::post('sanad/ai/escalations/{id}/review', [SanadWebController::class, 'reviewAiEscalation'])->name('sanad.ai.escalations.review');
     Route::post('sanad/ai/ask', [SanadWebController::class, 'askAi'])->name('sanad.ai.ask');
     Route::post('sanad/ai/knowledge', [SanadWebController::class, 'storeAiKnowledge'])->name('sanad.ai.knowledge.store');
+    Route::post('sanad/ai/knowledge/{id}', [SanadWebController::class, 'updateAiKnowledge'])->name('sanad.ai.knowledge.update');
     Route::get('sanad/requests', [SanadWebController::class, 'indexRequests'])->name('sanad.requests.index');
+    Route::get('sanad/assignments', [SanadWebController::class, 'assignments'])->name('sanad.assignments.index');
+    Route::post('sanad/assignments/{id}/confirm', [SanadWebController::class, 'confirmAssignment'])->name('sanad.assignments.confirm');
     Route::get('sanad/requests/{id}', [SanadWebController::class, 'showRequest'])->name('sanad.requests.show');
+    Route::get('sanad/request-documents', [SanadWebController::class, 'documentQueue'])->name('sanad.documents.queue');
+    Route::post('sanad/partner-documents/{documentId}/review', [SanadWebController::class, 'reviewPartnerDocument'])->name('sanad.partner-documents.review');
     Route::post('sanad/requests/{id}/actions', [SanadWebController::class, 'storeRequestAction'])->name('sanad.requests.actions.store');
     Route::post('sanad/requests/{id}/employees', [SanadWebController::class, 'assignEmployees'])->name('sanad.requests.employees.assign');
     Route::post('sanad/requests/{id}/lifecycle', [SanadWebController::class, 'updateRequestLifecycle'])->name('sanad.requests.lifecycle.update');
     Route::post('sanad/requests/{id}/payment-status', [SanadWebController::class, 'updatePaymentStatus'])->name('sanad.requests.payment.update');
     Route::post('sanad/requests/{id}/documents', [SanadWebController::class, 'storeDocument'])->name('sanad.requests.documents.store');
     Route::post('sanad/requests/{id}/documents/{documentId}/approve', [SanadWebController::class, 'approveDocument'])->name('sanad.requests.documents.approve');
+    Route::post('sanad/requests/{id}/documents/{documentId}/review', [SanadWebController::class, 'reviewDocument'])->name('sanad.requests.documents.review');
     Route::post('sanad/requests/{id}/buzz', [SanadWebController::class, 'storeBuzz'])->name('sanad.requests.buzz.store');
     Route::post('sanad/requests/{id}/buzz/{alertId}/acknowledge', [SanadWebController::class, 'acknowledgeBuzz'])->name('sanad.requests.buzz.acknowledge');
     Route::post('sanad/requests/{id}/chat-messages', [SanadWebController::class, 'storeChatMessage'])->name('sanad.requests.chat.store');
+    Route::post('sanad/requests/{id}/chat-threads/{threadId}/read', [SanadWebController::class, 'markChatRead'])->name('sanad.requests.chat.read');
+    Route::post('sanad/requests/{id}/document-requests', [SanadWebController::class, 'createDocumentRequest'])->name('sanad.requests.document-requests.store');
+    Route::post('sanad/requests/{id}/document-requests/{documentRequestId}/upload', [SanadWebController::class, 'uploadDocumentRequest'])->name('sanad.requests.document-requests.upload');
+    Route::post('sanad/requests/{id}/document-requests/{documentRequestId}/review', [SanadWebController::class, 'reviewDocumentRequest'])->name('sanad.requests.document-requests.review');
+
+    Route::prefix('customer-dashboard')->name('customer-portal.')->group(function () {
+        Route::get('/', [SanadCustomerPortalController::class, 'dashboard'])->name('dashboard');
+        Route::get('catalog', [SanadCustomerPortalController::class, 'catalog'])->name('catalog');
+        Route::get('catalog/{service}', [SanadCustomerPortalController::class, 'service'])->name('catalog.show');
+        Route::get('requests/create', [SanadCustomerPortalController::class, 'createRequest'])->name('requests.create');
+        Route::post('requests', [SanadCustomerPortalController::class, 'storeRequest'])->name('requests.store');
+        Route::get('requests', [SanadCustomerPortalController::class, 'requests'])->name('requests.index');
+        Route::get('requests/{id}', [SanadCustomerPortalController::class, 'showRequest'])->name('requests.show');
+        Route::post('requests/{id}/documents', [SanadCustomerPortalController::class, 'uploadRequestDocument'])->name('requests.documents.store');
+        Route::post('requests/{id}/document-requests/{documentRequestId}', [SanadCustomerPortalController::class, 'uploadDocumentRequest'])->name('requests.document-requests.upload');
+        Route::post('requests/{id}/messages', [SanadCustomerPortalController::class, 'sendMessage'])->name('requests.messages.store');
+        Route::get('document-vault', [SanadCustomerPortalController::class, 'vault'])->name('vault');
+        Route::post('document-vault', [SanadCustomerPortalController::class, 'storeVaultDocument'])->name('vault.store');
+        Route::post('document-vault/{id}/delete', [SanadCustomerPortalController::class, 'deleteVaultDocument'])->name('vault.delete');
+        Route::get('messages', [SanadCustomerPortalController::class, 'messages'])->name('messages');
+        Route::get('notifications', [SanadCustomerPortalController::class, 'notifications'])->name('notifications');
+        Route::get('billing', [SanadCustomerPortalController::class, 'billing'])->name('billing');
+        Route::get('support', [SanadCustomerPortalController::class, 'support'])->name('support');
+        Route::post('support', [SanadCustomerPortalController::class, 'storeComplaint'])->name('support.store');
+        Route::get('ai', [SanadCustomerPortalController::class, 'ai'])->name('ai');
+        Route::post('ai', [SanadCustomerPortalController::class, 'askAi'])->name('ai.ask');
+        Route::get('profile', [SanadCustomerPortalController::class, 'profile'])->name('profile');
+    });
 
     Route::group(['namespace' => '', 'middleware' => ['permission:permission list']], function () {
         Route::resource('permission',PermissionController::class);
@@ -326,6 +365,8 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('env-setting', [ SettingController::class , 'envChanges'])->name('envSetting');
     Route::post('update-profile', [ SettingController::class , 'updateProfile'])->name('updateProfile');
     Route::post('change-password', [ SettingController::class , 'changePassword'])->name('changePassword');
+    Route::post('setting/partner-documents/{id}', [ SettingController::class , 'uploadPartnerDocument'])->name('setting.partner-documents.upload');
+    Route::post('setting/partner-documents/{id}/delete', [ SettingController::class , 'deletePartnerDocument'])->name('setting.partner-documents.delete');
 
     //Frontend Setting
 
@@ -701,18 +742,30 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 Route::group(['prefix' => 'provider-dashboard', 'middleware' => ['auth', 'role:provider']], function () {
         Route::get('dashboard', [ProviderOrderController::class, 'dashboard'])->name('provider.dashboard');
 
-        // Product Management - Providers manage their own products
-        Route::group(['middleware' => ['permission:provider_product manage']], function () {
-            Route::resource('product', ProviderProductController::class, ['as' => 'provider']);
-            Route::get('product-index-data', [ProviderProductController::class, 'index_data'])->name('provider.product.index_data');
-        });
-
         // Order Management
         Route::get('orders', [ProviderOrderController::class, 'index'])->name('provider.order.index');
         Route::get('orders-data', [ProviderOrderController::class, 'index_data'])->name('provider.order.index_data');
         Route::get('orders/{id}', [ProviderOrderController::class, 'show'])->name('provider.order.show');
         Route::post('order-update-status', [ProviderOrderController::class, 'updateStatus'])->name('provider.order.update-status');
+        Route::post('orders/{id}/employees', [ProviderOrderController::class, 'assignEmployees'])->name('provider.order.employees.assign');
+        Route::post('orders/{id}/workflow-stages/{stageId}/complete', [ProviderOrderController::class, 'completeWorkflowStage'])->name('provider.order.workflow.complete');
         Route::get('order-statistics', [ProviderOrderController::class, 'statistics'])->name('provider.order.statistics');
+        Route::get('services', [ProviderOrderController::class, 'services'])->name('provider.services.index');
+        Route::post('services', [ProviderOrderController::class, 'updateServices'])->name('provider.services.update');
+        Route::get('workflows', [ProviderOrderController::class, 'workflows'])->name('provider.workflows.index');
+        Route::get('workflows/create', [ProviderOrderController::class, 'workflowForm'])->name('provider.workflows.create');
+        Route::get('workflows/{id}/edit', [ProviderOrderController::class, 'workflowForm'])->name('provider.workflows.edit');
+        Route::post('workflows', [ProviderOrderController::class, 'storeWorkflow'])->name('provider.workflows.store');
+        Route::post('workflows/{id}', [ProviderOrderController::class, 'storeWorkflow'])->name('provider.workflows.update');
+        Route::post('workflows/{id}/delete', [ProviderOrderController::class, 'destroyWorkflow'])->name('provider.workflows.destroy');
+        Route::get('kanban', [ProviderOrderController::class, 'kanban'])->name('provider.kanban.index');
+        Route::post('kanban/{id}/move', [ProviderOrderController::class, 'moveKanban'])->name('provider.kanban.move');
+        Route::get('employees', [ProviderOrderController::class, 'employees'])->name('provider.employees.index');
+        Route::get('performance', [ProviderOrderController::class, 'performance'])->name('provider.performance.index');
+        Route::get('financial-center', [ProviderOrderController::class, 'financial'])->name('provider.financial.index');
+        Route::get('notification-center', [ProviderOrderController::class, 'notifications'])->name('provider.notifications.index');
+        Route::get('profile', [ProviderOrderController::class, 'profile'])->name('provider.profile.index');
+        Route::post('profile/documents/{id}', [ProviderOrderController::class, 'uploadProfileDocument'])->name('provider.profile.documents.upload');
     });
 
 Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list');

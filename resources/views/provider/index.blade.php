@@ -13,7 +13,7 @@
                             <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
                             @if($list_status != 'pending')
                             @if($auth_user->can('provider add'))
-                            <a href="{{ route('provider.create') }}" class="float-right mr-1 btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> {{ __('messages.add_form_title',['form' => __('messages.provider')  ]) }}</a>
+                            <a href="{{ route('provider.create') }}" class="float-right mr-1 btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> Add Partner</a>
                             @endif
                             @endif
                         </div>
@@ -125,13 +125,20 @@
                     {
                       data:'providertype_id',
                       name:'providertype_id',
-                      title:"{{ __('messages.providertype') }}"
+                      title:"Partner Type"
                     },
                     {
                       data:'contact_number',
                       name:'contact_number',
                       title:"{{ __('messages.contact_number') }}"
                     },
+                    { data:'partner_score', name:'sanad_quality_score', title:"Partner Score" },
+                    { data:'active_orders', name:'active_orders', title:"Active Orders" },
+                    { data:'capacity', name:'capacity', title:"Available Capacity" },
+                    { data:'sla_compliance', name:'sla_compliance', title:"SLA Compliance" },
+                    { data:'acceptance_rate', name:'sanad_acceptance_rate', title:"Acceptance Rate", render: function(data){ return data === null || data === '' ? '-' : data + '%'; } },
+                    { data:'cancellation_rate', name:'sanad_cancellation_rate', title:"Cancellation Rate", render: function(data){ return data === null || data === '' ? '-' : data + '%'; } },
+                    { data:'average_completion', name:'sanad_average_completion_minutes', title:"Avg Completion", render: function(data){ return data === null || data === '' ? '-' : data + ' min'; } },
                     {
                         data: 'status',
                         name: 'status',

@@ -23,6 +23,10 @@ use App\Models\BookingPackageMapping;
 
 class ServicePackageController extends Controller
 {
+    private function ensureSanadCatalogAdmin(Request $request): void
+    {
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+    }
     use FileHandler;
     /**
      * Display a listing of the resource.
@@ -100,6 +104,7 @@ class ServicePackageController extends Controller
 
     public function bulk_action(Request $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         $ids = explode(',', $request->rowIds);
 
         $actionType = $request->action_type;
@@ -133,13 +138,15 @@ class ServicePackageController extends Controller
      */
     public function create(Request $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         $id = $request->id;
         $auth_user = authSession();
         $services = [];
         $selectedServiceId = [];
         $services_data = Service::pluck('name','id');
+        $servicePrices = Service::pluck('price', 'id')->map(fn ($price) => (float) $price);
         $servicepackage = ServicePackage::find($id);
-        $pageTitle = trans('messages.update_form_title', ['form' => trans('messages.package')]);
+        $pageTitle = trans('messages.update_form_title', ['form' => trans('messages.service_package')]);
         if($servicepackage !== null){
             $serviceIds = $servicepackage->packageServices->pluck('service_id')->toArray();
             if (is_array($serviceIds)) {
@@ -148,14 +155,14 @@ class ServicePackageController extends Controller
         }
     }
         if ($servicepackage == null) {
-            $pageTitle = trans('messages.add_button_form', ['form' => trans('messages.package')]);
+            $pageTitle = trans('messages.add_button_form', ['form' => trans('messages.service_package')]);
             $servicepackage = new ServicePackage;
         }
         $PriceList = PriceList::pluck('name','id');
         $AllServices = Service::pluck('name','id');
         $AllUser = User::pluck('contact_number','id');
         return view('servicepackage.create', compact('pageTitle', 'servicepackage', 'AllServices','auth_user','services',
-            'selectedServiceId','services_data','PriceList','AllUser'));
+            'selectedServiceId','services_data','servicePrices','PriceList','AllUser'));
     }
 
     /**
@@ -166,20 +173,43 @@ class ServicePackageController extends Controller
      */
     public function store(Request $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'name_ar' => 'required|string|max:255',
+            'service_id' => 'nullable',
+            'service_id_data' => 'required_without:service_id|array|min:1',
+            'status' => 'required',
+            'price' => 'nullable|numeric|min:0',
+        ]);
         $data = $request->all();
-        $provider_id = !empty($request->provider_id) ? $request->provider_id : \Auth::user()->id;
+        $provider_id = admin_id();
+        $serviceIds = $request->service_id;
+        if (empty($serviceIds) && is_array($request->service_id_data)) {
+            $serviceIds = $request->service_id_data;
+        }
+        $serviceIds = is_array($serviceIds) ? $serviceIds : (empty($serviceIds) ? [] : explode(',', $serviceIds));
+        $serviceIds = collect($serviceIds)->filter()->unique()->values()->all();
+        $servicePrices = Service::whereIn('id', $serviceIds)->pluck('price', 'id')->map(fn ($price) => (float) $price);
+        $bundlePrice = $request->filled('price') ? (float) $request->price : (float) $servicePrices->sum();
+
+        if ($bundlePrice <= 0) {
+            return redirect()->back()->withInput()->withErrors('Bundle price is required when selected services do not have prices.');
+        }
+
         $service_package = [
             'name' => $request->name,
+            'name_ar' => $request->name_ar,
             'description' => $request->description,
             'provider_id' => $provider_id,
             'status' => $request->status,
-            'price' => $request->price,
+            'price' => $bundlePrice,
             'start_at' => $request->start_at,
             'end_at' => $request->end_at,
             'category_id' => $request->category_id,
-            'service_id' => $request->service_id,
-            'duration' => $request->duration,
-            'car_number' => $request->car_number,
+            'service_id' => implode(',', $serviceIds),
+            'duration' => $request->duration ?? 0,
+            'car_number' => $request->car_number ?? '',
             'pricelist_id' => $request->pricelist_id,
             'subcategory_id' => $request->subcategory_id,
             'package_type' => $request->package_type,
@@ -199,16 +229,13 @@ class ServicePackageController extends Controller
                 $service_package['is_featured'] = 1;
             }
         }
-        $result = ServicePackage::updateOrCreate(['id' => $data['id']], $service_package);
+        $result = ServicePackage::updateOrCreate(['id' => $data['id'] ?? null], $service_package);
         if ($result->packageServices()->count() > 0) {
             $result->packageServices()->delete();
         }
-        if (!empty($request->service_id)) {
-            $service = $request->service_id;
-            if(!$request->is('api/*')) {
-//                $service = implode(",", $request->service_id);
-            }
-            foreach (explode(',', $service) as $key => $value) {
+        package_service::where('package_id', $result->id)->delete();
+        if (!empty($serviceIds)) {
+            foreach ($serviceIds as $value) {
                 $mapping_array = [
                     'service_package_id' => $result->id,
                     'service_id' => $value
@@ -239,16 +266,16 @@ class ServicePackageController extends Controller
         }
 
 
-        if ($request->service_id_data) {
-            foreach ($request->service_id_data as $key_data=> $values){
+        if (!empty($serviceIds)) {
+            foreach ($serviceIds as $values){
                 package_service::create([
                     'service_id' => $values,
                     'package_id' =>$result->id,
-                    'service_type_data' => $request->service_type_data[$key_data],
-                    'count' => $request->count[$key_data],
-                    'usage_times' => $request->usage_times[$key_data],
-                    'duration_of_use' => $request->duration_of_use[$key_data],
-                    'price' => $request->price_data[$key_data],
+                    'service_type_data' => 'limited',
+                    'count' => 1,
+                    'usage_times' => 1,
+                    'duration_of_use' => null,
+                    'price' => $servicePrices[$values] ?? 0,
                 ]);
             }
         }
@@ -274,7 +301,8 @@ class ServicePackageController extends Controller
      */
     public function edit($id)
     {
-        //
+        $this->ensureSanadCatalogAdmin(request());
+        return redirect()->route('servicepackage.create', ['id' => $id]);
     }
 
     /**
@@ -286,7 +314,9 @@ class ServicePackageController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->ensureSanadCatalogAdmin($request);
+        $request->merge(['id' => $id]);
+        return $this->store($request);
     }
 
     /**
@@ -297,6 +327,7 @@ class ServicePackageController extends Controller
      */
     public function destroy($id)
     {
+        $this->ensureSanadCatalogAdmin(request());
         if (demoUserPermission()) {
             if (request()->is('api/*')) {
                 return comman_message_response(__('messages.demo_permission_denied'));
@@ -318,6 +349,7 @@ class ServicePackageController extends Controller
     }
 
     public function action(Request $request){
+        $this->ensureSanadCatalogAdmin($request);
         $id = $request->id;
         $servicepackage = ServicePackage::where('id',$id)->first();
         $msg = __('messages.not_found_entry',['name' => __('messages.service_package')] );

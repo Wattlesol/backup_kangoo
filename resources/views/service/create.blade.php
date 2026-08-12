@@ -19,16 +19,95 @@
                     <div class="card-body">
                         {{ Form::model($servicedata,['method' => 'POST','route'=>'service.store', 'enctype'=>'multipart/form-data', 'data-toggle'=>"validator" ,'id'=>'service'] ) }}
                         {{ Form::hidden('id') }}
+                        {{ Form::hidden('provider_id', old('provider_id', $servicedata->provider_id ?: admin_id()), ['id' => 'provider_id']) }}
+                        {{ Form::hidden('type', old('type', $servicedata->type ?: 'fixed')) }}
+                        {{ Form::hidden('price', old('price', $servicedata->price ?: $servicedata->service_fee ?: 0), ['id' => 'price']) }}
                         @php
                             $isPartnerServiceEditor = auth()->user()->hasRole('provider') && !empty($servicedata->id);
                             $sanadReadOnly = $isPartnerServiceEditor ? ['readonly' => true] : [];
-                            $requiredDocumentsText = old('required_documents', is_array($servicedata->required_documents) ? implode("\n", $servicedata->required_documents) : $servicedata->required_documents);
                             $requiredSkillsText = old('required_employee_skills', is_array($servicedata->required_employee_skills) ? implode("\n", $servicedata->required_employee_skills) : $servicedata->required_employee_skills);
+                            $storedRequiredDocuments = old('required_documents', $servicedata->required_documents);
+                            if (is_string($storedRequiredDocuments)) {
+                                $decodedRequiredDocuments = json_decode($storedRequiredDocuments, true);
+                                $storedRequiredDocuments = json_last_error() === JSON_ERROR_NONE ? $decodedRequiredDocuments : preg_split('/\r\n|\r|\n/', $storedRequiredDocuments);
+                            }
+                            $requiredDocumentRows = collect($storedRequiredDocuments ?: [])->map(function ($document) {
+                                if (is_string($document)) {
+                                    $name = trim($document);
+                                    return [
+                                        'key' => \Illuminate\Support\Str::slug($name, '_'),
+                                        'name' => $name,
+                                        'required' => true,
+                                        'approval_required' => true,
+                                        'mime_types' => '',
+                                        'max_size_mb' => 10,
+                                    ];
+                                }
+                                $mimeTypes = $document['mime_types'] ?? '';
+                                if (is_array($mimeTypes)) {
+                                    $mimeTypes = implode(', ', $mimeTypes);
+                                }
+                                return [
+                                    'key' => $document['key'] ?? \Illuminate\Support\Str::slug($document['name'] ?? '', '_'),
+                                    'name' => $document['name'] ?? '',
+                                    'required' => filter_var($document['required'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                                    'approval_required' => filter_var($document['approval_required'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                                    'mime_types' => $mimeTypes,
+                                    'max_size_mb' => $document['max_size_mb'] ?? 10,
+                                ];
+                            })->filter(function ($document) {
+                                return trim($document['name'] ?? '') !== '';
+                            })->values()->all();
+                            if (empty($requiredDocumentRows)) {
+                                $requiredDocumentRows = [[
+                                    'key' => '',
+                                    'name' => '',
+                                    'required' => true,
+                                    'approval_required' => true,
+                                    'mime_types' => 'image/jpeg, image/png, application/pdf',
+                                    'max_size_mb' => 10,
+                                ]];
+                            }
+                            $storedInstructionSteps = old('service_instructions', $servicedata->service_instructions);
+                            if (is_string($storedInstructionSteps)) {
+                                $decodedInstructionSteps = json_decode($storedInstructionSteps, true);
+                                if (json_last_error() === JSON_ERROR_NONE && is_array($decodedInstructionSteps)) {
+                                    $storedInstructionSteps = $decodedInstructionSteps;
+                                } else {
+                                    $storedInstructionSteps = preg_split('/\r\n|\r|\n/', $storedInstructionSteps);
+                                }
+                            }
+                            $serviceInstructionRows = collect($storedInstructionSteps ?: [])->map(function ($step, $index) {
+                                if (is_string($step)) {
+                                    return [
+                                        'title' => 'Step '.($index + 1),
+                                        'instruction' => trim($step),
+                                    ];
+                                }
+                                return [
+                                    'title' => $step['title'] ?? 'Step '.($index + 1),
+                                    'instruction' => $step['instruction'] ?? $step['description'] ?? '',
+                                ];
+                            })->filter(function ($step) {
+                                return trim($step['title'] ?? '') !== '' || trim($step['instruction'] ?? '') !== '';
+                            })->values()->all();
+                            if (empty($serviceInstructionRows)) {
+                                $serviceInstructionRows = [[
+                                    'title' => 'Step 1',
+                                    'instruction' => '',
+                                ]];
+                            }
                         @endphp
                         <div class="row">
                             <div class="form-group col-md-4">
-                                {{ Form::label('name', __('messages.name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name', old('name'), array_merge(['placeholder' => __('messages.name'), 'class' => 'form-control', 'title' => 'Please enter alphabetic characters and spaces only'], $sanadReadOnly)) }}
+                                {{ Form::label('name_en', 'English Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_en', old('name_en', $servicedata->name_en ?: $servicedata->name), array_merge(['placeholder' => 'Service name in English', 'class' => 'form-control', 'required'], $sanadReadOnly)) }}
+                                <small class="help-block with-errors text-danger"></small>
+                            </div>
+
+                            <div class="form-group col-md-4">
+                                {{ Form::label('name_ar', 'Arabic Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_ar', old('name_ar'), array_merge(['class' => 'form-control', 'placeholder' => 'Service name in Arabic', 'required', 'dir' => 'rtl'], $sanadReadOnly)) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
@@ -53,27 +132,28 @@
                                     ]) }}
                             </div>
 
-                            @if(auth()->user()->hasAnyRole(['admin','demo_admin']))
-                            <div class="form-group col-md-4">
+                            @if(false && auth()->user()->hasAnyRole(['admin','demo_admin']))
+                            <div class="form-group col-md-4 d-none">
                                 {{ Form::label('name', 'Select Partner <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                 <br />
                                 {{ Form::select('provider_id', [ optional($servicedata->providers)->id => optional($servicedata->providers)->display_name ], optional($servicedata->providers)->id, [
                                             'class' => 'select2js form-group',
                                             'id' => 'provider_id',
                                             'onchange' => 'selectprovider(this)',
-                                            'required',
+                                            'disabled',
                                             'data-placeholder' => 'Select Partner',
                                             'data-ajax--url' => route('ajax-list', ['type' => 'provider']),
                                         ]) }}
                             </div>
                             @endif
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-4 d-none">
                                 {{ Form::label('name', 'Select Partner Address',['class'=>'form-control-label'],false) }}
                                 <br />
                                 {{ Form::select('provider_address_id[]', [], old('provider_address_id'), [
                                         'class' => 'select2js form-group provider_address_id',
                                         'id' =>'provider_address_id',
                                         'multiple' => 'multiple',
+                                        'disabled',
                                         'data-placeholder' => 'Select Partner Address',
                                     ]) }}
                                    
@@ -87,27 +167,27 @@
                                  @endif
                             </div> 
 
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-4 d-none">
                                 {{ Form::label('type',__('messages.price_type').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                {{ Form::select('type',['fixed' => __('messages.fixed') , 'hourly' => __('messages.hourly'), 'free' => __('messages.free') ],old('status'),[ 'class' =>'form-control select2js','required' ,'id'=>'price_type']) }}
+                                {{ Form::select('type',['fixed' => __('messages.fixed') , 'hourly' => __('messages.hourly'), 'free' => __('messages.free') ],old('status'),[ 'class' =>'form-control select2js','disabled' ,'id'=>'price_type']) }}
                             </div>
-                            <div class="form-group col-md-4" id="price_div">
+                            <div class="form-group col-md-4 d-none" id="price_div">
                                 {{ Form::label('price',__('messages.price').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                {{ Form::text('price',null, array_merge([ 'min' => 1, 'step' => 'any' , 'placeholder' => __('messages.price'),'class' =>'form-control', 'required','id' => 'price',  'pattern' => '^\\d+(\\.\\d{1,2})?$' ], $sanadReadOnly)) }}
+                                {{ Form::text('price',null, array_merge([ 'min' => 1, 'step' => 'any' , 'placeholder' => __('messages.price'),'class' =>'form-control', 'disabled','id' => 'price_legacy',  'pattern' => '^\\d+(\\.\\d{1,2})?$' ], $sanadReadOnly)) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
-                            <div class="form-group col-md-4" id="discount_div">
+                            <div class="form-group col-md-4 d-none" id="discount_div">
                                 {{ Form::label('discount',__('messages.discount').' %', ['class' => 'form-control-label']) }}
-                                {{ Form::number('discount',null, [ 'min' => 0,'max' => 99, 'step' => 'any' , 'id' =>'discount','placeholder' => __('messages.discount'),'class' =>'form-control']) }}
+                                {{ Form::number('discount',null, [ 'min' => 0,'max' => 99, 'step' => 'any' , 'id' =>'discount','placeholder' => __('messages.discount'),'class' =>'form-control', 'disabled']) }}
 
                                 <span id="discount-error" class="text-danger"></span>
                             </div>
 
 
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-4 d-none">
                                 {{ Form::label('duration', __('messages.duration').' (hours) ', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('duration', old('duration'), ['placeholder' => __('messages.duration'), 'class' => 'form-control min-datetimepicker-time']) }}
+                                {{ Form::text('duration', old('duration'), ['placeholder' => __('messages.duration'), 'class' => 'form-control min-datetimepicker-time', 'disabled']) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
@@ -116,10 +196,10 @@
                                 {{ Form::select('status',['1' => __('messages.active') , '0' => __('messages.inactive') ],old('status'),[ 'class' =>'form-control select2js','required']) }}
                             </div>
                             
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-4 d-none">
                                     {{ Form::label('visit_type', __('messages.visit_type').' ',['class'=>'form-control-label'],false) }}
                                     <br />
-                                    {{ Form::select('visit_type',$visittype,old('visit_type'),[ 'id' => 'visit_type' ,'class' =>'form-control select2js','required']) }}
+                                    {{ Form::select('visit_type',$visittype,old('visit_type'),[ 'id' => 'visit_type' ,'class' =>'form-control select2js','disabled']) }}
                                 </div>
 
                             <div class="form-group col-md-4">
@@ -207,14 +287,6 @@
                                     </div>
                                     <div class="row">
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('name_en', 'English Name', ['class' => 'form-control-label']) }}
-                                            {{ Form::text('name_en', null, array_merge(['class' => 'form-control', 'placeholder' => 'Service name in English'], $sanadReadOnly)) }}
-                                        </div>
-                                        <div class="form-group col-md-4">
-                                            {{ Form::label('name_ar', 'Arabic Name', ['class' => 'form-control-label']) }}
-                                            {{ Form::text('name_ar', null, array_merge(['class' => 'form-control', 'placeholder' => 'Service name in Arabic'], $sanadReadOnly)) }}
-                                        </div>
-                                        <div class="form-group col-md-4">
                                             {{ Form::label('government_entity', 'Government Entity', ['class' => 'form-control-label']) }}
                                             {{ Form::text('government_entity', null, array_merge(['class' => 'form-control', 'placeholder' => 'Ministry or authority'], $sanadReadOnly)) }}
                                         </div>
@@ -223,30 +295,126 @@
                                             {{ Form::text('estimated_completion_time', null, array_merge(['class' => 'form-control', 'placeholder' => 'Example: 3 business days'], $sanadReadOnly)) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('government_fee', 'Government Fee', ['class' => 'form-control-label']) }}
+                                            {{ Form::label('government_fee', 'Government Fees', ['class' => 'form-control-label']) }}
                                             {{ Form::number('government_fee', null, array_merge(['class' => 'form-control', 'min' => 0, 'step' => 'any'], $sanadReadOnly)) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('service_fee', 'Sanad Service Fee', ['class' => 'form-control-label']) }}
+                                            {{ Form::label('service_fee', 'Service Fees', ['class' => 'form-control-label']) }}
                                             {{ Form::number('service_fee', null, array_merge(['class' => 'form-control', 'min' => 0, 'step' => 'any'], $sanadReadOnly)) }}
                                         </div>
-                                        <div class="form-group col-md-6">
-                                            {{ Form::label('required_documents', 'Required Documents', ['class' => 'form-control-label']) }}
-                                            {{ Form::textarea('required_documents', $requiredDocumentsText, array_merge(['class' => 'form-control', 'rows' => 5, 'placeholder' => "One document per line"], $sanadReadOnly)) }}
+                                        <div class="form-group col-md-12">
+                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                                {{ Form::label('required_documents', 'Required Documents', ['class' => 'form-control-label mb-0']) }}
+                                                @if(!$isPartnerServiceEditor)
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" id="add-required-document">
+                                                        <i class="fa fa-plus"></i> Add Document
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            <div class="table-responsive sanad-required-documents">
+                                                <table class="table table-sm mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 24%;">Document Name</th>
+                                                            <th style="width: 18%;">Key</th>
+                                                            <th style="width: 14%;">Requirement</th>
+                                                            <th style="width: 16%;">Approval</th>
+                                                            <th style="width: 18%;">Accepted File Types</th>
+                                                            <th style="width: 8%;">Max MB</th>
+                                                            <th style="width: 2%;"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="required-document-rows">
+                                                        @foreach($requiredDocumentRows as $index => $document)
+                                                            <tr class="required-document-row">
+                                                                <td>
+                                                                    <input type="text" name="required_documents[{{ $index }}][name]" value="{{ $document['name'] }}" class="form-control required-document-name" placeholder="Example: Driving license front" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                </td>
+                                                                <td>
+                                                                    <input type="text" name="required_documents[{{ $index }}][key]" value="{{ $document['key'] }}" class="form-control required-document-key" placeholder="driving_license_front" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                </td>
+                                                                <td>
+                                                                    <select name="required_documents[{{ $index }}][required]" class="form-control" {{ $isPartnerServiceEditor ? 'disabled' : '' }}>
+                                                                        <option value="1" {{ $document['required'] ? 'selected' : '' }}>Required</option>
+                                                                        <option value="0" {{ !$document['required'] ? 'selected' : '' }}>Optional</option>
+                                                                    </select>
+                                                                </td>
+                                                                <td>
+                                                                    <select name="required_documents[{{ $index }}][approval_required]" class="form-control" {{ $isPartnerServiceEditor ? 'disabled' : '' }}>
+                                                                        <option value="1" {{ $document['approval_required'] ? 'selected' : '' }}>Approval Required</option>
+                                                                        <option value="0" {{ !$document['approval_required'] ? 'selected' : '' }}>No Approval</option>
+                                                                    </select>
+                                                                </td>
+                                                                <td>
+                                                                    <input type="text" name="required_documents[{{ $index }}][mime_types]" value="{{ $document['mime_types'] }}" class="form-control" placeholder="image/jpeg, application/pdf" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                </td>
+                                                                <td>
+                                                                    <input type="number" name="required_documents[{{ $index }}][max_size_mb]" value="{{ $document['max_size_mb'] }}" class="form-control" min="1" max="100" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                </td>
+                                                                <td class="text-center align-middle">
+                                                                    @if(!$isPartnerServiceEditor)
+                                                                        <button type="button" class="btn btn-link text-danger p-0 remove-required-document" title="Remove document">
+                                                                            <i class="ri-close-circle-line"></i>
+                                                                        </button>
+                                                                    @endif
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">These documents will be shown as selectable requirements in customer, partner, and request document upload flows.</small>
+                                        </div>
+                                        <div class="form-group col-md-12">
+                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                                {{ Form::label('service_instructions', 'Service Instructions', ['class' => 'form-control-label mb-0']) }}
+                                                @if(!$isPartnerServiceEditor)
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" id="add-service-instruction">
+                                                        <i class="fa fa-plus"></i> Add Step
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            <div class="table-responsive sanad-service-instructions">
+                                                <table class="table table-sm mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 24%;">Step Title</th>
+                                                            <th style="width: 74%;">Instruction</th>
+                                                            <th style="width: 2%;"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="service-instruction-rows">
+                                                        @foreach($serviceInstructionRows as $index => $step)
+                                                            <tr class="service-instruction-row">
+                                                                <td>
+                                                                    <input type="text" name="service_instructions[{{ $index }}][title]" value="{{ $step['title'] }}" class="form-control" placeholder="Step {{ $index + 1 }}" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                </td>
+                                                                <td>
+                                                                    <textarea name="service_instructions[{{ $index }}][instruction]" class="form-control" rows="2" placeholder="What should the customer do in this step?" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>{{ $step['instruction'] }}</textarea>
+                                                                </td>
+                                                                <td class="text-center align-middle">
+                                                                    @if(!$isPartnerServiceEditor)
+                                                                        <button type="button" class="btn btn-link text-danger p-0 remove-service-instruction" title="Remove step">
+                                                                            <i class="ri-close-circle-line"></i>
+                                                                        </button>
+                                                                    @endif
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">These steps are shown to customers as ordered service instructions.</small>
                                         </div>
                                         <div class="form-group col-md-6">
-                                            {{ Form::label('service_instructions', 'Service Instructions', ['class' => 'form-control-label']) }}
-                                            {{ Form::textarea('service_instructions', null, array_merge(['class' => 'form-control', 'rows' => 5, 'placeholder' => 'Internal and customer-facing instructions'], $sanadReadOnly)) }}
-                                        </div>
-                                        <div class="form-group col-md-6">
-                                            {{ Form::label('terms_and_conditions', 'Terms and Conditions', ['class' => 'form-control-label']) }}
+                                            {{ Form::label('terms_and_conditions', 'Terms & Conditions', ['class' => 'form-control-label']) }}
                                             {{ Form::textarea('terms_and_conditions', null, array_merge(['class' => 'form-control', 'rows' => 4], $sanadReadOnly)) }}
                                         </div>
-                                        <div class="form-group col-md-6">
+                                        <div class="form-group col-md-6 d-none">
                                             {{ Form::label('required_employee_skills', 'Required Employee Skills', ['class' => 'form-control-label']) }}
                                             {{ Form::textarea('required_employee_skills', $requiredSkillsText, ['class' => 'form-control', 'rows' => 4, 'placeholder' => "One skill per line"]) }}
                                         </div>
-                                        <div class="form-group col-md-12">
+                                        <div class="form-group col-md-12 d-none">
                                             {{ Form::label('partner_availability_notes', 'Partner Internal Notes / Availability', ['class' => 'form-control-label']) }}
                                             {{ Form::textarea('partner_availability_notes', null, ['class' => 'form-control', 'rows' => 3, 'placeholder' => 'Execution notes, availability, capacity, or partner-only comments']) }}
                                         </div>
@@ -288,7 +456,7 @@
                                 </div>
                             </div>
                             @endif
-                            <div class="form-group col-md-4" id="amount">
+                            <div class="form-group col-md-4 d-none" id="amount">
                             {{ Form::label('advance_payment_amount', __('messages.advance_payment_amount').' <span class="text-danger"></span> (%)', ['class' => 'form-control-label'], false) }}
                                 {{ Form::number('advance_payment_amount',old('advance_payment_amount'),['placeholder' => __('messages.amount'),'class' =>'form-control','id' => 'advance_payment_amount' ,'min' => '1', 'max' => '99']) }}
                                 <small class="help-block with-errors text-danger"></small>
@@ -315,6 +483,24 @@
         }
         .sanad-service-master-data .gap-2 {
             gap: 8px;
+        }
+        .sanad-required-documents table th,
+        .sanad-required-documents table td {
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        .sanad-required-documents .form-control {
+            min-width: 140px;
+        }
+        .sanad-required-documents .required-document-name {
+            min-width: 220px;
+        }
+        .sanad-service-instructions table th,
+        .sanad-service-instructions table td {
+            vertical-align: top;
+        }
+        .sanad-service-instructions textarea {
+            min-height: 72px;
         }
     </style>
     <script type="text/javascript">
@@ -397,10 +583,90 @@
         }
     }
 
-    (function($) {
-        "use strict";
-        $(document).ready(function() {
-            var provider_id = "{{ isset($servicedata->provider_id) ? $servicedata->provider_id : '' }}";
+	    (function($) {
+	        "use strict";
+	        $(document).ready(function() {
+                var requiredDocumentIndex = $('#required-document-rows .required-document-row').length;
+
+                function slugDocumentKey(value) {
+                    return (value || '')
+                        .toString()
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '_')
+                        .replace(/^_+|_+$/g, '');
+                }
+
+                function requiredDocumentRow(index) {
+                    return [
+                        '<tr class="required-document-row">',
+                            '<td><input type="text" name="required_documents[' + index + '][name]" class="form-control required-document-name" placeholder="Example: Driving license front"></td>',
+                            '<td><input type="text" name="required_documents[' + index + '][key]" class="form-control required-document-key" placeholder="driving_license_front"></td>',
+                            '<td><select name="required_documents[' + index + '][required]" class="form-control"><option value="1" selected>Required</option><option value="0">Optional</option></select></td>',
+                            '<td><select name="required_documents[' + index + '][approval_required]" class="form-control"><option value="1" selected>Approval Required</option><option value="0">No Approval</option></select></td>',
+                            '<td><input type="text" name="required_documents[' + index + '][mime_types]" class="form-control" value="image/jpeg, image/png, application/pdf" placeholder="image/jpeg, application/pdf"></td>',
+                            '<td><input type="number" name="required_documents[' + index + '][max_size_mb]" class="form-control" min="1" max="100" value="10"></td>',
+                            '<td class="text-center align-middle"><button type="button" class="btn btn-link text-danger p-0 remove-required-document" title="Remove document"><i class="ri-close-circle-line"></i></button></td>',
+                        '</tr>'
+                    ].join('');
+                }
+
+                $('#add-required-document').on('click', function() {
+                    $('#required-document-rows').append(requiredDocumentRow(requiredDocumentIndex));
+                    requiredDocumentIndex += 1;
+                });
+
+                $(document).on('click', '.remove-required-document', function() {
+                    var rows = $('#required-document-rows .required-document-row');
+                    if (rows.length <= 1) {
+                        $(this).closest('tr').find('input[type="text"]').val('');
+                        $(this).closest('tr').find('input[type="number"]').val('10');
+                        return;
+                    }
+                    $(this).closest('tr').remove();
+                });
+
+                $(document).on('input', '.required-document-name', function() {
+                    var row = $(this).closest('tr');
+                    var keyInput = row.find('.required-document-key');
+                    if (!keyInput.data('manually-edited')) {
+                        keyInput.val(slugDocumentKey($(this).val()));
+                    }
+                });
+
+                $(document).on('input', '.required-document-key', function() {
+                    $(this).data('manually-edited', true);
+                    $(this).val(slugDocumentKey($(this).val()));
+                });
+
+                var serviceInstructionIndex = $('#service-instruction-rows .service-instruction-row').length;
+
+                function serviceInstructionRow(index) {
+                    return [
+                        '<tr class="service-instruction-row">',
+                            '<td><input type="text" name="service_instructions[' + index + '][title]" class="form-control" value="Step ' + (index + 1) + '" placeholder="Step ' + (index + 1) + '"></td>',
+                            '<td><textarea name="service_instructions[' + index + '][instruction]" class="form-control" rows="2" placeholder="What should the customer do in this step?"></textarea></td>',
+                            '<td class="text-center align-middle"><button type="button" class="btn btn-link text-danger p-0 remove-service-instruction" title="Remove step"><i class="ri-close-circle-line"></i></button></td>',
+                        '</tr>'
+                    ].join('');
+                }
+
+                $('#add-service-instruction').on('click', function() {
+                    $('#service-instruction-rows').append(serviceInstructionRow(serviceInstructionIndex));
+                    serviceInstructionIndex += 1;
+                });
+
+                $(document).on('click', '.remove-service-instruction', function() {
+                    var rows = $('#service-instruction-rows .service-instruction-row');
+                    if (rows.length <= 1) {
+                        $(this).closest('tr').find('input[type="text"]').val('Step 1');
+                        $(this).closest('tr').find('textarea').val('');
+                        return;
+                    }
+                    $(this).closest('tr').remove();
+                });
+
+	            var provider_id = "{{ isset($servicedata->provider_id) ? $servicedata->provider_id : '' }}";
             var provider_address_id = "{{ isset($data) ? $data : [] }}";
 
             var category_id = "{{ isset($servicedata->category_id) ? $servicedata->category_id : '' }}";

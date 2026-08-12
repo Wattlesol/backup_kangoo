@@ -13,13 +13,15 @@ class ProviderDocument extends Model implements HasMedia
     use HasFactory,InteractsWithMedia,SoftDeletes;
     protected $table = 'provider_documents';
     protected $fillable = [
-       'provider_id','document_id','is_verified'
+       'provider_id','document_id','is_verified','verification_status','review_reason','reviewed_by','reviewed_at'
     ];
 
     protected $casts = [
         'provider_id'   => 'integer',
         'document_id'   => 'integer',
         'is_verified'   => 'integer',
+        'reviewed_by'   => 'integer',
+        'reviewed_at'   => 'datetime',
     ];
 
     public function providers(){

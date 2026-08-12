@@ -15,13 +15,20 @@ class SanadAiKnowledgeItem extends Model
         'category',
         'content',
         'visible_to',
+        'metadata',
         'is_active',
         'created_by',
     ];
 
     protected $casts = [
         'visible_to' => 'array',
+        'metadata' => 'array',
         'is_active' => 'boolean',
         'created_by' => 'integer',
     ];
+
+    public function chunks()
+    {
+        return $this->hasMany(SanadAiKnowledgeChunk::class, 'knowledge_item_id');
+    }
 }

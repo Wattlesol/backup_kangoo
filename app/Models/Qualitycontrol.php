@@ -15,6 +15,7 @@ class Qualitycontrol extends Model
         'provider_id',
         'status',
         'title',
+        'issue_type',
         'created_by',
     ];
 

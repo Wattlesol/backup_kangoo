@@ -23,6 +23,11 @@ class SanadChatThread extends Model
         'created_by' => 'integer',
     ];
 
+    public function unreadMessagesFor($userId)
+    {
+        return $this->messages()->whereNull('read_at')->where('sender_id', '!=', $userId)->count();
+    }
+
     public function messages()
     {
         return $this->hasMany(SanadChatMessage::class, 'thread_id', 'id')->orderBy('created_at');

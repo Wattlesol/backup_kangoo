@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::table('sanad_ai_knowledge_items', function (Blueprint $table) {
+            $table->json('metadata')->nullable()->after('visible_to');
+        });
+
+        Schema::table('sanad_ai_interactions', function (Blueprint $table) {
+            $table->json('metadata')->nullable()->after('status');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('sanad_ai_interactions', function (Blueprint $table) {
+            $table->dropColumn('metadata');
+        });
+
+        Schema::table('sanad_ai_knowledge_items', function (Blueprint $table) {
+            $table->dropColumn('metadata');
+        });
+    }
+};
