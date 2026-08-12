@@ -13,7 +13,7 @@ class ServiceAddon extends BaseModel implements  HasMedia
     use InteractsWithMedia,HasFactory,SoftDeletes;
     protected $table = 'service_addons';
     protected $fillable = [
-        'name', 'service_id','price','status','created_by'
+        'name', 'name_ar', 'service_id','price','status','created_by'
     ];
     protected $casts = [
         'service_id'    => 'integer',

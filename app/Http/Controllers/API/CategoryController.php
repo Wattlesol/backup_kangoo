@@ -33,7 +33,7 @@ class CategoryController extends Controller
             }
         }
 
-        $category = $category->orderBy('name','asc')->paginate($per_page);
+        $category = $category->orderBy('display_order')->orderBy('name','asc')->paginate($per_page);
         $items = CategoryResource::collection($category);
 
         $response = [

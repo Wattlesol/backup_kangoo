@@ -43,6 +43,9 @@ class Booking extends Model
         'sla_due_at',
         'assigned_by',
         'assigned_at',
+        'assignment_mode',
+        'assignment_reason',
+        'expected_completion_at',
         'escalated_at',
         'closed_at'
     ];
@@ -68,6 +71,7 @@ class Booking extends Model
         'assigned_by' => 'integer',
         'sla_due_at' => 'datetime',
         'assigned_at' => 'datetime',
+        'expected_completion_at' => 'datetime',
         'escalated_at' => 'datetime',
         'closed_at' => 'datetime',
     ];
@@ -119,12 +123,20 @@ class Booking extends Model
         return $this->hasMany(SanadDocumentVaultItem::class, 'booking_id', 'id');
     }
 
+    public function sanadDocumentRequests(){
+        return $this->hasMany(SanadDocumentRequest::class, 'booking_id', 'id');
+    }
+
     public function sanadBuzzAlerts(){
         return $this->hasMany(SanadBuzzAlert::class, 'booking_id', 'id');
     }
 
     public function sanadRequestActions(){
         return $this->hasMany(SanadRequestAction::class, 'booking_id', 'id');
+    }
+
+    public function sanadWorkflowStages(){
+        return $this->hasMany(SanadPartnerWorkflowStage::class, 'booking_id', 'id')->orderBy('execution_order')->orderBy('id');
     }
 
     public function scopeMyBooking($query){

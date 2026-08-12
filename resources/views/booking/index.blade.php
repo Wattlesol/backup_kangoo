@@ -91,9 +91,10 @@
                         searchable: false,
                     },
                     {
-                        data: 'id',
-                        name: 'id',
-                        title: "{{__('messages.id')}}"
+                        data: 'order_number',
+                        name: 'sanad_reference',
+                        orderable: false,
+                        title: "{{__('messages.order_number')}}"
                     },
                     {
                         data: 'service_id',
@@ -101,41 +102,41 @@
                         title: "{{__('messages.service')}}"
                     },
                     {
-                        data: 'date',
-                        name: 'date',
-                        title: "{{__('messages.booking_date')}}"
-                    },
-                    {
                         data: 'customer_id',
                         name: 'customer_id',
-                        title: "{{__('messages.user')}}"
+                        title: "Customer"
                     },
                     {
                         data: 'provider_id',
                         name: 'provider_id',
-                        title: "{{__('messages.provider')}}"
+                        title: "Partner"
                     },
                     {
                         data: 'status',
                         name: 'status',
-                        title: "{{__('messages.status')}}"
+                        title: "Current Status"
                     },
                     {
-                        data: 'total_amount',
-                        name: 'total_amount',
-                        title: "{{__('messages.total_amount')}}"
+                        data: 'priority',
+                        name: 'sanad_priority',
+                        orderable: false,
+                        title: "{{__('messages.priority')}}"
                     },
                     {
-                        data: 'payment_id',
-                        name: 'payment_id',
-                        title: "{{__('messages.payment_status')}}"
+                        data: 'expected_completion_at',
+                        name: 'expected_completion_at',
+                        title: "{{__('messages.expected_completion_date')}}"
                     },
                     {
-                       data: 'updated_at',
-                       name: 'updated_at',
-                       title: "{{ __('product.lbl_update_at') }}",
+                        data: 'date',
+                        name: 'created_at',
+                        title: "{{__('messages.created_date')}}"
+                    },
+                    {
+                       data: 'payment_id',
+                       name: 'payment_id',
+                       title: "{{ __('messages.payment_status') }}",
                        orderable: true,
-                       visible: false,
                     },
                     {
                         data: 'action',
@@ -148,7 +149,7 @@
                 ],
                         order: [
             
-                         [9, 'desc'] 
+                         [8, 'desc']
                      ]
 
                 

@@ -26,16 +26,25 @@ Sanad has been implemented by reusing the existing Kangoo Laravel backend, dashb
 | `25f84dbd` | Buzz API visibility and validation hardening |
 | `37d7d16d` | Payment and wallet API smoke fixes |
 | `cd6a02ec` | Government document verification API |
+| `7b9d3f44` | Local web role UAT gate for admin, partner, employee, and customer routes |
+| `51aa9677` | Document retention policy UI and 48-hour default retention |
+| `6fc8cf9a` | AI fallback-to-human escalation frontend evidence |
+| `043e5f33` | Finance role permission UI and role-scope QA |
+| `03d5130b` | Cross-platform lifecycle QA gate and comparison report evidence |
 
 ## Demo Credentials
 
-Use the seeded demo account for local/API verification:
+Use the seeded demo accounts for local QA verification:
 
 | Role | Email | Password |
 | --- | --- | --- |
+| Full admin | `admin@admin.com` | `12345678` |
 | Admin | `demo@admin.com` | `12345678` |
+| Partner | `demo@provider.com` | `12345678` |
+| Employee | `demo@employee.com` | `12345678` |
+| Customer | `demo@user.com` | `12345678` |
 
-Additional role accounts should be confirmed from the target deployment seed data before client demo.
+These accounts must be confirmed or recreated in the target UAT/deployed database before client demo.
 
 ## Demo Flow
 
@@ -61,19 +70,30 @@ Use `docs/sanad-local-sql-qa.md` to run full local SQL QA before deploying anyth
 | Partner Dashboard | Partner order actions, service restrictions, financial center, wallet/settlements |
 | Employee Dashboard | Employee profile fields, permissions, assignment, capacity, operational status |
 | Customer Dashboard | Request list/detail, documents, Buzz, chat, payment visibility |
-| Customer Mobile App | Sanad customer workflow commit `44031df` and targeted Flutter analysis passed |
-| Admin/Provider Mobile App | Sanad operations workflow commit `16ed2d1`, `nb_utils` compatibility pin, and targeted Flutter analysis passed |
+| Customer Mobile App | Sanad customer workflow, branding, privacy cleanup, mobile QA gate commit `14258a4`, Android debug APK build passed |
+| Admin/Partner/Employee Mobile App | Sanad operations workflow, branding, lifecycle sync fix commit `d4c61d2`, mobile QA gate, and Android debug APK build passed |
 | Backend/API | Sanad foundation, Buzz, document vault, chat, AI, payment/wallet, document verification |
-| AI Features | AI knowledge and ask flow verified by live API smoke |
-| Privacy Rules | Role-scoped requests, Buzz visibility, document visibility, wallet scoping |
-| Payment/Wallet | Live authenticated smoke passed for payment list, gateways, wallet history, wallet balance, wallet top-up |
+| AI Features | AI knowledge/ask flow, low-confidence escalation, and fallback-to-human UI verified |
+| Privacy Rules | Role-scoped requests, Buzz visibility, document visibility, wallet scoping, customer partner visibility, and mobile customer privacy cleanup |
+| Payment/Wallet | Payment/wallet API smoke, Financial Center role-scope UI, admin/partner rendered permission checks |
 | Government Verification | Live authenticated smoke passed for document create, pending filter, and approve verification |
+| Cross-Platform Lifecycle Sync | Backend lifecycle config, web lifecycle form, customer mobile display, and operations mobile update actions verified by `scripts/sanad_cross_platform_lifecycle_qa.sh` |
 
 ## Verification Commands
 
 ```bash
 scripts/sanad_local_sql_qa.sh
 scripts/sanad_web_sql_qa.sh
+scripts/sanad_visible_terminology_qa.sh
+scripts/sanad_partner_visibility_qa.sh
+scripts/sanad_web_role_uat.sh
+scripts/sanad_request_detail_frontend_qa.sh
+scripts/sanad_customer_frontend_qa.sh
+scripts/sanad_service_catalog_frontend_qa.sh
+scripts/sanad_document_policy_qa.sh
+scripts/sanad_ai_escalation_qa.sh
+scripts/sanad_finance_permissions_qa.sh
+scripts/sanad_cross_platform_lifecycle_qa.sh
 scripts/sanad_dokploy_deploy_and_qa.sh
 php -l app/Http/Controllers/API/SanadController.php
 php -l app/Http/Controllers/SanadWebController.php
@@ -93,6 +113,20 @@ BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PA
 BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PASSWORD=12345678 scripts/sanad_integrated_qa.sh
 PATH=/Users/xain/development/flutter/bin:$PATH flutter analyze lib/screens/sanad/my_sanad_screen.dart lib/model/sanad_models.dart lib/network/rest_apis.dart
 PATH=/Users/xain/development/flutter/bin:$PATH flutter analyze lib/screens/sanad/sanad_operations_screen.dart lib/model/sanad_models.dart lib/networks/rest_apis.dart
+```
+
+Run the Flutter app-level QA gates from each mobile repository:
+
+```bash
+# Customer mobile app
+cd /Users/xain/Documents/kangoo/handyman_user_flutter_v11.13.2
+scripts/sanad_mobile_qa.sh
+open docs/sanad-customer-mobile-walkthrough.md
+
+# Admin/partner/employee operations mobile app
+cd /Users/xain/Documents/kangoo/handyman_admin_flutter_app-v3.9.0
+scripts/sanad_mobile_qa.sh
+open docs/sanad-operations-mobile-walkthrough.md
 ```
 
 ## Live Smoke Results
@@ -132,6 +166,26 @@ BASE_URL=http://127.0.0.1:8091/api SANAD_TEST_EMAIL=demo@admin.com SANAD_TEST_PA
 | Customer mobile source and Android debug APK artifact contract | Passed |
 | Admin/provider/employee mobile source and Android debug APK artifact contract | Passed |
 
+## Frontend And Policy QA Result
+
+The latest frontend and policy gates passed locally:
+
+| QA Gate | Result |
+| --- | --- |
+| Visible Sanad terminology | Passed |
+| Customer-facing partner visibility | Passed |
+| Local web role UAT | Passed |
+| Request detail frontend sign-off gate | Passed admin, partner, and employee request detail section/role-control checks |
+| Web action workflow gate | Passed Buzz create/acknowledge and document create/approve action checks from the rendered request detail UI |
+| AI web action gate | Passed knowledge creation, matched answer, and low-confidence escalation checks from the rendered AI console |
+| Customer request frontend sign-off gate | Passed customer request detail terminology, privacy, payment summary, and forbidden-label checks |
+| Service catalog frontend sign-off gate | Passed admin service catalog, Sanad master data, partner terminology, and partner service catalog checks |
+| Document retention/download-before-deletion policy | Passed source-level policy, PHP syntax, and rendered route checks |
+| AI fallback escalation | Passed source, API, and rendered AI console checks |
+| Finance role permissions | Passed source, PHP syntax, admin rendered page, and partner rendered page checks |
+| Cross-platform lifecycle sync | Passed source-level web/customer mobile/operations mobile lifecycle contract checks |
+| Mobile walkthrough artifacts | Passed QA-script checks for customer and operations role walkthrough documents |
+
 ## Local SQL QA Result
 
 The full local SQL QA gate passed against `http://127.0.0.1:8092/api` using a fresh MySQL restore from `database/dumps/kangoo_sa.sql.gz`, Laravel migrations, a seeded QA Sanad request, and required request lifecycle verification. Authenticated web SQL QA also passed for login, Sanad dashboard, Sanad request queue, Sanad request detail, Sanad AI console, and Payment/Financial Center routes. See `docs/sanad-local-sql-qa.md`.
@@ -143,7 +197,7 @@ The following Android debug builds passed locally using Flutter `3.27.4`, Java `
 | Application | Command | Artifact |
 | --- | --- | --- |
 | Customer mobile app | `JAVA_HOME=/usr/local/opt/openjdk@17 PATH=/usr/local/opt/openjdk@17/bin:/Users/xain/development/flutter/bin:$PATH flutter build apk --debug` | `/Users/xain/Documents/kangoo/handyman_user_flutter_v11.13.2/build/app/outputs/flutter-apk/app-debug.apk` |
-| Admin/provider mobile app | `JAVA_HOME=/usr/local/opt/openjdk@17 PATH=/usr/local/opt/openjdk@17/bin:/Users/xain/development/flutter/bin:$PATH flutter build apk --debug` | `/Users/xain/Documents/kangoo/handyman_admin_flutter_app-v3.9.0/build/app/outputs/flutter-apk/app-debug.apk` |
+| Admin/partner/employee operations mobile app | `JAVA_HOME=/usr/local/opt/openjdk@17 PATH=/usr/local/opt/openjdk@17/bin:/Users/xain/development/flutter/bin:$PATH flutter build apk --debug` | `/Users/xain/Documents/kangoo/handyman_admin_flutter_app-v3.9.0/build/app/outputs/flutter-apk/app-debug.apk` |
 
 ## Deployment Notes
 
@@ -176,12 +230,13 @@ BASE_URL=https://kangoo.sa/api SANAD_TEST_EMAIL=<uat-admin-email> SANAD_TEST_PAS
 
 ## Remaining QA Gates
 
-The backend, web dashboards, API smoke tests, integrated QA script, and Android debug APK test builds are complete on the local environment. Release signing/store packaging is intentionally deferred until after system testing. The active QA gate is now client UAT:
+The backend, web dashboards, API smoke tests, integrated QA script, frontend policy gates, cross-platform lifecycle gate, and Android debug APK test builds are complete on the local environment. Release signing/store packaging is intentionally deferred until after system testing. The active QA gates are now client UAT and deployment verification:
 
 | Gate | Status | Reason |
 | --- | --- | --- |
 | Client UAT acceptance | Ready for QA | Final sign-off requires client review of the deployed environment and Android debug test builds. |
 | Cross-platform runtime synchronization | Passed | API contracts, backend runtime workflows, mobile source wiring, and Android debug APK artifacts passed integrated QA. |
+| Production deployment verification | Blocked | Dokploy has not applied the merged Sanad backend code to the live container yet; live Sanad routes still need post-deploy QA. |
 
 The client UAT checklist is available at `docs/sanad-uat-checklist.md`.
 

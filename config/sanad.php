@@ -56,6 +56,24 @@ return [
 
     'ai' => [
         'enabled' => env('SANAD_AI_ENABLED', true),
+        'provider' => env('SANAD_AI_PROVIDER', 'nvidia'),
+        'base_url' => env('NVIDIA_AI_BASE_URL', 'https://integrate.api.nvidia.com/v1'),
+        'api_key' => env('NVIDIA_API_KEY'),
+        'model' => env('NVIDIA_AI_MODEL', 'glm-5.2'),
+        'embedding_model' => env('NVIDIA_AI_EMBEDDING_MODEL', 'nvidia/nv-embedqa-e5-v5'),
+        'temperature' => env('SANAD_AI_TEMPERATURE', 0.2),
+        'max_tokens' => env('SANAD_AI_MAX_TOKENS', 700),
         'requires_escalation_when_confidence_below' => env('SANAD_AI_ESCALATION_THRESHOLD', 0.65),
+        'vector_store' => env('SANAD_VECTOR_STORE', 'database'),
+        'chunk_size' => env('SANAD_RAG_CHUNK_SIZE', 900),
+        'chunk_overlap' => env('SANAD_RAG_CHUNK_OVERLAP', 120),
+        'chroma_url' => env('CHROMA_URL', 'http://127.0.0.1:8000'),
+        'chroma_collection' => env('CHROMA_COLLECTION', 'sanad_knowledge_base'),
+        'langsmith' => [
+            'enabled' => env('LANGSMITH_TRACING', true),
+            'api_key' => env('LANGSMITH_API_KEY'),
+            'endpoint' => env('LANGSMITH_ENDPOINT', 'https://api.smith.langchain.com'),
+            'project' => env('LANGSMITH_PROJECT', 'sanad-rag'),
+        ],
     ],
 ];

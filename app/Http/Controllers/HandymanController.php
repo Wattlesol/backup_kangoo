@@ -229,7 +229,7 @@ class HandymanController extends Controller
      */
     public function store(UserRequest $request)
     {
-        if(demoUserPermission()){
+        if(demoUserPermission() && !auth()->user()->hasAnyRole(['provider'])){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();

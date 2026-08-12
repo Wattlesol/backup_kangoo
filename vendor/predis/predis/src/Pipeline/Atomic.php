@@ -3,8 +3,7 @@
 /*
  * This file is part of the Predis package.
  *
- * (c) 2009-2020 Daniele Alessandri
- * (c) 2021-2025 Till Krüss
+ * (c) Daniele Alessandri <suppakilla@gmail.com>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -19,10 +18,11 @@ use Predis\Connection\NodeConnectionInterface;
 use Predis\Response\ErrorInterface as ErrorResponseInterface;
 use Predis\Response\ResponseInterface;
 use Predis\Response\ServerException;
-use SplQueue;
 
 /**
  * Command pipeline wrapped into a MULTI / EXEC transaction.
+ *
+ * @author Daniele Alessandri <suppakilla@gmail.com>
  */
 class Atomic extends Pipeline
 {
@@ -31,9 +31,9 @@ class Atomic extends Pipeline
      */
     public function __construct(ClientInterface $client)
     {
-        if (!$client->getCommandFactory()->supports('multi', 'exec', 'discard')) {
+        if (!$client->getProfile()->supportsCommands(array('multi', 'exec', 'discard'))) {
             throw new ClientException(
-                "'MULTI', 'EXEC' and 'DISCARD' are not supported by the current command factory."
+                "The current profile does not support 'MULTI', 'EXEC' and 'DISCARD'."
             );
         }
 
@@ -59,30 +59,28 @@ class Atomic extends Pipeline
     /**
      * {@inheritdoc}
      */
-    protected function executePipeline(ConnectionInterface $connection, SplQueue $commands)
+    protected function executePipeline(ConnectionInterface $connection, \SplQueue $commands)
     {
-        $commandFactory = $this->getClient()->getCommandFactory();
-        $connection->executeCommand($commandFactory->create('multi'));
-        $buffer = '';
+        $profile = $this->getClient()->getProfile();
+        $connection->executeCommand($profile->createCommand('multi'));
 
         foreach ($commands as $command) {
-            $buffer .= $command->serializeCommand();
+            $connection->writeRequest($command);
         }
-
-        $connection->write($buffer);
 
         foreach ($commands as $command) {
             $response = $connection->readResponse($command);
 
             if ($response instanceof ErrorResponseInterface) {
-                $connection->executeCommand($commandFactory->create('discard'));
+                $connection->executeCommand($profile->createCommand('discard'));
                 throw new ServerException($response->getMessage());
             }
         }
 
-        $executed = $connection->executeCommand($commandFactory->create('exec'));
+        $executed = $connection->executeCommand($profile->createCommand('exec'));
 
         if (!isset($executed)) {
+            // TODO: should be throwing a more appropriate exception.
             throw new ClientException(
                 'The underlying transaction has been aborted by the server.'
             );
@@ -97,21 +95,16 @@ class Atomic extends Pipeline
             );
         }
 
-        $responses = [];
+        $responses = array();
         $sizeOfPipe = count($commands);
         $exceptions = $this->throwServerExceptions();
-        $protocolVersion = (int) $connection->getParameters()->protocol;
 
         for ($i = 0; $i < $sizeOfPipe; ++$i) {
             $command = $commands->dequeue();
             $response = $executed[$i];
 
             if (!$response instanceof ResponseInterface) {
-                if ($protocolVersion === 2) {
-                    $responses[] = $command->parseResponse($response);
-                } else {
-                    $responses[] = $command->parseResp3Response($response);
-                }
+                $responses[] = $command->parseResponse($response);
             } elseif ($response instanceof ErrorResponseInterface && $exceptions) {
                 $this->exception($connection, $response);
             } else {

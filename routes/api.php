@@ -83,6 +83,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //Route::post('service-save', [ App\Http\Controllers\ServiceController::class, 'store' ] );
     Route::post('service-delete/{id}', [ App\Http\Controllers\ServiceController::class, 'destroy' ] );
     Route::post('booking-save', [ App\Http\Controllers\BookingController::class, 'store' ] );
+    Route::post('booking/{id}/additional-services', [ App\Http\Controllers\BookingController::class, 'addServiceAddon' ] );
     Route::post('get-payment-method', [ App\Http\Controllers\BookingController::class, 'getPaymentMethod' ] );
     Route::post('create-stripe-payment', [ App\Http\Controllers\BookingController::class, 'createStripePayment' ] );
 
@@ -100,6 +101,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('sanad/document-vault/{id}/verify', [ API\SanadController::class, 'verifyDocumentVaultItem' ]);
     Route::get('sanad/chat-threads', [ API\SanadController::class, 'chatThreads' ]);
     Route::post('sanad/chat-messages', [ API\SanadController::class, 'storeChatMessage' ]);
+    Route::get('sanad/requests/{id}/communication', [ API\SanadController::class, 'communication' ]);
+    Route::post('sanad/requests/{id}/communication', [ API\SanadController::class, 'sendCommunication' ]);
+    Route::post('sanad/requests/{id}/communication/{threadId}/read', [ API\SanadController::class, 'markCommunicationRead' ]);
+    Route::post('sanad/requests/{id}/document-requests', [ API\SanadController::class, 'createDocumentRequest' ]);
     Route::post('sanad/ai/ask', [ API\SanadController::class, 'aiAsk' ]);
     Route::post('sanad/ai/knowledge', [ API\SanadController::class, 'storeAiKnowledge' ]);
     Route::get('booking-list', [ API\BookingController::class, 'getBookingList' ] );

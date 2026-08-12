@@ -29,7 +29,7 @@ class User extends Authenticatable implements HasMedia
         'social_image','is_available','designation','last_online_time',
         'known_languages','skills','description','why_choose_me','is_email_verified','language',
         'sanad_job_title','sanad_department','sanad_employee_status','sanad_permissions',
-        'sanad_working_hours','sanad_daily_capacity'
+        'sanad_working_hours','sanad_daily_capacity','sanad_quality_score','sanad_sla_compliance_rate','sanad_acceptance_rate','sanad_cancellation_rate','sanad_average_completion_minutes'
     ];
 
     /**
@@ -65,6 +65,11 @@ class User extends Authenticatable implements HasMedia
         'is_email_verified'    => 'integer',
         'sanad_permissions'    => 'array',
         'sanad_daily_capacity' => 'integer',
+        'sanad_quality_score' => 'decimal:2',
+        'sanad_sla_compliance_rate' => 'decimal:2',
+        'sanad_acceptance_rate' => 'decimal:2',
+        'sanad_cancellation_rate' => 'decimal:2',
+        'sanad_average_completion_minutes' => 'decimal:2',
     ];
 
     protected static function boot(){
@@ -189,6 +194,10 @@ class User extends Authenticatable implements HasMedia
     }
     public function providerService(){
         return $this->hasMany(Service::class, 'provider_id','id');
+    }
+    public function sanadServicePerformances()
+    {
+        return $this->hasMany(SanadPartnerServicePerformance::class, 'provider_id');
     }
     public function providerHandyman(){
         return $this->hasMany(User::class, 'provider_id','id');

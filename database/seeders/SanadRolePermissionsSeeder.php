@@ -10,40 +10,11 @@ class SanadRolePermissionsSeeder extends Seeder
 {
     public function run()
     {
-        $adminPermissions = [
-            'provider list',
-            'provider add',
-            'provider edit',
-            'provider delete',
-            'providerdocument list',
-            'providerdocument add',
-            'providerdocument edit',
-            'providerdocument delete',
-            'providerpayout list',
-            'providerpayout add',
-            'providerpayout edit',
-            'providerpayout delete',
-            'service list',
-            'service add',
-            'service edit',
-            'service delete',
-            'servicepackage list',
-            'servicepackage add',
-            'servicepackage edit',
-            'servicepackage delete',
-            'booking list',
-            'booking add',
-            'booking edit',
-            'booking delete',
-            'payment list',
-            'payment add',
-            'payment edit',
-            'payment delete',
-            'handyman list',
-            'handyman add',
-            'handyman edit',
-            'handyman delete',
-        ];
+        $allPermissions = Permission::all();
+        $adminRole = Role::firstOrCreate(['name' => 'admin']);
+        $adminRole->syncPermissions($allPermissions);
+        $demoAdminRole = Role::firstOrCreate(['name' => 'demo_admin']);
+        $demoAdminRole->syncPermissions($allPermissions);
 
         $providerPermissions = [
             'service list',
@@ -66,8 +37,6 @@ class SanadRolePermissionsSeeder extends Seeder
             'handyman edit',
             'handyman delete',
         ];
-
-        $this->assignPermissions(['admin', 'demo_admin'], $adminPermissions);
         $this->assignPermissions(['provider'], $providerPermissions);
         $this->assignPermissions(['handyman'], [
             'booking list',

@@ -7,7 +7,7 @@
     $generalsetting = $settings->has('general-setting') ? json_decode($settings['general-setting']->value) : null;
     $socialmedia = $settings->has('social-media') ? json_decode($settings['social-media']->value) : null;
     $appsetting = $settings->has('site-setup') ? json_decode($settings['site-setup']->value) : null;
-        $copyright_text = ($appsetting && isset($appsetting->site_copyright)) ? $appsetting->site_copyright : 'Copyright © 2024 Kangoo Marketplace by Iqonic Design';
+        $copyright_text = ($appsetting && isset($appsetting->site_copyright)) ? $appsetting->site_copyright : 'Copyright © 2026 Sanad Solutions. All rights reserved.';
         $position = strpos($copyright_text, 'by');
         if ($position !== false) {
             $first_part = substr($copyright_text, 0, $position + 2);

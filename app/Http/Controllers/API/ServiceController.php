@@ -232,7 +232,12 @@ class ServiceController extends Controller
         // $tax = Tax::where('status',1)->get();
         // $taxes = TaxResource::collection($tax);
         $servicefaq =  ServiceFaq::where('service_id',$id)->get();
-        $serviceAddon = ServiceAddon::where('service_id',$id)->where('status',1)->get();
+        $serviceAddon = ServiceAddon::where('status', 1)
+            ->where(function ($query) use ($id) {
+                $query->whereNull('service_id')
+                    ->orWhere('service_id', $id);
+            })
+            ->get();
         $serviceaddon =  ServiceAddonResource::collection($serviceAddon);
         $response = [
             'service_detail'    => $service_detail,

@@ -40,6 +40,8 @@ class UserRequest extends FormRequest
                 'sanad_working_hours' => 'nullable|string|max:255',
                 'sanad_daily_capacity' => 'nullable|integer|min:0|max:100',
                 'skills' => 'nullable|string',
+                'partner_verification_document_ids' => 'required_if:user_type,provider|array|min:1',
+                'partner_verification_document_ids.*' => 'integer|exists:documents,id',
         ];
     }
 

@@ -21,15 +21,17 @@ class ProviderPayout extends Model
     }
     public function scopeMyPayout($query)
     {
-        if(auth()->user()->hasRole('admin')) {
+        $user = auth()->user();
+
+        if($user->hasAnyRole(['admin', 'demo_admin']) || in_array($user->user_type, ['admin', 'demo_admin'], true)) {
             return $query;
         }
 
-        if(auth()->user()->hasRole('provider')) {
-            return $query->where('provider_id', \Auth::id());
+        if($user->hasRole('provider') || $user->user_type === 'provider') {
+            return $query->where('provider_id', $user->id);
         }
 
-        return $query;
+        return $query->whereRaw('1 = 0');
     }
 
 }

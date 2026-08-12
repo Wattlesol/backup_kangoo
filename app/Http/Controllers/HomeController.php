@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\Service;
 use App\Models\Slider;
 use App\Models\Category;
+use App\Models\SubCategory;
 use App\Models\ProviderDocument;
 use App\Models\AppSetting;
 use App\Models\Setting;
@@ -58,7 +59,21 @@ class HomeController extends Controller
         $data['dashboard'] = [
             'count_total_booking'               => Booking::myBooking()->count(),
             'count_total_service'               => Service::myService()->count(),
-            'count_total_provider'              => User::myUsers('get_provider')->count(),
+            'count_total_provider'              => User::myUsers('get_provider')->where('status', 1)->count(),
+            'count_active_service'              => Service::myService()->where('status', 1)->count(),
+            'count_pending_orders'               => Booking::myBooking()->where(function ($query) {
+                $query->whereIn('sanad_stage', ['submitted', 'pending_review'])
+                    ->orWhere(function ($legacy) { $legacy->whereNull('sanad_stage')->where('status', 'pending'); });
+            })->count(),
+            'count_in_progress_orders'           => Booking::myBooking()->where(function ($query) {
+                $query->whereIn('sanad_stage', ['assigned_to_partner', 'assigned_to_employee', 'in_progress'])
+                    ->orWhere(function ($legacy) { $legacy->whereNull('sanad_stage')->whereIn('status', ['accept', 'in_progress']); });
+            })->count(),
+            'count_completed_orders'            => Booking::myBooking()->where(function ($query) {
+                $query->whereIn('sanad_stage', ['completed', 'closed'])
+                    ->orWhere(function ($legacy) { $legacy->whereNull('sanad_stage')->where('status', 'completed'); });
+            })->count(),
+            'count_cancelled_orders'            => Booking::myBooking()->where('status', 'cancelled')->count(),
             'new_customer'                      => User::myUsers('get_customer')->orderBy('id', 'DESC')->take(5)->get(),
             'new_provider'                      => User::myUsers('get_provider')->with('getServiceRating')->orderBy('id', 'DESC')->take(5)->get(),
             'upcomming_booking'                 => Booking::myBooking()->with('customer')->where('status', 'pending')->orderBy('id', 'DESC')->take(5)->get(),
@@ -149,8 +164,7 @@ class HomeController extends Controller
     }
     public function providerDashboard($data)
     {
-
-        return view('dashboard.provider-dashboard', compact('data'));
+        return redirect()->route('provider.dashboard');
     }
     public function handymanDashboard($data)
     {
@@ -159,31 +173,7 @@ class HomeController extends Controller
     }
     public function userDashboard($data)
     {
-        $user = auth()->user();
-
-        // Get customer's order statistics
-        $orderStats = [
-            'total_orders' => 0,
-            'pending_orders' => 0,
-            'completed_orders' => 0,
-            'total_spent' => 0
-        ];
-
-        // Check if Order model and orders table exist (for e-commerce functionality)
-        if (class_exists('App\Models\Order') && \Illuminate\Support\Facades\Schema::hasTable('orders')) {
-            $orders = \App\Models\Order::where('customer_id', $user->id);
-            $orderStats = [
-                'total_orders' => (clone $orders)->count(),
-                'pending_orders' => (clone $orders)->where('status', 'pending')->count(),
-                'completed_orders' => (clone $orders)->where('status', 'completed')->count(),
-                'total_spent' => (clone $orders)->where('payment_status', 'paid')->sum('total_amount')
-            ];
-        }
-
-        $data['order_stats'] = $orderStats;
-        $data['user_id'] = $user->id;
-
-        return view('dashboard.user-dashboard', compact('data'));
+        return redirect()->route('customer-portal.dashboard');
     }
 
     private function sanadEmployeeDashboardData(User $user)
@@ -518,6 +508,12 @@ class HomeController extends Controller
                 $service->status = $request->status;
                 $service->save();
                 break;
+            case 'service_featured':
+                $message_form = __('messages.service');
+                $service = \App\Models\Service::find($request->id);
+                $service->is_featured = $request->status;
+                $service->save();
+                break;
             case 'coupon_status':
                 $coupon = \App\Models\Coupon::find($request->id);
                 $coupon->status = $request->status;
@@ -538,6 +534,10 @@ class HomeController extends Controller
                 $message_form = __('messages.providerdocument');
                 $document = \App\Models\ProviderDocument::find($request->id);
                 $document->is_verified = $request->status;
+                $document->verification_status = $request->status ? 'approved' : 'pending';
+                $document->review_reason = null;
+                $document->reviewed_by = auth()->id();
+                $document->reviewed_at = now();
                 $document->save();
                 break;
             case 'tax_status':
@@ -956,7 +956,18 @@ class HomeController extends Controller
 
     public function removeFile(Request $request)
     {
-        if (demoUserPermission()) {
+        // Demo admin is allowed to add/remove catalog media during QA. Keep the
+        // legacy demo restriction for unrelated destructive settings/actions.
+        $demoMediaTypes = [
+            'category_image',
+            'category_icon',
+            'subcategory_image',
+            'service_attachment',
+            'package_attachment',
+            'serviceaddon_image',
+        ];
+
+        if (demoUserPermission() && !in_array($request->type, $demoMediaTypes, true)) {
             $message = __('messages.demo_permission_denied');
             $response = [
                 'status'    => false,
@@ -984,7 +995,15 @@ class HomeController extends Controller
                 break;
             case 'category_image':
                 $data = Category::find($request->id);
-                $message = __('messages.msg_removed', ['name' => __('messages.category')]);
+                $message = __('messages.msg_removed', ['name' => __('messages.category') . ' image']);
+                break;
+            case 'category_icon':
+                $data = Category::find($request->id);
+                $message = __('messages.msg_removed', ['name' => __('messages.category') . ' icon']);
+                break;
+            case 'subcategory_image':
+                $data = SubCategory::find($request->id);
+                $message = __('messages.msg_removed', ['name' => __('messages.subcategory') . ' image']);
                 break;
             case 'provider_document':
                 $data = ProviderDocument::find($request->id);

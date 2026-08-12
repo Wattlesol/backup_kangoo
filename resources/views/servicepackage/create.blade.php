@@ -5,7 +5,7 @@
             <div class="card card-block card-stretch">
                 <div class="card-body p-0">
                     <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                        <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
+                        <h5 class="font-weight-bold">{{ !empty($servicepackage->id) ? 'Update Service Bundle' : 'Create Service Bundle' }}</h5>
                         @if($auth_user->can('servicepackage list'))
                         <a href="{{ route('servicepackage.index') }}" class="float-right btn btn-sm btn-primary"><i class="fa fa-angle-double-left"></i> {{ __('messages.back') }}</a>
                         @endif
@@ -24,26 +24,18 @@
                             {{ Form::text('name',old('name'),['placeholder' => trans('messages.name'),'class' =>'form-control','required']) }}
                             <small class="help-block with-errors text-danger"></small>
                         </div>
-                        @if(auth()->user()->hasAnyRole(['admin','demo_admin']))
                         <div class="form-group col-md-4">
-                            {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.provider') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                            <br />
-                            {{ Form::select('provider_id', [ optional($servicepackage->providers)->id => optional($servicepackage->providers)->display_name ], optional($servicepackage->providers)->id, [
-                                    'class' => 'select2js form-group',
-                                    'id' => 'provider_id',
-                                    'required',
-                                    'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.provider') ]),
-                                    'data-ajax--url' => route('ajax-list', ['type' => 'provider']),
-                            ]) }}
+                            {{ Form::label('name_ar','Arabic Name <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
+                            {{ Form::text('name_ar',old('name_ar'),['placeholder' => 'اسم الحزمة بالعربية','class' =>'form-control','dir'=>'rtl','required']) }}
+                            <small class="help-block with-errors text-danger"></small>
                         </div>
-                        @endif
-
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-4 sanad-legacy-field">
                             {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.user') ]).' ',['class'=>'form-control-label',],false) }}
                             <br />
-                            {{ Form::select('category_id', [],"",[
+                            {{ Form::select('legacy_user_id', [],"",[
                                 'class' => 'select2js form-group category',
                                 'id' => 'user_id',
+                                'disabled' => true,
                                 'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.user') ]),
                                 'data-ajax--url' => route('ajax-list', ['type' => 'user']),
                             ]) }}
@@ -68,27 +60,18 @@
 
                             ]) }}
                         </div>
-                        <div class="form-group col-md-4 " id="select_subcategory">
+                        <div class="form-group col-md-4 sanad-legacy-field" id="select_subcategory">
                             {{ Form::label('name', "Price List",['class'=>'form-control-label'],false) }}
                             <br />
                             {{ Form::select('pricelist_id',$PriceList, [
                                 'class' => 'select2 form-group pricelist',
                                 'id' => 'pricelist',
+                                'disabled' => true,
                                 'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.pricelist') ]),
 
                             ]) }}
                         </div>
 
-                        <div class="form-group col-md-4 " id="select_subcategory">
-                            {{ Form::label('name', "Services",['class'=>'form-control-label'],false) }}
-                            <br />
-                            {{ Form::select('service_id',$AllServices, [
-                                'class' => 'select2 form-group pricelist',
-                                'id' => 'services',
-                                'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.service') ]),
-
-                            ]) }}
-                        </div>
 {{--                        <div class="form-group col-md-4">--}}
 {{--                            {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.service') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}--}}
 {{--                            <br />--}}
@@ -100,12 +83,12 @@
 {{--                                'required' => 'required',--}}
 {{--                            ]) }}--}}
 {{--                        </div>--}}
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-4 sanad-legacy-field">
                             {{ Form::label('duration',__('messages.duration').'',['class'=>'form-control-label'], false ) }}
                             {{ Form::text('duration',old('duration'),['placeholder' => __('messages.duration'),'class' =>'form-control']) }}
                             <small class="help-block with-errors text-danger"></small>
                         </div>
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-4 sanad-legacy-field">
                             {{ Form::label('Car_Number',"Car Number",['class'=>'form-control-label'], false ) }}
                             {{ Form::text('car_number',old('car_number'),['placeholder' => "Car Number",'class' =>'form-control']) }}
                             <small class="help-block with-errors text-danger"></small>
@@ -113,23 +96,23 @@
 
                         <div class="form-group col-md-4" id="price_div">
                                 {{ Form::label('price',__('messages.price').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                {{ Form::number('price',null, [ 'min' => 1, 'step' => 'any' , 'placeholder' => __('messages.price'),'class' =>'form-control', 'required','id' => 'price' ]) }}
-                                <small class="help-block with-errors text-danger"></small>
+                                {{ Form::number('price',null, [ 'min' => 0, 'step' => 'any' , 'placeholder' => 'Auto-calculated from selected services if left empty','class' =>'form-control','id' => 'price' ]) }}
+                                <small class="help-block text-muted">Leave empty to use the total of selected service prices.</small>
                             </div>
                         <div class="form-group col-md-4">
                             {{ Form::label('status',trans('messages.status').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                             {{ Form::select('status',['1' => __('messages.active') , '0' => __('messages.inactive') ],old('status'),[ 'id' => 'role' ,'class' =>'form-control select2js','required']) }}
                         </div>
-                        <div class="form-group col-md-4">
-                            {{ Form::label('status','Type',['class'=>'form-control-label'],false) }}
+                        <div class="form-group col-md-4 sanad-legacy-field">
+                            {{ Form::label('status','Bundle Type',['class'=>'form-control-label'],false) }}
                             {{ Form::select('package_type', ['single' => 'فردي', 'family' => 'عائلي ','Breaks'=>"استراحات",'specific_place'=>"مكان محدد"], null, [
                         'class' =>'form-control',
-                                        'required' => 'required',
+                                        'disabled' => true,
                                     ]) }}                        </div>
                         <div class="form-group col-md-4">
                             <label class="form-control-label" for="package_attachment">{{ __('messages.image') }} <span class="text-danger">*</span> </label>
                             <div class="custom-file">
-                            <input type="file" name="package_attachment[]" class="custom-file-input"  data-file-error="{{ __('messages.files_not_allowed') }}" multiple required>
+                            <input type="file" name="package_attachment[]" class="custom-file-input"  data-file-error="{{ __('messages.files_not_allowed') }}" multiple {{ empty($servicepackage->id) ? 'required' : '' }}>
                                 <label class="custom-file-label upload-label">{{ __('messages.choose_file',['file' =>  __('messages.attachments') ]) }}</label>
                             </div>
                         </div>
@@ -176,23 +159,25 @@
                             </div>
                         </div>
 
-                    <div class="row">
-                     <h3>Service </h3>
+                        <div class="row">
+                            <h3>Bundle Service Details</h3>
 
                         <div class="table-responsive">
-                            <button type="button" class="float-right mr-1 btn btn-sm btn-primary " id="add_service"><i class="fa fa-plus-circle"></i> Add Service</button>
+                            <div class="d-flex justify-content-end flex-wrap gap-2">
+                                <a href="{{ route('service.create') }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                    <i class="fa fa-plus"></i> Create New Service
+                                </a>
+                                <button type="button" class="btn btn-sm btn-primary" id="add_service"><i class="fa fa-plus-circle"></i> Add Service</button>
+                            </div>
                             <br>
                             <br>
                             <br>
                             <table class="table">
                                 <thead>
                                 <tr>
-                                    <th scope="col">service</th>
-                                    <th scope="col">service Type</th>
-                                    <th scope="col">count</th>
-                                    <th scope="col">Usage times</th>
-                                    <th scope="col">Duration of use before next time</th>
-                                    <th scope="col">Price</th>
+                                    <th scope="col">Service</th>
+                                    <th scope="col">Service Price</th>
+                                    <th scope="col" class="text-right">Action</th>
                                 </tr>
                                 </thead>
                                 <tbody id="service_list">
@@ -234,32 +219,20 @@
 
                 var category_id = "{{ isset($servicepackage->category_id) ? $servicepackage->category_id : '' }}";
                 var subcategory_id = "{{ isset($servicepackage->subcategory_id) ? $servicepackage->subcategory_id : '' }}";
-                var provider_id = "{{ isset($servicepackage->provider_id) ? $servicepackage->provider_id : '' }}";
                 var service_id = "{{$servicepackage->packageServices->pluck('service_id')->implode(',')}}"
-                if(service_id !== ''){
-                    getService(service_id)
-                }
                 getSubCategory(category_id, subcategory_id)
-                getService(provider_id)
-                $(document).on('change', '#provider_id', function() {
-                    var provider_id = $(this).val();
-                    $('#custom_service_id').empty();
-                    getService(provider_id,category_id)
-                })
+                getService()
 
                    $(document).on('change', '#package_type', function() {
 
-                    var provider_id=$('#provider_id').val();
-
                     $('#custom_service_id').empty();
-                    getService(provider_id)
+                    getService()
                 })
 
 
 
                 $(document).on('change', '#category_id', function() {
                     var category_id = $(this).val();
-                    var provider_id = $('#provider_id').val();
                     var subcategory_id = $('#subcategory_id').val();
 
 
@@ -267,17 +240,16 @@
                     getSubCategory(category_id, subcategory_id);
 
                     $('#custom_service_id').empty();
-                    getService(provider_id,category_id,subcategory_id)
+                    getService(category_id,subcategory_id)
                 })
 
                 $(document).on('change', '#subcategory_id', function() {
                     var subcategory_id = $(this).val();
                     var category_id = $('#category_id').val();
-                    var provider_id = $('#provider_id').val();
                     var selectedServiceIds = $('#custom_service_id').val();
 
                     $('#custom_service_id').empty();
-                    getService(provider_id,category_id,subcategory_id,selectedServiceIds)
+                    getService(category_id,subcategory_id,selectedServiceIds)
                 })
             })
 
@@ -313,12 +285,12 @@
                     }
                 });
             }
-            function getService(provider_id,category_id,subcategory_id,service_id=''){
+            function getService(category_id,subcategory_id,service_id=''){
                 var selectedServiceId = {!! json_encode($selectedServiceId) !!};
                 $.ajax({
                     url: "{{ route('service-list') }}",
                     method:"POST",
-                    data : { '_token': $('meta[name=csrf-token]').attr('content'),provider_id : provider_id,category_id:category_id,subcategory_id:subcategory_id },
+                    data : { '_token': $('meta[name=csrf-token]').attr('content'),category_id:category_id,subcategory_id:subcategory_id },
 
                     success: function(result) {
                         console.log(result)
@@ -338,50 +310,86 @@
 
         $(function () {
             var i = 1;
+            var servicePrices = @json($servicePrices ?? []);
+            var existingServiceIds = @json($selectedServiceId ?? []);
+            var serviceOptions = `{{ Form::select('service_id_data[]', $services_data, null, [
+                'class' => 'form-control bundle-service-select',
+                'data-placeholder' => __('messages.select_name', ['select' => __('messages.service')]),
+                'required' => 'required',
+            ]) }}`;
+
+            function formatPrice(value) {
+                var amount = parseFloat(value || 0);
+                return amount.toFixed(2);
+            }
+
+            function selectedServiceIds() {
+                return $('.bundle-service-select').map(function () {
+                    return $(this).val();
+                }).get().filter(Boolean);
+            }
+
+            function refreshRowPrice(row) {
+                var serviceId = row.find('.bundle-service-select').val();
+                row.find('.bundle-service-price').text(formatPrice(servicePrices[serviceId] || 0));
+                row.find('.bundle-service-price-input').val(servicePrices[serviceId] || 0);
+            }
+
+            function refreshBundleTotal() {
+                if ($('#price').val() !== '') return;
+                var total = selectedServiceIds().reduce(function(sum, serviceId) {
+                    return sum + parseFloat(servicePrices[serviceId] || 0);
+                }, 0);
+                $('#price').attr('placeholder', total > 0 ? formatPrice(total) : 'Auto-calculated from selected services if left empty');
+            }
+
+            function addServiceRow(serviceId) {
+                var row = $(`<tr>
+                    <td class="align-middle">${serviceOptions}</td>
+                    <td class="align-middle">
+                        <strong class="bundle-service-price">0.00</strong>
+                        <input type="hidden" name="price_data[]" class="bundle-service-price-input" value="0">
+                        <input type="hidden" name="service_type_data[]" value="limited">
+                        <input type="hidden" name="count[]" value="1">
+                        <input type="hidden" name="usage_times[]" value="1">
+                        <input type="hidden" name="duration_of_use[]" value="">
+                    </td>
+                    <td class="align-middle text-right">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-service-row"><i class="fa fa-times"></i></button>
+                    </td>
+                </tr>`);
+                $("#service_list").append(row);
+                row.find('.bundle-service-select').val(serviceId || '');
+                refreshRowPrice(row);
+                refreshBundleTotal();
+            }
+
+            existingServiceIds.forEach(function(serviceId) {
+                addServiceRow(serviceId);
+            });
+
             // add new row in Main Dive
             $("#add_service").click(function () {
-
-                $("#service_list").append(
-                    `<tr>
-    <td>
-        {{ Form::select('service_id_data[]', $services_data, [], [
-            'class' => 'select2js form-group',
-            'data-placeholder' => __('messages.select_name', ['select' => __('messages.service')]),
-            'required' => 'required',
-        ]) }}
-                    </td>
-                             <td>
-{{ Form::select('service_type_data[]', ['limited' => 'Limited', 'unlimited' => 'Unlimited'], null, [
-            'class' => 'form-group',
-            'required' => 'required',
-        ]) }}
-                    </td>
-                    <td>
-                        <input required type="number" name="count[]" />
-                    </td>
-                    <td>
-                        <input required type="number" name="usage_times[]" />
-                    </td>
-                    <td>
-                        <input  required type="text" name="duration_of_use[]" />
-                    </td>
-                    <td>
-                        <input required type="number" step="0.01" name="price_data[]" />
-                    </td>
-
-                </tr>`
-                );
+                addServiceRow();
                 i++;
             });
 
-            //remove selected Row
-            // $("#devices").on("click", ".btn", function () {
-            //     $(this).parent().remove();
-            //
-            // });
+            $("#service_list").on("change", ".bundle-service-select", function () {
+                var row = $(this).closest('tr');
+                refreshRowPrice(row);
+                refreshBundleTotal();
+            });
+
+            $("#service_list").on("click", ".remove-service-row", function () {
+                $(this).closest('tr').remove();
+                refreshBundleTotal();
+            });
+
+            $('#price').on('input', refreshBundleTotal);
 
 
         });
     </script>
 @endsection
 </x-master-layout>
+<style>.sanad-legacy-field{display:none!important}</style>

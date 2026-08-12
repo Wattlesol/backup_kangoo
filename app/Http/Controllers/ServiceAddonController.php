@@ -9,6 +9,10 @@ use App\Http\Requests\ServiceAddonRequest;
 
 class ServiceAddonController extends Controller
 {
+    private function ensureSanadCatalogAdmin(Request $request): void
+    {
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+    }
     /**
      * Display a listing of the resource.
      *
@@ -57,7 +61,7 @@ class ServiceAddonController extends Controller
             })
 
             ->editColumn('service_id', function ($query) {
-                return ($query->service_id != null && isset($query->service)) ? $query->service->name : '-';
+                return ($query->service_id != null && isset($query->service)) ? $query->service->name : 'All Services';
             })
             ->editColumn('price', function ($query) {
                 return ($query->price != null && isset($query->price)) ? getPriceFormat($query->price) : '-';
@@ -72,6 +76,7 @@ class ServiceAddonController extends Controller
 
     public function bulk_action(Request $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         $ids = explode(',', $request->rowIds);
 
         $actionType = $request->action_type;
@@ -104,6 +109,7 @@ class ServiceAddonController extends Controller
      */
     public function create(Request $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         //
         $id = $request->id;
         $auth_user = authSession();
@@ -126,15 +132,17 @@ class ServiceAddonController extends Controller
      */
     public function store(ServiceAddonRequest $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         //
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $data['service_id'] = $request->filled('service_id') ? $request->service_id : null;
 
         $data['created_by'] = auth()->user()->id;
        
-        $result = ServiceAddon::updateOrCreate(['id' => $data['id'] ],$data);
+        $result = ServiceAddon::updateOrCreate(['id' => $data['id'] ?? null],$data);
         
             storeMediaFile($result,$request->serviceaddon_image, 'serviceaddon_image');
         
@@ -171,7 +179,8 @@ class ServiceAddonController extends Controller
      */
     public function edit(ServiceAddon $serviceAddon)
     {
-        //
+        $this->ensureSanadCatalogAdmin(request());
+        return redirect()->route('serviceaddon.create', ['id' => $serviceAddon->id]);
     }
 
     /**
@@ -183,7 +192,24 @@ class ServiceAddonController extends Controller
      */
     public function update(Request $request, ServiceAddon $serviceAddon)
     {
-        //
+        $this->ensureSanadCatalogAdmin($request);
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'name_ar' => 'required|string|max:255',
+            'service_id' => 'nullable|exists:services,id',
+            'price' => 'required|numeric|min:0',
+            'status' => 'nullable|boolean',
+            'serviceaddon_image' => 'nullable|mimes:jpg,jpeg,png,webp',
+        ]);
+        $data['service_id'] = $request->filled('service_id') ? $request->service_id : null;
+        $data['created_by'] = $serviceAddon->created_by ?: auth()->id();
+        $serviceAddon->update($data);
+        if ($request->hasFile('serviceaddon_image')) {
+            storeMediaFile($serviceAddon, $request->file('serviceaddon_image'), 'serviceaddon_image');
+        }
+        return redirect()->route('serviceaddon.index')->withSuccess(
+            trans('messages.update_form', ['form' => trans('messages.service_addon')])
+        );
     }
 
     /**
@@ -194,6 +220,7 @@ class ServiceAddonController extends Controller
      */
     public function destroy($id)
     {
+        $this->ensureSanadCatalogAdmin(request());
         //
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));

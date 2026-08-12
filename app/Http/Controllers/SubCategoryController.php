@@ -10,6 +10,11 @@ use Yajra\DataTables\DataTables;
 
 class SubCategoryController extends Controller
 {
+    private function ensureSanadCatalogAdmin(): void
+    {
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -164,6 +169,7 @@ class SubCategoryController extends Controller
      */
     public function store(SubCategoryRequest $request)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
@@ -213,7 +219,7 @@ class SubCategoryController extends Controller
      */
     public function edit($id)
     {
-        //
+        return redirect()->route('subcategory.create', ['id' => $id]);
     }
 
     /**
@@ -225,7 +231,9 @@ class SubCategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->ensureSanadCatalogAdmin();
+        $request->merge(['id' => $id]);
+        return $this->store(app(SubCategoryRequest::class));
     }
 
     /**
@@ -236,6 +244,7 @@ class SubCategoryController extends Controller
      */
     public function destroy($id)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }

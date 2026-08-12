@@ -9,7 +9,7 @@
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">مراقبه الجوده</h5>
+                            <h5 class="font-weight-bold">Quality Control</h5>
                             <!-- Button trigger modal -->
                             <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
                                 Create
@@ -31,12 +31,21 @@
                                                 <div class="row">
                                                     <div class="col-md-12">
                                                         <div class="form-group">
-                                                            <label for="exampleInputEmail1" class="form-label">عنوان الشكوي<span style="color: red">*</span></label>
+                                                        <label for="exampleInputEmail1" class="form-label">Issue Title<span style="color: red">*</span></label>
                                                             <input type="text" class="form-control" value="{{@old('title')}}"  name="title" aria-describedby="emailHelp"
                                                                    placeholder="عنوان الشكوي">
                                                         </div>
                                                     </div>
 
+                                                    <div class="form-group col-md-12">
+                                                        <label for="issue_type" class="form-control-label">Issue Type</label>
+                                                        <select name="issue_type" id="issue_type" class="form-control" required>
+                                                            <option value="customer_complaint">Customer Complaint</option>
+                                                            <option value="escalation">Escalation</option>
+                                                            <option value="sla_violation">SLA Violation</option>
+                                                            <option value="customer_feedback">Customer Feedback</option>
+                                                        </select>
+                                                    </div>
                                                     <div class="form-group col-md-12">
                                                         {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.provider') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                                         <br />
@@ -75,6 +84,14 @@
                 <form class="row">
                     <!-- Provider Field -->
                     <div class="col-md-6">
+                        <label for="issue_type_filter">Issue Type</label>
+                        <select name="issue_type" id="issue_type_filter" class="form-control mb-2">
+                            <option value="">All Issue Types</option>
+                            <option value="customer_complaint">Customer Complaints</option>
+                            <option value="escalation">Escalations</option>
+                            <option value="sla_violation">SLA Violations</option>
+                            <option value="customer_feedback">Customer Feedback</option>
+                        </select>
                         {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.provider') ]).' <span class="text-danger">*</span>', ['class'=>'form-control-label'], false) }}
                         {{ Form::select('provider_id', [], "", [
                             'class' => 'select2js form-control',
@@ -119,7 +136,8 @@
             <thead>
             <tr>
                 <th>#</th>
-                <th>مزود الخدمه</th>
+                <th>Partner</th>
+                <th>Issue Type</th>
                 <th>الحاله</th>
                 <th>انشاء بواسطه</th>
                 <th>عرض</th>
@@ -130,6 +148,7 @@
                 <tr>
                     <td>{{$key+1}}</td>
                     <td>{{$item->provider->display_name}}</td>
+                    <td>{{ str_replace('_', ' ', ucfirst($item->issue_type ?: 'customer_complaint')) }}</td>
                     <td>{{trans('messages.'.\App\Enums\ComplaintEnums::GetById($item->status))}}</td>
                     <td>{{$item->createdby->display_name}}</td>
 

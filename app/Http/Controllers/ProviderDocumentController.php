@@ -92,7 +92,13 @@ class ProviderDocumentController extends Controller
 
         switch ($actionType) {
             case 'change-featured':
-                $branches = ProviderDocument::whereIn('id', $ids)->update(['is_verified' => $request->is_verified]);
+                $branches = ProviderDocument::whereIn('id', $ids)->update([
+                    'is_verified' => $request->is_verified,
+                    'verification_status' => $request->is_verified ? 'approved' : 'pending',
+                    'review_reason' => null,
+                    'reviewed_by' => auth()->id(),
+                    'reviewed_at' => now(),
+                ]);
                 $message = 'Bulk ProviderDocument Featured Updated';
                 break;
 
@@ -161,6 +167,10 @@ class ProviderDocumentController extends Controller
             $data['provider_id'] = auth()->id();
         }
         $data['is_verified'] = !empty($data['is_verified']) ? $data['is_verified']: 0;
+        $data['verification_status'] = $data['is_verified'] ? 'approved' : 'pending';
+        $data['review_reason'] = null;
+        $data['reviewed_by'] = auth()->id();
+        $data['reviewed_at'] = now();
         $data['provider_id'] = !empty( $data['provider_id'] ) ?  $data['provider_id'] : auth()->user()->id;
         $result = ProviderDocument::updateOrCreate(['id' => $request->id ],$data);
         storeMediaFile($result,$request->provider_document, 'provider_document');

@@ -29,6 +29,9 @@ class QualityControlController extends Controller
         if (request()->status) {
             $query->where('status', request()->status);
         }
+        if (request()->issue_type) {
+            $query->where('issue_type', request()->issue_type);
+        }
         $data = $query->paginate(20);
         $title = "مراقبه الجوده";
         $route = route('time.create');
@@ -65,6 +68,7 @@ class QualityControlController extends Controller
             'title' => $request->title,
             'created_by' => auth()->user()->id,
             'provider_id' => $request->provider_id,
+            'issue_type' => $request->issue_type ?: 'customer_complaint',
         ]);
 
 

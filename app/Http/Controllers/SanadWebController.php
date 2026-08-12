@@ -7,20 +7,90 @@ use App\Models\BookingHandymanMapping;
 use App\Models\Payment;
 use App\Models\SanadAiInteraction;
 use App\Models\SanadAiKnowledgeItem;
+use App\Services\SanadAiRagService;
+use App\Services\SanadKnowledgeIngestionService;
 use App\Models\SanadAuditLog;
 use App\Models\SanadBuzzAlert;
 use App\Models\SanadChatMessage;
 use App\Models\SanadChatThread;
 use App\Models\SanadDocumentVaultItem;
 use App\Models\SanadRequestAction;
+use App\Models\SanadPartnerServicePerformance;
 use App\Models\User;
+use App\Models\ProviderDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Models\SanadAssignmentDecision;
+use App\Services\SanadAssignmentService;
+use App\Models\Notification;
+use App\Models\SanadDocumentRequest;
 
 class SanadWebController extends Controller
 {
+    public function assignments(Request $request, SanadAssignmentService $assignmentService)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+        $query = Booking::with(['customer', 'service', 'provider'])->latest();
+        if ($request->assignment_state === 'unassigned') $query->whereNull('provider_id');
+        if ($request->assignment_state === 'assigned') $query->whereNotNull('provider_id');
+        $orders = $query->paginate(25)->withQueryString();
+        $partners = User::where('user_type', 'provider')->where('status', 1)->orderBy('display_name')->get();
+        $latestDecisions = SanadAssignmentDecision::with(['selectedProvider', 'actor'])
+            ->whereIn('booking_id', $orders->pluck('id'))
+            ->latest()
+            ->get()
+            ->groupBy('booking_id')
+            ->map(fn ($items) => $items->first());
+        $recommendations = [];
+        foreach ($orders as $order) {
+            $recommendations[$order->id] = $assignmentService->candidates($order)->take(3);
+            $top = $recommendations[$order->id]->first();
+            if ($top && !$order->provider_id && !SanadAssignmentDecision::where('booking_id', $order->id)->where('status', 'recommended')->exists()) {
+                SanadAssignmentDecision::create([
+                    'booking_id' => $order->id,
+                    'recommended_provider_id' => $top->id,
+                    'assignment_mode' => 'suggested',
+                    'status' => 'recommended',
+                    'score_snapshot' => ['selected_score' => $top->assignment_score, 'metrics' => $top->assignment_metrics],
+                ]);
+            }
+        }
+        return view('sanad.assignments', compact('orders', 'recommendations', 'partners', 'latestDecisions'));
+    }
+
+    public function confirmAssignment(Request $request, $id, SanadAssignmentService $assignmentService)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+        $booking = Booking::findOrFail($id);
+        $request->validate(['provider_id' => 'required|exists:users,id', 'reason' => 'nullable|string|max:2000']);
+        if ($booking->provider_id && !$request->reason) return back()->withErrors('A reason is required when reassigning an order.');
+        $candidates = $assignmentService->candidates($booking);
+        $selected = $candidates->firstWhere('id', (int) $request->provider_id)
+            ?: User::where('user_type', 'provider')->where('status', 1)->find($request->provider_id);
+        if (!$selected) return back()->withErrors('The selected Partner is inactive or unavailable.');
+        $selectedScore = $selected->assignment_score ?? null;
+        $selectedMetrics = $selected->assignment_metrics ?? [];
+        $decision = SanadAssignmentDecision::create([
+            'booking_id' => $booking->id,
+            'recommended_provider_id' => optional($candidates->first())->id,
+            'selected_provider_id' => $selected->id,
+            'assignment_mode' => $request->mode ?: 'suggested',
+            'status' => 'pending_partner_acceptance', 'reason' => $request->reason,
+            'score_snapshot' => ['selected_score' => $selectedScore, 'metrics' => $selectedMetrics, 'candidates' => $candidates->take(3)->map(fn ($p) => ['id' => $p->id, 'score' => $p->assignment_score])->values()],
+            'decided_by' => auth()->id(),
+        ]);
+        $booking->provider_id = $selected->id;
+        $booking->assignment_mode = $request->mode ?: 'suggested';
+        $booking->assignment_reason = $request->reason;
+        $booking->assigned_by = auth()->id();
+        $booking->assigned_at = now();
+        $booking->status = 'pending';
+        $booking->sanad_stage = 'assigned_to_partner';
+        $booking->save();
+        return back()->withSuccess('Partner assignment sent. Waiting for Partner acceptance.');
+    }
     public function dashboard()
     {
         $auth_user = authSession();
@@ -32,14 +102,42 @@ class SanadWebController extends Controller
         return view('sanad.dashboard', compact('pageTitle', 'auth_user', 'role', 'dashboard'));
     }
 
+    public function partnerPerformance(Request $request)
+    {
+        $performances = SanadPartnerServicePerformance::with(['provider', 'service'])
+            ->when($request->filled('provider_id'), fn ($query) => $query->where('provider_id', $request->provider_id))
+            ->when($request->filled('service_id'), fn ($query) => $query->where('service_id', $request->service_id))
+            ->orderByDesc('quality_score')
+            ->orderByDesc('completed_orders')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('sanad.partner-performance', [
+            'pageTitle' => 'Partner Performance',
+            'auth_user' => authSession(),
+            'performances' => $performances,
+        ]);
+    }
+
     public function aiConsole(Request $request)
     {
         $user = auth()->user();
-        $knowledgeItems = SanadAiKnowledgeItem::latest()->take(10)->get();
-        $interactions = SanadAiInteraction::with('user')
-            ->when(!$user->hasAnyRole(['admin', 'demo_admin']), function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
+        $knowledgeItems = SanadAiKnowledgeItem::withCount('chunks')
+            ->where('title', 'not like', '%Smoke Test%')
+            ->where('title', 'not like', '%Integrated QA Knowledge%')
+            ->where('title', 'not like', '%Driving License Renewal Customer Requirements%')
+            ->where('title', 'not like', '%Payment help%')
+            ->latest()
+            ->paginate(20);
+
+        $interactionQuery = SanadAiInteraction::query()
+            ->where('question', 'not like', '%Smoke Test%')
+            ->where('answer', 'not like', '%Smoke test%')
+            ->where('question', 'not like', '%Integrated QA Knowledge%')
+            ->where('answer', 'not like', '%Integrated QA%')
+            ->when(!$user->hasAnyRole(['admin', 'demo_admin']), fn ($query) => $query->where('user_id', $user->id));
+
+        $interactions = (clone $interactionQuery)->with('user')
             ->latest()
             ->take(10)
             ->get();
@@ -50,19 +148,25 @@ class SanadWebController extends Controller
             'knowledgeItems' => $knowledgeItems,
             'interactions' => $interactions,
             'aiSummary' => [
-                'knowledge_items' => SanadAiKnowledgeItem::count(),
-                'active_knowledge_items' => SanadAiKnowledgeItem::where('is_active', true)->count(),
-                'interactions' => SanadAiInteraction::when(!$user->hasAnyRole(['admin', 'demo_admin']), function ($query) use ($user) {
-                    $query->where('user_id', $user->id);
-                })->count(),
-                'escalations' => SanadAiInteraction::when(!$user->hasAnyRole(['admin', 'demo_admin']), function ($query) use ($user) {
-                    $query->where('user_id', $user->id);
-                })->where('requires_escalation', true)->count(),
+                'knowledge_items' => SanadAiKnowledgeItem::where('title', 'not like', '%Smoke Test%')
+                    ->where('title', 'not like', '%Integrated QA Knowledge%')
+                    ->where('title', 'not like', '%Driving License Renewal Customer Requirements%')
+                    ->where('title', 'not like', '%Payment help%')
+                    ->count(),
+                'active_knowledge_items' => SanadAiKnowledgeItem::where('is_active', true)
+                    ->where('title', 'not like', '%Smoke Test%')
+                    ->where('title', 'not like', '%Integrated QA Knowledge%')
+                    ->where('title', 'not like', '%Driving License Renewal Customer Requirements%')
+                    ->where('title', 'not like', '%Payment help%')
+                    ->count(),
+                'agent_confidence' => round((float) (clone $interactionQuery)->avg('confidence') * 100),
+                'interactions' => (clone $interactionQuery)->count(),
+                'escalations' => (clone $interactionQuery)->where('requires_escalation', true)->count(),
             ],
         ]);
     }
 
-    public function storeAiKnowledge(Request $request)
+    public function storeAiKnowledge(Request $request, SanadAiRagService $rag, SanadKnowledgeIngestionService $ingestion)
     {
         if (!auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
             return redirect()->back()->withErrors('Only admins can manage Sanad AI knowledge.');
@@ -70,49 +174,202 @@ class SanadWebController extends Controller
 
         $request->validate([
             'title' => 'required|string|max:255',
-            'category' => 'nullable|string|max:255',
-            'content' => 'required|string',
+            'content' => 'nullable|string',
+            'knowledge_pdfs' => 'nullable|array',
+            'knowledge_pdfs.*' => 'file|mimes:pdf|max:20480',
+            'google_doc_url' => 'nullable|url|max:1000',
             'visible_to' => 'nullable|array',
         ]);
 
+        $ingested = $ingestion->extract(
+            $request->input('content'),
+            $request->file('knowledge_pdfs', []),
+            $request->input('google_doc_url')
+        );
+
+        if ($ingested['content'] === '') {
+            return redirect()->back()->withErrors('Add content, upload a readable PDF, or provide a public Google Docs link.');
+        }
+
+        $classification = $this->classifyKnowledge($request->title, $ingested['content']);
+
         $item = SanadAiKnowledgeItem::create([
             'title' => $request->title,
-            'category' => $request->category,
-            'content' => $request->content,
+            'category' => $classification['category'],
+            'content' => $ingested['content'],
             'visible_to' => $request->visible_to ?: config('sanad.document_visibility'),
+            'metadata' => [
+                'tags' => $classification['tags'],
+                'ingestion' => $ingested['metadata'],
+                'agent_confidence' => $classification['confidence'],
+            ],
             'is_active' => true,
             'created_by' => optional(auth()->user())->id,
         ]);
+
+        $rag->indexKnowledgeItem($item);
 
         $this->audit($request, 'sanad.ai.knowledge_created', $item);
 
         return redirect()->back()->withSuccess('Sanad AI knowledge item added.');
     }
 
-    public function askAi(Request $request)
+    public function updateAiKnowledge(Request $request, $id, SanadAiRagService $rag)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string',
+            'visible_to' => 'nullable|array',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $item = SanadAiKnowledgeItem::findOrFail($id);
+        $classification = $this->classifyKnowledge($request->title, $request->content);
+        $metadata = $item->metadata ?: [];
+        $metadata['tags'] = $classification['tags'];
+        $metadata['agent_confidence'] = $classification['confidence'];
+        $metadata['fine_tuned_at'] = now()->toIso8601String();
+
+        $item->update([
+            'title' => $request->title,
+            'category' => $classification['category'],
+            'content' => $request->content,
+            'visible_to' => $request->visible_to ?: config('sanad.document_visibility'),
+            'metadata' => $metadata,
+            'is_active' => $request->boolean('is_active', true),
+        ]);
+
+        $rag->indexKnowledgeItem($item);
+        $this->audit($request, 'sanad.ai.knowledge_updated', $item);
+
+        return redirect()->back()->withSuccess('Sanad AI knowledge item updated.');
+    }
+
+    public function askAi(Request $request, SanadAiRagService $rag)
     {
         $request->validate([
             'question' => 'required|string',
             'booking_id' => 'nullable|integer',
         ]);
 
-        $answer = $this->answerFromKnowledgeBase($request->question);
-        $confidence = $answer ? 0.75 : 0.25;
-        $requiresEscalation = $confidence < (float) config('sanad.ai.requires_escalation_when_confidence_below');
+        $booking = $request->booking_id ? Booking::find($request->booking_id) : null;
+        $answer = $rag->answer($request->question, $booking, optional(auth()->user())->user_type ?: 'admin');
+        $confidence = $answer['confidence'];
+        $requiresEscalation = $answer['requires_escalation'];
 
         $interaction = SanadAiInteraction::create([
             'user_id' => optional(auth()->user())->id,
             'booking_id' => $request->booking_id,
             'question' => $request->question,
-            'answer' => $answer ?: 'Your question has been sent to the Sanad support team for review.',
+            'answer' => $answer['answer'],
             'confidence' => $confidence,
             'requires_escalation' => $requiresEscalation,
             'status' => $requiresEscalation ? 'escalated' : 'answered',
+            'metadata' => [
+                'sources' => $answer['sources'],
+                'live_context' => $answer['live_context'],
+                'provider' => $answer['provider_metadata'] ?? [],
+                'langsmith_run_id' => $answer['langsmith_run_id'] ?? null,
+            ],
         ]);
 
         $this->audit($request, 'sanad.ai.asked', $interaction);
 
         return redirect()->back()->withSuccess('Sanad AI response recorded.');
+    }
+
+    public function aiEscalations(Request $request)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'handyman']), 403);
+
+        $baseQuery = $this->realAiInteractionsQuery()
+            ->with(['user', 'booking.customer', 'booking.service']);
+
+        $status = $request->input('status', 'open');
+        $query = clone $baseQuery;
+
+        if ($status === 'open') {
+            $query->where(function ($builder) {
+                $builder->where('requires_escalation', true)
+                    ->orWhereIn('status', ['escalated', 'handover_required', 'needs_revision']);
+            });
+        } elseif ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $interactions = $query->latest()->paginate(15)->withQueryString();
+
+        $summaryQuery = $this->realAiInteractionsQuery();
+        $summary = [
+            'open' => (clone $summaryQuery)->where(function ($builder) {
+                $builder->where('requires_escalation', true)
+                    ->orWhereIn('status', ['escalated', 'handover_required', 'needs_revision']);
+            })->count(),
+            'approved' => (clone $summaryQuery)->where('status', 'approved')->count(),
+            'resolved' => (clone $summaryQuery)->where('status', 'resolved')->count(),
+            'needs_revision' => (clone $summaryQuery)->where('status', 'needs_revision')->count(),
+            'avg_confidence' => round((float) (clone $summaryQuery)->avg('confidence') * 100),
+        ];
+
+        return view('sanad.ai-escalations', [
+            'pageTitle' => 'AI Escalation Workspace',
+            'auth_user' => authSession(),
+            'interactions' => $interactions,
+            'summary' => $summary,
+            'status' => $status,
+        ]);
+    }
+
+    public function reviewAiEscalation(Request $request, $id)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'handyman']), 403);
+
+        $request->validate([
+            'review_action' => 'required|in:approve,edit_approve,resolve,needs_revision',
+            'answer' => 'nullable|string',
+            'review_note' => 'nullable|string|max:2000',
+        ]);
+
+        if ($request->review_action === 'edit_approve' && !trim((string) $request->answer)) {
+            return back()->withErrors('Add the corrected answer before saving and approving.');
+        }
+
+        $interaction = SanadAiInteraction::findOrFail($id);
+        $previous = Arr::only($interaction->toArray(), ['answer', 'status', 'requires_escalation']);
+        $metadata = $interaction->metadata ?: [];
+        $action = $request->review_action;
+
+        if (in_array($action, ['edit_approve', 'approve'], true) && $request->filled('answer')) {
+            $interaction->answer = $request->answer;
+        }
+
+        $interaction->status = [
+            'approve' => 'approved',
+            'edit_approve' => 'approved',
+            'resolve' => 'resolved',
+            'needs_revision' => 'needs_revision',
+        ][$action];
+        $interaction->requires_escalation = $action === 'needs_revision';
+        $metadata['review'] = [
+            'action' => $action,
+            'note' => $request->review_note,
+            'reviewed_by' => auth()->id(),
+            'reviewed_by_name' => optional(auth()->user())->display_name ?: optional(auth()->user())->first_name ?: optional(auth()->user())->email,
+            'reviewed_at' => now()->toIso8601String(),
+            'previous' => $previous,
+        ];
+        $interaction->metadata = $metadata;
+        $interaction->save();
+
+        $this->audit($request, 'sanad.ai.escalation_reviewed', $interaction, [
+            'action' => $action,
+            'previous' => $previous,
+            'current' => Arr::only($interaction->toArray(), ['answer', 'status', 'requires_escalation']),
+        ]);
+
+        return back()->withSuccess('AI escalation review saved.');
     }
 
     public function indexRequests(Request $request)
@@ -331,6 +588,20 @@ class SanadWebController extends Controller
         }
         $booking->save();
 
+        if ($request->action === 'accept_order') {
+            $assignmentDecision = SanadAssignmentDecision::where('booking_id', $booking->id)
+                ->where('selected_provider_id', $booking->provider_id)
+                ->latest()
+                ->first();
+            if ($assignmentDecision) {
+                $snapshot = $assignmentDecision->score_snapshot ?: [];
+                $snapshot['accepted_at'] = now()->toIso8601String();
+                $assignmentDecision->status = 'accepted';
+                $assignmentDecision->score_snapshot = $snapshot;
+                $assignmentDecision->save();
+            }
+        }
+
         $action = SanadRequestAction::create([
             'booking_id' => $booking->id,
             'actor_id' => optional(auth()->user())->id,
@@ -484,45 +755,285 @@ class SanadWebController extends Controller
 
     public function storeDocument(Request $request, $id)
     {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'provider', 'user']), 403);
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
             'document_type' => 'required|string|max:255',
+            'document_key' => 'nullable|string|max:100',
+            'source' => 'nullable|in:request,customer,partner',
+            'provider_id' => 'nullable|exists:users,id',
             'file_name' => 'nullable|string|max:255',
             'file_path' => 'nullable|string|max:255',
+            'document' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
             'visible_to' => 'nullable|array',
             'visible_to.*' => 'string',
             'retention_until' => 'nullable|date',
         ]);
 
+        $source = $request->source ?: (auth()->user()->hasRole('provider') ? 'partner' : 'customer');
+        if (auth()->user()->hasRole('provider') && (int) $request->provider_id !== auth()->id()) abort(403);
+        $allowedDocuments = $this->serviceDocumentOptions($booking->service);
+        if ($allowedDocuments->isNotEmpty() && auth()->user()->hasAnyRole(['provider', 'user']) && $request->document_key !== 'custom') {
+            $submittedType = trim((string) $request->document_type);
+            $submittedKey = trim((string) $request->document_key);
+            $isConfigured = $allowedDocuments->contains(function ($document) use ($submittedType, $submittedKey) {
+                return $document['name'] === $submittedType || ($submittedKey !== '' && $document['key'] === $submittedKey);
+            });
+            if (!$isConfigured) {
+                return redirect()->back()->withErrors('Please select a configured document type for this service.');
+            }
+        }
         $document = SanadDocumentVaultItem::create([
             'booking_id' => $booking->id,
+            'service_id' => $booking->service_id,
+            'provider_id' => $source === 'partner' ? ($request->provider_id ?: $booking->provider_id) : null,
             'owner_id' => $booking->customer_id,
             'uploaded_by' => optional(auth()->user())->id,
             'document_type' => $request->document_type,
+            'document_key' => $request->document_key,
+            'source' => $source,
             'visible_to' => $request->visible_to ?: ['admin'],
             'file_name' => $request->file_name,
             'file_path' => $request->file_path,
-            'retention_until' => $request->retention_until,
+            'retention_until' => $request->retention_until ?: now()->addHours(48),
         ]);
+        if ($request->hasFile('document')) storeMediaFile($document, $request->file('document'), 'document');
 
         $this->audit($request, 'sanad.document.created', $document);
 
         return redirect()->back()->withSuccess('Sanad document added.');
     }
 
+    private function serviceDocumentOptions($service)
+    {
+        return collect(optional($service)->required_documents ?: [])
+            ->map(function ($document, $index) {
+                if (is_array($document)) {
+                    $name = trim((string) ($document['name'] ?? $document['label'] ?? $document['title'] ?? $document['key'] ?? ''));
+                    $key = trim((string) ($document['key'] ?? Str::slug($name ?: 'document-'.$index, '_')));
+
+                    return $name ? ['key' => $key, 'name' => $name] : null;
+                }
+
+                $name = trim((string) $document);
+
+                return $name ? ['key' => Str::slug($name, '_'), 'name' => $name] : null;
+            })
+            ->filter()
+            ->values();
+    }
+
     public function approveDocument(Request $request, $id, $documentId)
     {
+        return $this->reviewDocument($request->merge(['verification_status' => 'approved']), $id, $documentId);
+    }
+
+    public function reviewDocument(Request $request, $id, $documentId)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
         $booking = Booking::myBooking()->findOrFail($id);
         $document = $this->visibleDocumentsQuery($booking)->findOrFail($documentId);
+        $request->validate([
+            'verification_status' => 'required|in:approved,rejected,replacement_requested,pending',
+            'reason' => 'nullable|string|max:2000',
+        ]);
+        if (in_array($request->verification_status, ['rejected', 'replacement_requested'], true) && !$request->reason) {
+            return back()->withErrors('A reason is required for rejected or replacement-requested documents.');
+        }
 
-        $document->verification_status = 'approved';
-        $document->approved_at = now();
-        $document->approved_by = optional(auth()->user())->id;
+        $document->verification_status = $request->verification_status;
+        $document->approved_at = $request->verification_status === 'approved' ? now() : null;
+        $document->approved_by = $request->verification_status === 'approved' ? optional(auth()->user())->id : null;
+        $document->reviewed_at = now();
+        $document->reviewed_by = auth()->id();
+        $document->review_reason = $request->reason;
         $document->save();
 
-        $this->audit($request, 'sanad.document.approved', $document);
+        foreach (array_filter([$document->owner_id, $document->provider_id]) as $recipientId) {
+            Notification::create([
+                'id' => Str::random(32),
+                'type' => 'sanad_document_review',
+                'notifiable_type' => User::class,
+                'notifiable_id' => $recipientId,
+                'data' => json_encode([
+                    'type' => 'sanad_document_review', 'id' => $document->id,
+                    'subject' => 'Document review',
+                    'message' => 'Your document was marked '.Str::headline($document->verification_status).'.',
+                ]),
+            ]);
+        }
 
-        return redirect()->back()->withSuccess('Sanad document approved.');
+        $this->audit($request, 'sanad.document.reviewed', $document, ['status' => $document->verification_status, 'reason' => $request->reason]);
+
+        return redirect()->back()->withSuccess('Document review saved.');
+    }
+
+    public function documentQueue(Request $request)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+
+        $partnerCards = ProviderDocument::with(['providers', 'document', 'media'])
+            ->whereHas('providers', function ($query) {
+                $query->where('user_type', 'provider');
+            })
+            ->whereHas('document', function ($query) {
+                $query->where('status', 1);
+            })
+            ->when($request->filled('partner_status'), function ($query) use ($request) {
+                if (in_array($request->partner_status, ['pending', 'approved', 'rejected'], true)) {
+                    $query->where('verification_status', $request->partner_status);
+                } else {
+                    $query->where('is_verified', (int) $request->partner_status);
+                }
+            })
+            ->latest()
+            ->get()
+            ->groupBy('provider_id')
+            ->map(function ($documents) {
+                $partner = optional($documents->first())->providers;
+                $total = $documents->count();
+                $approved = $documents->where('is_verified', 1)->count();
+                $rejected = $documents->where('verification_status', 'rejected')->count();
+                $uploaded = $documents->filter(fn ($document) => getMediaFileExit($document, 'provider_document'))->count();
+
+                return [
+                    'partner' => $partner,
+                    'documents' => $documents,
+                    'total' => $total,
+                    'uploaded' => $uploaded,
+                    'approved' => $approved,
+                    'rejected' => $rejected,
+                    'pending' => max($total - $approved - $rejected, 0),
+                    'status' => $rejected > 0 ? 'needs_revision' : ($total > 0 && $approved === $total ? 'verified' : ($uploaded > 0 ? 'in_review' : 'waiting_for_uploads')),
+                    'progress' => $total > 0 ? (int) round(($approved / $total) * 100) : 0,
+                ];
+            })
+            ->sortBy(fn ($group) => optional($group['partner'])->display_name ?: '');
+
+        $uploadedDocuments = SanadDocumentVaultItem::with(['booking.customer', 'booking.provider', 'booking.sanadDocumentRequests.document', 'service', 'provider'])
+            ->whereNotNull('booking_id')
+            ->whereHas('booking')
+            ->where($this->realDocumentConstraint())
+            ->when($request->filled('order_status'), fn ($q) => $q->where('verification_status', $request->order_status))
+            ->when($request->filled('source'), fn ($q) => $q->where('source', $request->source))
+            ->latest()
+            ->get();
+
+        $documentRequestBookingIds = SanadDocumentRequest::whereHas('booking')->pluck('booking_id');
+
+        $requestBookingIds = $uploadedDocuments->pluck('booking_id')->merge($documentRequestBookingIds)->filter()->unique();
+
+        $requestCards = Booking::with(['customer', 'provider', 'service', 'sanadDocuments' => function ($query) use ($request) {
+                $query->where($this->realDocumentConstraint())
+                    ->when($request->filled('order_status'), fn ($q) => $q->where('verification_status', $request->order_status))
+                    ->when($request->filled('source'), fn ($q) => $q->where('source', $request->source))
+                    ->latest();
+            }, 'sanadDocumentRequests.document', 'sanadDocumentRequests.requester'])
+            ->whereIn('id', $requestBookingIds)
+            ->latest()
+            ->get()
+            ->map(function ($booking) {
+                $documents = $booking->sanadDocuments;
+                $service = $booking->service;
+                $requiredDocuments = collect(optional($service)->required_documents ?: [])->values();
+                $submittedKeys = $documents->pluck('document_key')->filter()->map(fn ($key) => Str::slug($key, '_'))->all();
+                $submittedNames = $documents->pluck('document_type')->filter()->map(fn ($name) => Str::slug($name, '_'))->all();
+                $missingRequired = $requiredDocuments->filter(function ($document) use ($submittedKeys, $submittedNames) {
+                    $key = Str::slug((string) ($document['key'] ?? $document['name'] ?? ''), '_');
+                    $name = Str::slug((string) ($document['name'] ?? ''), '_');
+
+                    return !in_array($key, $submittedKeys, true) && !in_array($name, $submittedNames, true);
+                });
+                $documentRequests = $booking->sanadDocumentRequests->sortByDesc('created_at')->values();
+                $partnerRequests = $documentRequests->where('requested_from', 'customer')->values();
+                $totalRequired = $requiredDocuments->count();
+                $approved = $documents->where('verification_status', 'approved')->count();
+                $pending = $documents->where('verification_status', 'pending')->count();
+
+                return [
+                    'booking' => $booking,
+                    'service' => $service,
+                    'documents' => $documents,
+                    'document_requests' => $documentRequests,
+                    'partner_requests' => $partnerRequests,
+                    'missing_required' => $missingRequired->values(),
+                    'required_count' => $totalRequired,
+                    'submitted_count' => $documents->count(),
+                    'approved_count' => $approved,
+                    'pending_count' => $pending,
+                    'progress' => $totalRequired > 0
+                        ? (int) min(100, round(($approved / $totalRequired) * 100))
+                        : ($documents->count() > 0 ? 100 : 0),
+                ];
+            })
+            ->sortByDesc(fn ($group) => optional($group['booking'])->created_at);
+
+        $partnerSummary = [
+            'partners' => $partnerCards->count(),
+            'pending' => $partnerCards->sum('pending'),
+            'approved' => $partnerCards->sum('approved'),
+        ];
+
+        $orderSummary = [
+            'orders' => $requestCards->count(),
+            'pending' => $requestCards->sum('pending_count'),
+            'approved' => $requestCards->sum('approved_count'),
+        ];
+
+        return view('sanad.document-queue', compact('partnerCards', 'requestCards', 'partnerSummary', 'orderSummary'));
+    }
+
+    private function realDocumentConstraint(): \Closure
+    {
+        return function ($query) {
+            $query->where('document_type', 'not like', '%Privacy Check%')
+                ->where('document_type', 'not like', '%Smoke%')
+                ->where('document_type', 'not like', '%Integrated QA%')
+                ->where(function ($fileQuery) {
+                    $fileQuery->whereNull('file_name')
+                        ->orWhere(function ($nestedFileQuery) {
+                            $nestedFileQuery->where('file_name', 'not like', '%smoke%')
+                                ->where('file_name', 'not like', '%integrated-qa%')
+                                ->where('file_name', 'not like', '%qa.pdf%');
+                        });
+                })
+                ->where(function ($pathQuery) {
+                    $pathQuery->whereNull('file_path')
+                        ->orWhere(function ($nestedPathQuery) {
+                            $nestedPathQuery->where('file_path', 'not like', '%smoke%')
+                                ->where('file_path', 'not like', '%integrated-qa%')
+                                ->where('file_path', 'not like', '%qa.pdf%');
+                        });
+                });
+        };
+    }
+
+    public function reviewPartnerDocument(Request $request, $documentId)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+
+        $request->validate([
+            'verification_status' => 'nullable|in:pending,approved,rejected',
+            'is_verified' => 'nullable|in:0,1',
+            'review_reason' => 'nullable|string|max:2000',
+        ]);
+
+        $document = ProviderDocument::findOrFail($documentId);
+        $status = $request->verification_status ?: ($request->is_verified ? 'approved' : 'pending');
+        if ($status === 'rejected' && !$request->filled('review_reason')) {
+            return back()->withErrors('A rejection reason is required.');
+        }
+
+        $document->verification_status = $status;
+        $document->is_verified = $status === 'approved' ? 1 : 0;
+        $document->review_reason = $status === 'pending' ? null : $request->review_reason;
+        $document->reviewed_by = auth()->id();
+        $document->reviewed_at = now();
+        $document->save();
+
+        $this->audit($request, 'sanad.partner_document.reviewed', $document, ['verification_status' => $document->verification_status, 'reason' => $document->review_reason]);
+
+        return redirect()->back()->withSuccess('Partner document review saved.');
     }
 
     public function storeBuzz(Request $request, $id)
@@ -568,11 +1079,23 @@ class SanadWebController extends Controller
             'message' => 'required|string|max:2000',
             'visible_to' => 'nullable|array',
             'visible_to.*' => 'string',
+            'thread_type' => 'nullable|in:shared,internal,partner_internal',
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
         ]);
 
-        $visibleTo = $request->visible_to ?: config('sanad.document_visibility');
-        $thread = $this->visibleChatThread($booking) ?: SanadChatThread::create([
+        $threadType = $request->thread_type ?: 'shared';
+        if ($threadType === 'internal') abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+        if ($threadType === 'partner_internal') {
+            abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'provider']), 403);
+        }
+        $visibleTo = match ($threadType) {
+            'internal' => ['admin', 'demo_admin', 'employee'],
+            'partner_internal' => ['admin', 'demo_admin', 'employee', 'provider'],
+            default => ['admin', 'demo_admin', 'employee', 'provider', 'user'],
+        };
+        $thread = SanadChatThread::where('booking_id', $booking->id)->where('thread_type', $threadType)->latest()->first() ?: SanadChatThread::create([
             'booking_id' => $booking->id,
+            'thread_type' => $threadType,
             'participant_roles' => $visibleTo,
             'created_by' => optional(auth()->user())->id,
         ]);
@@ -583,11 +1106,77 @@ class SanadWebController extends Controller
             'sender_role' => optional(auth()->user())->user_type,
             'message' => $request->message,
             'visible_to' => $visibleTo,
+            'message_type' => 'text',
         ]);
+        if ($request->hasFile('attachment')) storeMediaFile($message, $request->file('attachment'), 'attachment');
+        $thread->update(['last_message_at' => now()]);
 
         $this->audit($request, 'sanad.chat.message_created', $message);
 
         return redirect()->back()->withSuccess('Sanad chat message sent.');
+    }
+
+    public function createDocumentRequest(Request $request, $id)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'provider']), 403);
+        $booking = Booking::myBooking()->findOrFail($id);
+        if (auth()->user()->hasRole('provider') && (int) $booking->provider_id !== auth()->id()) abort(403);
+        $request->validate(['document_name' => 'required|string|max:255', 'requested_from' => 'required|in:customer,partner', 'reason' => 'required|string|max:2000', 'instructions' => 'nullable|string|max:4000', 'due_at' => 'nullable|date']);
+        $target = $request->requested_from === 'customer' ? $booking->customer_id : $booking->provider_id;
+        $item = SanadDocumentRequest::create([
+            'booking_id' => $booking->id, 'service_id' => $booking->service_id,
+            'document_key' => $request->document_key, 'document_name' => $request->document_name,
+            'requested_from' => $request->requested_from, 'requested_from_user_id' => $target,
+            'requested_by' => auth()->id(), 'reason' => $request->reason, 'instructions' => $request->instructions,
+            'required' => $request->boolean('required', true), 'due_at' => $request->due_at,
+        ]);
+        $thread = SanadChatThread::firstOrCreate(['booking_id' => $booking->id, 'thread_type' => 'shared'], ['participant_roles' => ['admin','demo_admin','employee','provider','user'], 'created_by' => auth()->id()]);
+        SanadChatMessage::create(['thread_id' => $thread->id, 'sender_id' => auth()->id(), 'sender_role' => auth()->user()->user_type, 'message' => 'Document requested: '.$item->document_name, 'visible_to' => ['admin','demo_admin','employee','provider','user'], 'message_type' => 'document_request', 'document_request_id' => $item->id]);
+        $thread->update(['last_message_at' => now()]);
+        $this->audit($request, 'sanad.document_request.created', $item);
+        return back()->withSuccess('Document request created.');
+    }
+
+    public function markChatRead(Request $request, $id, $threadId)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        $thread = SanadChatThread::where('booking_id', $booking->id)->findOrFail($threadId);
+        abort_unless($thread->thread_type === 'shared' || auth()->user()->hasAnyRole(['admin','demo_admin','employee']), 403);
+        $thread->messages()->whereNull('read_at')->where('sender_id', '!=', auth()->id())->update(['read_at' => now()]);
+        return back()->withSuccess('Conversation marked as read.');
+    }
+
+    public function uploadDocumentRequest(Request $request, $id, $documentRequestId)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        $item = $booking->sanadDocumentRequests()->findOrFail($documentRequestId);
+        abort_unless(in_array(auth()->id(), array_filter([$booking->customer_id, $booking->provider_id, $item->requested_by])), 403);
+        $request->validate(['document' => 'required|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240']);
+        $document = SanadDocumentVaultItem::create(['booking_id' => $booking->id, 'service_id' => $booking->service_id, 'provider_id' => auth()->user()->hasRole('provider') ? auth()->id() : null, 'owner_id' => $booking->customer_id, 'uploaded_by' => auth()->id(), 'document_type' => $item->document_name, 'document_key' => $item->document_key, 'source' => auth()->user()->hasRole('provider') ? 'partner' : 'customer', 'required' => $item->required]);
+        storeMediaFile($document, $request->file('document'), 'document');
+        $item->update(['document_id' => $document->id, 'status' => 'submitted']);
+        $this->audit($request, 'sanad.document_request.submitted', $item);
+        return back()->withSuccess('Document submitted for review.');
+    }
+
+    public function reviewDocumentRequest(Request $request, $id, $documentRequestId)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+        $item = Booking::myBooking()->findOrFail($id)->sanadDocumentRequests()->findOrFail($documentRequestId);
+        $request->validate(['status' => 'required|in:approved,rejected,replacement_requested,pending', 'review_reason' => 'nullable|string|max:2000']);
+        if (in_array($request->status, ['rejected','replacement_requested'], true) && !$request->review_reason) return back()->withErrors('A reason is required.');
+        $item->update(['status' => $request->status, 'reviewed_by' => auth()->id(), 'reviewed_at' => now(), 'review_reason' => $request->review_reason]);
+        $this->audit($request, 'sanad.document_request.reviewed', $item);
+        return back()->withSuccess('Document request review saved.');
+    }
+
+    private function realAiInteractionsQuery()
+    {
+        return SanadAiInteraction::query()
+            ->where('question', 'not like', '%Smoke Test%')
+            ->where('answer', 'not like', '%Smoke test%')
+            ->where('question', 'not like', '%Integrated QA Knowledge%')
+            ->where('answer', 'not like', '%Integrated QA%');
     }
 
     private function visibleDocumentsQuery(Booking $booking)
@@ -935,6 +1524,46 @@ class SanadWebController extends Controller
             ->first();
 
         return optional($item)->content;
+    }
+
+    private function classifyKnowledge(string $title, string $content): array
+    {
+        $text = Str::lower($title . ' ' . $content);
+        $categories = [
+            'Documents' => ['document', 'upload', 'id', 'passport', 'license', 'certificate', 'attachment', 'nafath'],
+            'Payment' => ['payment', 'invoice', 'billing', 'paid', 'refund', 'fee', 'amount', 'wallet'],
+            'Workflow' => ['stage', 'status', 'approval', 'review', 'assigned', 'processing', 'timeline', 'sla'],
+            'Support' => ['complaint', 'support', 'escalation', 'urgent', 'issue', 'rejected', 'human'],
+            'Legal' => ['legal', 'contract', 'terms', 'policy', 'government', 'compliance'],
+        ];
+
+        $scores = collect($categories)->mapWithKeys(function ($terms, $category) use ($text) {
+            return [$category => collect($terms)->sum(fn ($term) => substr_count($text, $term))];
+        });
+
+        $category = $scores->sortDesc()->keys()->first() ?: 'General';
+        if (($scores[$category] ?? 0) === 0) {
+            $category = 'General';
+        }
+
+        $stopWords = ['the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'will', 'can', 'should', 'sanad'];
+        $tags = collect(preg_split('/[^\pL\pN]+/u', $text))
+            ->filter(fn ($term) => mb_strlen($term) > 3)
+            ->reject(fn ($term) => in_array($term, $stopWords, true))
+            ->countBy()
+            ->sortDesc()
+            ->keys()
+            ->take(8)
+            ->values()
+            ->all();
+
+        $confidence = min(100, max(35, ($scores[$category] ?? 1) * 15 + count($tags) * 3));
+
+        return [
+            'category' => $category,
+            'tags' => $tags,
+            'confidence' => $confidence,
+        ];
     }
 
     private function audit(Request $request, $action, $model, array $metadata = [])

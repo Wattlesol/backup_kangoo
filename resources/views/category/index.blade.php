@@ -113,12 +113,17 @@
                     {
                         data: 'name',
                         name: 'name',
-                        title: "{{ __('messages.name') }}"
+                        title: "English Name"
                     },
                     {
-                        data: 'description',
-                        name: 'description',
-                        title: "{{ __('messages.description') }}"
+                        data: 'name_ar',
+                        name: 'name_ar',
+                        title: "Arabic Name"
+                    },
+                    {
+                        data: 'display_order',
+                        name: 'display_order',
+                        title: "Display Order"
                     },
                     {
                         data: 'is_featured',

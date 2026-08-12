@@ -9,8 +9,11 @@ use App\Models\User;
 use App\Models\Service;
 use Hash;
 use App\Models\ProviderSlotMapping;
+use App\Models\ProviderDocument;
 use App\Http\Requests\UserRequest;
 use App\Models\NotificationTemplate;
+use App\Models\Notification;
+use Illuminate\Support\Str;
 
 class SettingController extends Controller
 {
@@ -182,6 +185,11 @@ class SettingController extends Controller
                 break;
             case 'password_form':
                 $data  = view('setting.' . $page, compact('user_data', 'page'))->render();
+                break;
+            case 'partner_documents':
+                abort_unless($auth_user->user_type === 'provider', 403);
+                $provider = $auth_user->load('providerDocument.document');
+                $data = view('setting.partner_documents', compact('provider', 'page'))->render();
                 break;
             case 'profile_form':
                 $why_choose_me = json_decode($user_data->why_choose_me, true);
@@ -418,6 +426,68 @@ class SettingController extends Controller
         storeMediaFile($user, $request->profile_image, 'profile_image');
 
         return redirect()->route('setting.index', ['page' => 'profile_form'])->withSuccess(__('messages.profile') . ' ' . __('messages.updated'));
+    }
+
+    public function uploadPartnerDocument(Request $request, $id)
+    {
+        if (demoUserPermission()) {
+            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        }
+
+        $providerDocument = ProviderDocument::where('provider_id', auth()->id())->where('id', $id)->firstOrFail();
+        $request->validate([
+            'provider_document' => 'required|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
+        ]);
+
+        storeMediaFile($providerDocument, $request->file('provider_document'), 'provider_document');
+        $providerDocument->is_verified = 0;
+        $providerDocument->verification_status = 'pending';
+        $providerDocument->review_reason = null;
+        $providerDocument->reviewed_by = null;
+        $providerDocument->reviewed_at = null;
+        $providerDocument->save();
+        $this->notifyAdminsForPartnerDocument($providerDocument);
+
+        return redirect()->route('setting.index', ['page' => 'partner_documents'])->withSuccess('Verification document uploaded for Sanad review.');
+    }
+
+    public function deletePartnerDocument($id)
+    {
+        if (demoUserPermission()) {
+            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        }
+
+        $providerDocument = ProviderDocument::where('provider_id', auth()->id())->where('id', $id)->firstOrFail();
+        $providerDocument->clearMediaCollection('provider_document');
+        $providerDocument->is_verified = 0;
+        $providerDocument->verification_status = 'pending';
+        $providerDocument->review_reason = null;
+        $providerDocument->reviewed_by = null;
+        $providerDocument->reviewed_at = null;
+        $providerDocument->save();
+
+        return redirect()->route('setting.index', ['page' => 'partner_documents'])->withSuccess('Verification document removed.');
+    }
+
+    private function notifyAdminsForPartnerDocument(ProviderDocument $providerDocument): void
+    {
+        $providerDocument->loadMissing(['providers', 'document']);
+        User::whereIn('user_type', ['admin', 'demo_admin'])->get()->each(function ($admin) use ($providerDocument) {
+            Notification::create([
+                'id' => Str::random(32),
+                'type' => 'partner_verification_document_submitted',
+                'notifiable_type' => User::class,
+                'notifiable_id' => $admin->id,
+                'data' => json_encode([
+                    'type' => 'partner_verification_document_submitted',
+                    'id' => $providerDocument->id,
+                    'subject' => 'Partner verification document submitted',
+                    'message' => optional($providerDocument->providers)->display_name.' submitted '.optional($providerDocument->document)->name.' for verification.',
+                    'provider_id' => $providerDocument->provider_id,
+                    'document_id' => $providerDocument->document_id,
+                ]),
+            ]);
+        });
     }
 
     public function changePassword(Request $request)
@@ -970,5 +1040,3 @@ class SettingController extends Controller
     }
 
 }
-
-

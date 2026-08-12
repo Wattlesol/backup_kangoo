@@ -6,7 +6,7 @@
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
                             <h5 class="font-weight-bold">{{ $pageTitle ?? __('messages.list') }}</h5>
-                            <a href="{{ route('handyman.index') }}" class="float-right btn btn-sm btn-primary"><i
+                            <a href="{{ auth()->user()->user_type === 'provider' ? route('provider.employees.index') : route('handyman.index') }}" class="float-right btn btn-sm btn-primary"><i
                                     class="fa fa-angle-double-left"></i> {{ __('messages.back') }}</a>
                             @if($auth_user->can('handyman list'))
                             @endif
@@ -102,6 +102,7 @@
                                     ]) }}
                             </div>
                             @endif
+                            @if(auth()->user()->user_type !== 'provider')
                             <div class="form-group col-md-4">
                                 {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.provider_address') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                 <br />
@@ -121,6 +122,7 @@
                                         'data-ajax--url' => route('ajax-list', ['type' => 'country']),
                                     ]) }}
                             </div>
+                            @endif
 
                             <div class="form-group col-md-4">
                                 {{ Form::label('state_id', __('messages.select_name',[ 'select' => __('messages.state') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}

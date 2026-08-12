@@ -13,7 +13,7 @@ class ServicePackage extends Model implements  HasMedia
     use InteractsWithMedia,HasFactory;
     protected $table = 'service_packages';
     protected $fillable = [
-        'name', 'description', 'provider_id', 'status' , 'price','start_at','end_at','is_featured','category_id','subcategory_id','package_type','pricelist_id','service_id','car_number','duration'
+        'name', 'name_ar', 'description', 'provider_id', 'status' , 'price','start_at','end_at','is_featured','category_id','subcategory_id','package_type','pricelist_id','service_id','car_number','duration'
     ];
     protected $casts = [
         'provider_id'    => 'integer',

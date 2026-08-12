@@ -108,12 +108,12 @@
                     {
                         data: 'name',
                         name: 'name',
-                        title: "{{ __('messages.name') }}"
+                        title: "English Name"
                     },
                     {
-                        data:'provider_id',
-                        name:'provider_id',
-                        title:"{{ __('messages.provider') }}"
+                        data:'name_ar',
+                        name:'name_ar',
+                        title:"Arabic Name"
                     },
                     {
                         data:'category_id',
@@ -121,9 +121,24 @@
                         title: "{{ __('messages.category') }}"
                     },
                     {
-                        data:'price',
-                        name:'price',
-                        title:"{{ __('messages.price') }}"
+                        data:'government_entity',
+                        name:'government_entity',
+                        title:"Government Entity"
+                    },
+                    {
+                        data:'government_fee',
+                        name:'government_fee',
+                        title:"Government Fees"
+                    },
+                    {
+                        data:'service_fee',
+                        name:'service_fee',
+                        title:"Service Fees"
+                    },
+                    {
+                        data:'is_featured',
+                        name:'is_featured',
+                        title:"{{ __('messages.featured') }}"
                     },
                     {
                         data: 'status',

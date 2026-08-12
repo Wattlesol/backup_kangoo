@@ -1,0 +1,7 @@
+<x-master-layout>
+@include('customer-portal.partials.styles')
+<div class="container-fluid sanad-page">
+    <div class="sanad-header"><div><h1 class="sanad-title">Notifications</h1><div class="sanad-muted">Request, document, billing, and buzz notifications.</div></div></div>
+    <div class="row"><div class="col-lg-7"><div class="sanad-card"><div class="sanad-card-header">Platform Notifications</div><div class="sanad-card-body">@forelse($notifications as $notification)<div class="border-bottom py-2"><strong>{{ data_get($notification->data, 'subject', data_get($notification->data, 'title', 'Notification')) }}</strong><div class="sanad-muted">{{ data_get($notification->data, 'message', '') }}</div><small>{{ optional($notification->created_at)->format('Y-m-d H:i') }}</small></div>@empty<p class="sanad-muted">No notifications.</p>@endforelse</div></div>{{ $notifications->links() }}</div><div class="col-lg-5"><div class="sanad-card"><div class="sanad-card-header">Buzz Notifications</div><div class="sanad-card-body">@forelse($buzzAlerts as $buzz)<div class="border-bottom py-2"><span class="sanad-badge warn">{{ Str::headline($buzz->priority) }}</span><div>{{ $buzz->message }}</div><small>{{ optional($buzz->created_at)->format('Y-m-d H:i') }}</small></div>@empty<p class="sanad-muted">No buzz notifications.</p>@endforelse</div></div></div></div>
+</div>
+</x-master-layout>

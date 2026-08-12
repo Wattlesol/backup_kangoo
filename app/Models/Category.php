@@ -14,11 +14,12 @@ class Category extends BaseModel implements HasMedia
     use HasFactory,HasRoles,InteractsWithMedia,SoftDeletes;
     protected $table = 'categories';
     protected $fillable = [
-        'name', 'description', 'is_featured', 'status' , 'color'
+        'name', 'name_ar', 'name_en', 'description', 'is_featured', 'status' , 'color', 'icon', 'display_order'
     ];
     protected $casts = [
         'status'    => 'integer',
         'is_featured'  => 'integer',
+        'display_order'  => 'integer',
     ];
 
     public function services(){
@@ -26,7 +27,7 @@ class Category extends BaseModel implements HasMedia
     }
     public function scopeList($query)
     {
-        return $query->orderBy('updated_at', 'desc');
+        return $query->orderBy('display_order')->orderBy('name');
     }
     
     

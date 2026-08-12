@@ -28,7 +28,8 @@ class ServiceAddonRequest extends FormRequest
         return [
             //
             'name'                           => 'required',
-            'service_id'                     => 'required',
+            'name_ar'                        => 'required|string|max:255',
+            'service_id'                     => 'nullable|exists:services,id',
             'price'                          => 'required|min:0',
             'serviceaddon_image'             => 'mimes:jpg,jpeg,png,webp'
         ];

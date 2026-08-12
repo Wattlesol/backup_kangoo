@@ -14,6 +14,55 @@ $menu->add('<span>'.__('messages.dashboard').'</span><span class="custom-tooltip
 </svg>')
 ->link->attr(['class' => '']);
 
+if (auth()->user()->user_type == "provider") {
+    $menu->add('<span>Sanad Operations</span>', ['class' => 'category-main']);
+
+    $providerItems = [
+        ['label' => 'Assigned Orders', 'route' => 'provider.order.index', 'icon' => 'fa-clipboard-list'],
+        ['label' => 'Operations Board', 'route' => 'provider.kanban.index', 'icon' => 'fa-columns'],
+        ['label' => 'Sanad Services', 'route' => 'provider.services.index', 'icon' => 'fa-toggle-on'],
+        ['label' => 'Employee Workflows', 'route' => 'provider.workflows.index', 'icon' => 'fa-project-diagram'],
+        ['label' => 'Employees', 'route' => 'provider.employees.index', 'icon' => 'fa-users'],
+        ['label' => 'Employee Performance', 'route' => 'provider.performance.index', 'icon' => 'fa-chart-line'],
+        ['label' => 'Financial Center', 'route' => 'provider.financial.index', 'icon' => 'fa-wallet'],
+        ['label' => 'Notification Center', 'route' => 'provider.notifications.index', 'icon' => 'fa-bell'],
+        ['label' => 'Partner Profile', 'route' => 'provider.profile.index', 'icon' => 'fa-building'],
+    ];
+
+    foreach ($providerItems as $item) {
+        $menu->add('<span>'.$item['label'].'</span><span class="custom-tooltip"><span class="tooltip-text">'.$item['label'].'</span></span>', ['route' => $item['route']])
+            ->prepend('<i class="fas '.$item['icon'].' mr-2"></i>')
+            ->link->attr(['class' => '']);
+    }
+
+    return;
+}
+
+if (in_array(auth()->user()->user_type, ['user', 'customer'], true)) {
+    $menu->add('<span>Customer Portal</span>', ['class' => 'category-main']);
+
+    $customerItems = [
+        ['label' => 'Service Catalog', 'route' => 'customer-portal.catalog', 'icon' => 'fa-th-large'],
+        ['label' => 'Create New Request', 'route' => 'customer-portal.requests.create', 'icon' => 'fa-plus-circle'],
+        ['label' => 'My Requests', 'route' => 'customer-portal.requests.index', 'icon' => 'fa-clipboard-list'],
+        ['label' => 'Document Vault', 'route' => 'customer-portal.vault', 'icon' => 'fa-folder-open'],
+        ['label' => 'Messages', 'route' => 'customer-portal.messages', 'icon' => 'fa-comments'],
+        ['label' => 'Notifications', 'route' => 'customer-portal.notifications', 'icon' => 'fa-bell'],
+        ['label' => 'Billing', 'route' => 'customer-portal.billing', 'icon' => 'fa-file-invoice-dollar'],
+        ['label' => 'Complaints & Support', 'route' => 'customer-portal.support', 'icon' => 'fa-headset'],
+        ['label' => 'Sanad AI Assistant', 'route' => 'customer-portal.ai', 'icon' => 'fa-robot'],
+        ['label' => 'Customer Profile', 'route' => 'customer-portal.profile', 'icon' => 'fa-user-shield'],
+    ];
+
+    foreach ($customerItems as $item) {
+        $menu->add('<span>'.$item['label'].'</span><span class="custom-tooltip"><span class="tooltip-text">'.$item['label'].'</span></span>', ['route' => $item['route']])
+            ->prepend('<i class="fas '.$item['icon'].' mr-2"></i>')
+            ->link->attr(['class' => '']);
+    }
+
+    return;
+}
+
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.service')]), ['class' => 'category-main'])
 ->data('permission', ['category list','subcategory list','service list']);
 
@@ -66,8 +115,7 @@ $settings = App\Models\Setting::whereIn('type', ['service-configurations','OTHER
 $servicesetting = $settings->has('service-configurations') ? json_decode($settings['service-configurations']->value) : null;
 $othersetting = $settings->has('OTHER_SETTING') ? json_decode($settings['OTHER_SETTING']->value) : null;
 
-if(optional($servicesetting)->service_packages == 1){
-$menu->services->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.service_package')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'servicepackage.index'])
+$menu->services->add('<span>Service Bundles</span>', ['class' => 'sidebar-layout' ,'route' => 'servicepackage.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M15.5777 3.38197L17.5777 4.43152C19.7294 5.56066 20.8052 6.12523 21.4026 7.13974C22 8.15425 22 9.41667 22 11.9415V12.0585C22 14.5833 22 15.8458 21.4026 16.8603C20.8052 17.8748 19.7294 18.4393 17.5777 19.5685L15.5777 20.618C13.8221 21.5393 12.9443 22 12 22C11.0557 22 10.1779 21.5393 8.42229 20.618L6.42229 19.5685C4.27063 18.4393 3.19479 17.8748 2.5974 16.8603C2 15.8458 2 14.5833 2 12.0585V11.9415C2 9.41667 2 8.15425 2.5974 7.13974C3.19479 6.12523 4.27063 5.56066 6.42229 4.43152L8.42229 3.38197C10.1779 2.46066 11.0557 2 12 2C12.9443 2 13.8221 2.46066 15.5777 3.38197Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
 <path d="M21 7.5L17 9.5M12 12L3 7.5M12 12V21.5M12 12C12 12 14.7426 10.6287 16.5 9.75C16.6953 9.65237 17 9.5 17 9.5M17 9.5V13M17 9.5L7.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -75,10 +123,8 @@ $menu->services->add('<span>'.trans('messages.list_form_title',['form' => trans(
 ')
 ->data('permission', 'servicepackage list' )
 ->link->attr(['class' => '']);
-}
 
-if(optional($servicesetting)->service_addons == 1){
-$menu->services->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.service_addon')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'serviceaddon.index'])
+$menu->services->add('<span>Additional Services</span>', ['class' => 'sidebar-layout' ,'route' => 'serviceaddon.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M14.5 6.5H17.5M17.5 6.5H20.5M17.5 6.5V9.5M17.5 6.5V3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
 <path d="M2.5 6.5C2.5 4.61438 2.5 3.67157 3.08579 3.08579C3.67157 2.5 4.61438 2.5 6.5 2.5C8.38562 2.5 9.32843 2.5 9.91421 3.08579C10.5 3.67157 10.5 4.61438 10.5 6.5C10.5 8.38562 10.5 9.32843 9.91421 9.91421C9.32843 10.5 8.38562 10.5 6.5 10.5C4.61438 10.5 3.67157 10.5 3.08579 9.91421C2.5 9.32843 2.5 8.38562 2.5 6.5Z" stroke="currentColor" stroke-width="1.5"/>
@@ -88,7 +134,6 @@ $menu->services->add('<span>'.trans('messages.list_form_title',['form' => trans(
 ')
 ->data('permission', ['service add on list'])
 ->link->attr(['class' => '']);
-}
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.booking')]), ['class' => 'category-main'])->data('permission', 'booking list');
 
@@ -103,6 +148,44 @@ $menu->add('<span>'.__('messages.booking').'</span><span class="custom-tooltip">
 ->nickname('booking')
 ->data('permission', 'booking list');
 
+$menu->add('<span>Assignment</span><span class="custom-tooltip"><span class="tooltip-text">Assignment</span></span>', ['route' => 'sanad.assignments.index'])
+->data('role', ['admin', 'demo_admin'])
+->data('permission', 'booking list');
+$menu->add('<span>Request Documents</span><span class="custom-tooltip"><span class="tooltip-text">Request Documents</span></span>', ['route' => 'sanad.documents.queue'])
+->data('role', ['admin', 'demo_admin', 'employee'])
+->data('permission', 'document list');
+
+$menu->add('<span>AI Tools</span>', ['class' => 'category-main'])
+->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+->data('permission', 'booking list');
+
+$menu->add('<span>Knowledge Base</span><span class="custom-tooltip"><span class="tooltip-text">Knowledge Base</span></span>', ['route' => 'sanad.knowledge.index'])
+->prepend('<i class="fas fa-brain mr-2"></i>')
+->data('role', ['admin', 'demo_admin'])
+->data('permission', 'booking list')
+->link->attr(['class' => '']);
+
+$menu->add('<span>Sanad AI Assistant</span><span class="custom-tooltip"><span class="tooltip-text">Sanad AI Assistant</span></span>', ['route' => 'sanad.ai.index'])
+->prepend('<i class="fas fa-robot mr-2"></i>')
+->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+->data('permission', 'booking list')
+->link->attr(['class' => '']);
+
+$menu->add('<span>AI Escalations</span><span class="custom-tooltip"><span class="tooltip-text">AI Escalations</span></span>', ['route' => 'sanad.ai.escalations.index'])
+->prepend('<i class="fas fa-user-check mr-2"></i>')
+->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+->data('permission', 'booking list')
+->link->attr(['class' => '']);
+
+$menu->add('<span>Chat System</span><span class="custom-tooltip"><span class="tooltip-text">Chat System</span></span>', ['route' => ['sanad.requests.index', 'action_state' => 'open_chat']])
+->prepend('<i class="fas fa-comments mr-2"></i>')
+->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+->data('permission', 'booking list')
+->link->attr(['class' => '']);
+
+$menu->add('<span>Performance</span>', ['class' => 'category-main'])
+->data('permission', ['handyman list', 'userrating list','handymanrating list']);
+
 $menu->add('<span>'.__('messages.QualityControl',['form' => __('messages.QualityControl')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'complaint.index_data'])
 ->data('permission', 'handyman list')
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -111,6 +194,18 @@ $menu->add('<span>'.__('messages.QualityControl',['form' => __('messages.Quality
 <circle cx="18.5" cy="14.25" r="1.5" stroke="currentColor" stroke-width="1.5"/>
 <ellipse cx="18.5" cy="18.375" rx="2.625" ry="1.5" stroke="currentColor" stroke-width="1.5"/>
 </svg>')
+->link->attr(['class' => '']);
+
+$menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.user_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.user_ratings').'</span></span>', ['route' => 'booking-rating.index'])
+->prepend('<i class="fas fa-star mr-2"></i>')
+->nickname('user_ratings')
+->data('permission', 'userrating list')
+->link->attr(['class' => '']);
+
+$menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.handyman_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.handyman_ratings').'</span></span>', ['route' => 'handyman-rating.index'])
+->prepend('<i class="fas fa-star-half-alt mr-2"></i>')
+->nickname('handyman_ratings')
+->data('permission', 'handymanrating list')
 ->link->attr(['class' => '']);
 
 if (auth()->user()->user_type == "user"){
@@ -214,7 +309,7 @@ $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-t
 ->data('permission', 'booking create');
 
 // E-commerce Menu Section (Admin Only)
-if (auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+if (false && auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
     $menu->add(__('messages.sidebar_form_title',['form' => 'E-commerce']), ['class' => 'category-main'])
     ->data('permission', ['product_category list','product list','store list','order list'])
     ->data('role', ['admin', 'demo_admin']);
@@ -271,6 +366,10 @@ $menu->add('<span>Orders</span><span class="custom-tooltip"><span class="tooltip
 
 } // End of admin-only ecommerce section
 
+// Time templates are legacy Region infrastructure and are not part of the
+// Sanad Admin requirements. Keep the routes/tables for compatibility, but do
+// not expose this module in the Sanad admin navigation.
+if (false) {
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.time')]), ['class' => 'category-main'])->data('permission', 'user list');
 
 $menu->add('<span>'.__('messages.time').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.time').'</span></span>', ['route' => 'time.index'])
@@ -293,7 +392,9 @@ $menu->add('<span>'.__('messages.Createtime').'</span><span class="custom-toolti
 </svg>')
 ->nickname('time')
 ->data('permission', 'booking create');
+}
 
+if (false) {
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.city')]), ['class' => 'category-main'])->data('permission', 'user list');
 
 $menu->add('<span>'.__('messages.city').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.city').'</span></span>', ['route' => 'city.index'])
@@ -385,6 +486,7 @@ $menu->add('<span>'.__('messages.createPriceList').'</span><span class="custom-t
 </svg>')
 ->nickname('pricelist')
 ->data('permission', 'user create');
+}
 
 if(optional($servicesetting)->post_services == 1){
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.custom_job')]), ['class' => 'category-main'])->data('permission', 'postjob');
@@ -632,22 +734,6 @@ $menu->coupon->add('<span>'.__('messages.add_form_title',['form' => __('messages
 <path d="M15 12L12 12M12 12L9 12M12 12L12 9M12 12L12 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
 </svg>')
 ->link->attr(['class' => '']);
-
-$menu->add('Ratings', ['class' => 'category-main'])->data('permission', ['userrating list','handymanrating list']);
-
-$menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.user_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.user_ratings').'</span></span>', ['route' => 'booking-rating.index'])
-->prepend('<svg width="15" height="15" class="sidebar-menu-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M15.94,10.179l-2.437-0.325l1.62-7.379c0.047-0.235-0.132-0.458-0.372-0.458H5.25c-0.241,0-0.42,0.223-0.373,0.458l1.634,7.376L4.06,10.179c-0.312,0.041-0.446,0.425-0.214,0.649l2.864,2.759l-0.724,3.947c-0.058,0.315,0.277,0.554,0.559,0.401l3.457-1.916l3.456,1.916c-0.419-0.238,0.56,0.439,0.56-0.401l-0.725-3.947l2.863-2.759C16.388,10.604,16.254,10.22,15.94,10.179M10.381,2.778h3.902l-1.536,6.977L12.036,9.66l-1.655-3.546V2.778z M5.717,2.778h3.903v3.335L7.965,9.66L7.268,9.753L5.717,2.778zM12.618,13.182c-0.092,0.088-0.134,0.217-0.11,0.343l0.615,3.356l-2.938-1.629c-0.057-0.03-0.122-0.048-0.184-0.048c-0.063,0-0.128,0.018-0.185,0.048l-2.938,1.629l0.616-3.356c0.022-0.126-0.019-0.255-0.11-0.343l-2.441-2.354l3.329-0.441c0.128-0.017,0.24-0.099,0.295-0.215l1.435-3.073l1.435,3.073c0.055,0.116,0.167,0.198,0.294,0.215l3.329,0.441L12.618,13.182z" fill="#6C757D" />
-</svg>')
-->nickname('user_ratings')
-->data('permission', 'userrating list');
-
-$menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.handyman_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.handyman_ratings').'</span></span>', ['route' => 'handyman-rating.index'])
-->prepend('<svg width="15" height="15" class="sidebar-menu-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M15.94,10.179l-2.437-0.325l1.62-7.379c0.047-0.235-0.132-0.458-0.372-0.458H5.25c-0.241,0-0.42,0.223-0.373,0.458l1.634,7.376L4.06,10.179c-0.312,0.041-0.446,0.425-0.214,0.649l2.864,2.759l-0.724,3.947c-0.058,0.315,0.277,0.554,0.559,0.401l3.457-1.916l3.456,1.916c-0.419-0.238,0.56,0.439,0.56-0.401l-0.725-3.947l2.863-2.759C16.388,10.604,16.254,10.22,15.94,10.179M10.381,2.778h3.902l-1.536,6.977L12.036,9.66l-1.655-3.546V2.778z M5.717,2.778h3.903v3.335L7.965,9.66L7.268,9.753L5.717,2.778zM12.618,13.182c-0.092,0.088-0.134,0.217-0.11,0.343l0.615,3.356l-2.938-1.629c-0.057-0.03-0.122-0.048-0.184-0.048c-0.063,0-0.128,0.018-0.185,0.048l-2.938,1.629l0.616-3.356c0.022-0.126-0.019-0.255-0.11-0.343l-2.441-2.354l3.329-0.441c0.128-0.017,0.24-0.099,0.295-0.215l1.435-3.073l1.435,3.073c0.055,0.116,0.167,0.198,0.294,0.215l3.329,0.441L12.618,13.182z" fill="#6C757D" />
-</svg>')
-->nickname('handyman_ratings')
-->data('permission', 'handymanrating list');
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.system')]), ['class' => 'category-main'])
 ->data('permission', 'system setting');

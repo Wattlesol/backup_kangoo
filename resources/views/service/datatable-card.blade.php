@@ -66,8 +66,8 @@
       @if(!empty($data->duration))
       @php
          $durationParts = explode(':', $data->duration);
-         $hours = intval($durationParts[0]);
-         $minutes = intval($durationParts[1]);
+         $hours = intval($durationParts[0] ?? 0);
+         $minutes = intval($durationParts[1] ?? 0);
       @endphp
       <li class="d-inline-block fw-500 position-relative service-price">
          <!-- ({{ $data->duration }} min) -->
@@ -79,13 +79,10 @@
       </li>
       @endif
    </ul>
-   <div
-      class="mt-3">
+   <div class="mt-3">
       <div class="d-flex align-items-center gap-2">
-         <img src="{{ getSingleMedia($data->providers,'profile_image', null) }}" alt="service" class="img-fluid rounded-3 object-cover avatar-24">
-         <a href="{{ route('provider.detail', ($data->providers)->id) }}">
-            <span class="font-size-14 service-user-name">{{ ($data->providers)->display_name }}</span>
-         </a>
+         <span class="badge bg-primary-subtle text-primary">{{ __('messages.service') }}</span>
+         <span class="font-size-14 service-user-name">Sanad Operations</span>
       </div>
       <div class="d-flex align-items-center gap-1 f-none mt-2">
          @if($totalRating > 0)

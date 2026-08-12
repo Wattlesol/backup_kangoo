@@ -15,66 +15,89 @@ This checklist is for client/user acceptance testing after the Sanad backend, da
 | Current build gate | Android debug test APKs and integrated backend/API QA |
 | Release builds | Deferred until after full system testing/UAT approval |
 
+## Local QA Baseline
+
+The following implementation-side gates have passed locally and should be used as the baseline before client UAT:
+
+| Gate | Evidence | Status |
+| --- | --- | --- |
+| Web role UAT | `scripts/sanad_web_role_uat.sh` | Passed |
+| Request detail frontend sign-off gate | `scripts/sanad_request_detail_frontend_qa.sh` | Passed |
+| Web action workflow gate | `scripts/sanad_web_action_qa.sh` | Passed |
+| AI web action gate | `scripts/sanad_ai_web_action_qa.sh` | Passed |
+| Customer request frontend sign-off gate | `scripts/sanad_customer_frontend_qa.sh` | Passed |
+| Service catalog frontend sign-off gate | `scripts/sanad_service_catalog_frontend_qa.sh` | Passed |
+| Visible terminology and branding | `scripts/sanad_visible_terminology_qa.sh` | Passed |
+| Customer-facing partner visibility | `scripts/sanad_partner_visibility_qa.sh` | Passed |
+| Document retention/download policy | `scripts/sanad_document_policy_qa.sh` | Passed |
+| AI fallback escalation | `scripts/sanad_ai_escalation_qa.sh` | Passed |
+| Finance role permissions | `scripts/sanad_finance_permissions_qa.sh` | Passed |
+| Cross-platform lifecycle contract | `scripts/sanad_cross_platform_lifecycle_qa.sh` | Passed |
+| Customer mobile QA gate | `handyman_user_flutter_v11.13.2/scripts/sanad_mobile_qa.sh` | Passed |
+| Operations mobile QA gate | `handyman_admin_flutter_app-v3.9.0/scripts/sanad_mobile_qa.sh` | Passed |
+| Customer mobile walkthrough artifact | `handyman_user_flutter_v11.13.2/docs/sanad-customer-mobile-walkthrough.md` | Ready for device sign-off |
+| Operations mobile walkthrough artifact | `handyman_admin_flutter_app-v3.9.0/docs/sanad-operations-mobile-walkthrough.md` | Ready for device sign-off |
+
 ## Pre-UAT Checks
 
 | Check | Expected Result | Status |
 | --- | --- | --- |
-| Backend deployment is available | Dashboard opens successfully | Pending |
-| Database migrations are applied | Sanad tables/fields are available | Pending |
-| Demo users are confirmed | Admin, partner, employee, and customer accounts are available | Pending |
-| Mobile apps point to UAT API URL | Apps load Sanad data from shared backend | Pending |
-| Integrated QA is run against UAT URL | `scripts/sanad_integrated_qa.sh` passes against deployed API | Pending |
+| Backend deployment is available | Dashboard opens successfully | Blocked by Dokploy live container update |
+| Database migrations are applied | Sanad tables/fields are available | Passed locally; pending deployed UAT confirmation |
+| Demo users are confirmed | Admin, partner, employee, and customer accounts are available | Passed locally; pending deployed UAT confirmation |
+| Mobile apps point to UAT API URL | Apps load Sanad data from shared backend | Ready after UAT API URL confirmation |
+| Integrated QA is run against UAT URL | `scripts/sanad_integrated_qa.sh` passes against deployed API | Pending deployment |
 
 ## Admin Acceptance Testing
 
 | Step | Expected Result | Status |
 | --- | --- | --- |
-| Sign in as admin | Admin reaches dashboard successfully | Pending |
-| Open Sanad dashboard | Sanad KPIs, request overview, financial indicators, and operational alerts are visible | Pending |
-| Open request queue | Admin can view Sanad requests with lifecycle, priority, role, and payment context | Pending |
-| Open request detail | Admin can review customer, partner, employee, document, billing, quality, Buzz, and chat sections | Pending |
-| Update request lifecycle | Request stage and priority update successfully | Pending |
-| Assign employee/team | Assignment saves and appears on the request detail | Pending |
-| Review document vault | Admin can view and approve/verify submitted documents | Pending |
-| Use Buzz alerts | Admin can create and acknowledge Buzz alerts | Pending |
-| Use AI console | Admin can add knowledge and ask an AI support question | Pending |
-| Review Financial Center | Payments, wallet, VAT, commission, refunds, invoices, and settlement data are accessible | Pending |
+| Sign in as admin | Admin reaches dashboard successfully | Passed locally; client sign-off pending |
+| Open Sanad dashboard | Sanad KPIs, request overview, financial indicators, and operational alerts are visible | Passed locally; client sign-off pending |
+| Open request queue | Admin can view Sanad requests with lifecycle, priority, role, and payment context | Passed locally; client sign-off pending |
+| Open request detail | Admin can review customer, partner, employee, document, billing, quality, Buzz, and chat sections | Passed locally; client sign-off pending |
+| Update request lifecycle | Request stage and priority update successfully | Passed locally; client sign-off pending |
+| Assign employee/team | Assignment saves and appears on the request detail | Passed locally; client sign-off pending |
+| Review document vault | Admin can view, create, and approve/verify submitted documents | Passed locally with action QA; client sign-off pending |
+| Use Buzz alerts | Admin can create and acknowledge Buzz alerts | Passed locally with action QA; client sign-off pending |
+| Use AI console | Admin can add knowledge, receive a matched answer, and trigger low-confidence human-review escalation | Passed locally with AI action QA; client sign-off pending |
+| Review Financial Center | Payments, wallet, VAT, commission, refunds, invoices, and settlement data are accessible | Passed locally; client sign-off pending |
 
 ## Partner Acceptance Testing
 
 | Step | Expected Result | Status |
 | --- | --- | --- |
-| Sign in as partner/provider | Partner reaches assigned operational view successfully | Pending |
-| View assigned requests | Partner sees only relevant service requests | Pending |
-| Update partner action/status | Partner action is saved and reflected in request timeline | Pending |
-| Review service restrictions | Partner view follows allowed service and role boundaries | Pending |
-| Review financial data | Partner wallet/settlement/payment visibility is scoped correctly | Pending |
-| Use mobile operations screen | Partner can view Sanad request data in the admin/provider mobile app | Pending |
-| Confirm privacy boundaries | Partner cannot access unrelated customer/admin-only documents or data | Pending |
+| Sign in as partner/provider | Partner reaches assigned operational view successfully | Passed locally; client sign-off pending |
+| View assigned requests | Partner sees only relevant service requests | Passed locally; client sign-off pending |
+| Update partner action/status | Partner action is saved and reflected in request timeline | Passed locally; client sign-off pending |
+| Review service restrictions | Partner view follows allowed service and role boundaries | Passed locally; client sign-off pending |
+| Review financial data | Partner wallet/settlement/payment visibility is scoped correctly | Passed locally; client sign-off pending |
+| Use mobile operations screen | Partner can view Sanad request data in the admin/provider mobile app | Source/build QA passed; device walkthrough pending |
+| Confirm privacy boundaries | Partner cannot access unrelated customer/admin-only documents or data | Passed locally; client sign-off pending |
 
 ## Employee Acceptance Testing
 
 | Step | Expected Result | Status |
 | --- | --- | --- |
-| Sign in as employee | Employee reaches assigned operational view successfully | Pending |
-| Review profile/permissions | Employee role, capacity, and operational status are visible where applicable | Pending |
-| View assigned work | Employee sees assigned Sanad requests/tasks only | Pending |
-| Update operational status | Employee status/action is saved and visible to operations/admin | Pending |
-| Use mobile operations screen | Employee can review assigned Sanad workflow in the admin/provider mobile app | Pending |
-| Confirm privacy boundaries | Employee cannot access admin-only, partner-only, or unrelated customer data | Pending |
+| Sign in as employee | Employee reaches assigned operational view successfully | Passed locally; client sign-off pending |
+| Review profile/permissions | Employee role, capacity, and operational status are visible where applicable | Passed locally; client sign-off pending |
+| View assigned work | Employee sees assigned Sanad requests/tasks only | Passed locally; client sign-off pending |
+| Update operational status | Employee status/action is saved and visible to operations/admin | Passed locally; client sign-off pending |
+| Use mobile operations screen | Employee can review assigned Sanad workflow in the admin/provider mobile app | Source/build QA passed; device walkthrough pending |
+| Confirm privacy boundaries | Employee cannot access admin-only, partner-only, or unrelated customer data | Passed locally; client sign-off pending |
 
 ## Customer Acceptance Testing
 
 | Step | Expected Result | Status |
 | --- | --- | --- |
-| Sign in as customer | Customer reaches customer dashboard/mobile app successfully | Pending |
-| View request list | Customer sees their own Sanad requests only | Pending |
-| Open request detail | Customer can review lifecycle, payment, document, Buzz, and chat context intended for customer visibility | Pending |
-| Upload/review documents | Customer document visibility follows privacy rules | Pending |
-| Use chat | Customer can send/receive request-related messages | Pending |
-| Review Buzz alert visibility | Customer sees only relevant Buzz alerts | Pending |
-| Review payment visibility | Customer payment/wallet visibility is scoped correctly | Pending |
-| Use customer mobile Sanad screen | Customer mobile app loads Sanad foundation and request data from the shared API | Pending |
+| Sign in as customer | Customer reaches customer dashboard/mobile app successfully | Passed locally; client sign-off pending |
+| View request list | Customer sees their own Sanad requests only | Passed locally; client sign-off pending |
+| Open request detail | Customer can review lifecycle, payment, document, Buzz, and chat context intended for customer visibility | Passed locally; client sign-off pending |
+| Upload/review documents | Customer document visibility follows privacy rules | Passed locally; client sign-off pending |
+| Use chat | Customer can send/receive request-related messages | Passed locally; client sign-off pending |
+| Review Buzz alert visibility | Customer sees only relevant Buzz alerts | Passed locally; client sign-off pending |
+| Review payment visibility | Customer payment/wallet visibility is scoped correctly | Passed locally; client sign-off pending |
+| Use customer mobile Sanad screen | Customer mobile app loads Sanad foundation and request data from the shared API | Source/build QA passed; device walkthrough pending |
 
 ## UAT Sign-Off
 

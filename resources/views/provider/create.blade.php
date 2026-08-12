@@ -136,6 +136,22 @@
                                 {{ Form::label('address',__('messages.address'), ['class' => 'form-control-label']) }}
                                 {{ Form::textarea('address', null, ['class'=>"form-control textarea" , 'rows'=>3  , 'placeholder'=> __('messages.address') ]) }}
                             </div>
+                            <div class="form-group col-md-12">
+                                <label class="form-control-label">Partner Verification Requirements <span class="text-danger">*</span></label>
+                                @if($partnerVerificationDocuments->isNotEmpty())
+                                    <div class="verification-checklist">
+                                        @foreach($partnerVerificationDocuments as $document)
+                                            <label class="verification-option">
+                                                <input type="checkbox" name="partner_verification_document_ids[]" value="{{ $document->id }}" {{ in_array($document->id, old('partner_verification_document_ids', $selectedVerificationDocumentIds), true) ? 'checked' : '' }}>
+                                                <span>{{ $document->name }} {{ $document->is_required ? '(Default required)' : '' }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <small class="text-muted">These requirements will appear on the partner profile until Sanad verifies the uploaded documents.</small>
+                                @else
+                                    <div class="alert alert-warning mb-0">Create document types under System Documents before adding a partner.</div>
+                                @endif
+                            </div>
                         </div>
                         <div class="row">
                             <div class="form-group col-md-6">
@@ -158,6 +174,11 @@
     $data = $providerdata->providerTaxMapping->pluck('tax_id')->implode(',');
     @endphp
     @section('bottom_script')
+    <style>
+        .verification-checklist { max-height: 180px; overflow-y: auto; border: 1px solid #e3e7ee; border-radius: 4px; padding: 8px 10px; background: #fff; }
+        .verification-option { display: flex; align-items: center; gap: 8px; padding: 6px 2px; margin: 0; font-weight: 400; cursor: pointer; }
+        .verification-option input { margin: 0; }
+    </style>
     <script type="text/javascript">
     (function($) {
         "use strict";

@@ -18,7 +18,7 @@ class ServiceAddonResource extends JsonResource
             'id'            => $this->id,
             'name'          => $this->name,
             'service_id'    => $this->service_id,
-            'service_name'  => $this->service->name,
+            'service_name'  => optional($this->service)->name ?: 'All Services',
             'price'         => $this->price,
             'status'        => $this->status,
             'serviceaddon_image' => optional($this->getMedia('serviceaddon_image')->first())->getUrl(),

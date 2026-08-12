@@ -6,7 +6,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PAT
 DOKPLOY_URL="${DOKPLOY_URL:-https://deploy.wattlesol.com}"
 DOKPLOY_COMPOSE_ID="${DOKPLOY_COMPOSE_ID:-dt3y93oBMayMC8VBFjXVJ}"
 EXPECTED_COMMIT="${SANAD_EXPECTED_COMMIT:-$(git rev-parse HEAD)}"
-LIVE_BASE_URL="${SANAD_LIVE_BASE_URL:-https://kangoo.sa/api}"
+LIVE_BASE_URL="${SANAD_LIVE_BASE_URL:-https://sanad.wattlesol.com/api}"
 PROD_BRANCH="${SANAD_DEPLOY_BRANCH:-origin/prod}"
 
 if [[ -z "${DOKPLOY_API_KEY:-}" ]]; then
