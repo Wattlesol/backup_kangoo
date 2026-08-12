@@ -516,7 +516,7 @@ $menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messa
 ->link->attr(['class' => '']);
 
 $menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messages.handymantype')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'handymantype.index'])
-->data('permission', 'handymantype list')
+->data('permission', ['handymantype list','handyman list','handyman add','handyman edit'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M14 20.8344C13.3663 20.9421 12.695 21 12 21C8.13401 21 5 19.2091 5 17C5 14.7909 8.13401 13 12 13C13.7135 13 15.2832 13.3518 16.5 13.9359" stroke="currentColor" stroke-width="1.5"/>
 <g clip-path="url(#clip0_10_6123)">
@@ -650,7 +650,7 @@ $menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.
 ->data('permission', 'handymanrating list');
 
 $menu->add(__('messages.sidebar_form_title',['form' => trans('messages.system')]), ['class' => 'category-main'])
-->data('permission', ['terms condition','privacy policy','help support','refund cancellation policy','document list']);
+->data('permission', 'system setting');
 if(default_earning_type() === 'subscription'){
 $menu->add('<span>'.__('messages.plan').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.plan').'</span></span>', ['route' => 'plans.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -662,10 +662,8 @@ $menu->add('<span>'.__('messages.plan').'</span><span class="custom-tooltip"><sp
 ->nickname('plan')
 ->data('permission', 'plan list');
 }
+/*
 $menu->add('<span>'.__('messages.tax').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.tax').'</span></span>', ['route' => 'tax.index'])
-->prepend('<svg width="15" height="15" class="sidebar-menu-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M5.17194 7.17188C5.5675 7.17188 5.95418 7.05458 6.28308 6.83482C6.61198 6.61505 6.86832 6.3027 7.0197 5.93724C7.17107 5.57179 7.21068 5.16966 7.13351 4.7817C7.05634 4.39373 6.86586 4.03737 6.58615 3.75766C6.30645 3.47796 5.95008 3.28748 5.56212 3.21031C5.17416 3.13314 4.77202 3.17274 4.40657 3.32412C4.04112 3.47549 3.72876 3.73184 3.509 4.06074C3.28924 4.38963 3.17194 4.77631 3.17194 5.17188C3.17252 5.70213 3.38342 6.2105 3.75836 6.58545C4.13331 6.9604 4.64168 7.1713 5.17194 7.17188V7.17188ZM5.17194 4.50521C5.30379 4.50521 5.43269 4.54431 5.54232 4.61756C5.65195 4.69082 5.7374 4.79494 5.78786 4.91675C5.83832 5.03857 5.85152 5.17262 5.82579 5.30194C5.80007 5.43126 5.73658 5.55005 5.64334 5.64328C5.55011 5.73652 5.43132 5.80001 5.302 5.82573C5.17268 5.85146 5.03863 5.83825 4.91682 5.7878C4.795 5.73734 4.69088 5.65189 4.61762 5.54226C4.54437 5.43262 4.50527 5.30373 4.50527 5.17188C4.50539 4.9951 4.57567 4.8256 4.70066 4.7006C4.82566 4.5756 4.99516 4.50533 5.17194 4.50521V4.50521ZM10.8282 8.82813C10.4326 8.82813 10.0459 8.94543 9.71705 9.16519C9.38815 9.38495 9.13181 9.69731 8.98043 10.0628C8.82906 10.4282 8.78945 10.8303 8.86662 11.2183C8.94379 11.6063 9.13427 11.9626 9.41398 12.2423C9.69368 12.522 10.05 12.7125 10.438 12.7897C10.826 12.8669 11.2281 12.8273 11.5936 12.6759C11.959 12.5245 12.2714 12.2682 12.4911 11.9393C12.7109 11.6104 12.8282 11.2237 12.8282 10.8281C12.8276 10.2979 12.6167 9.7895 12.2418 9.41456C11.8668 9.03961 11.3584 8.82871 10.8282 8.82813V8.82813ZM10.8282 11.4948C10.6963 11.4948 10.5674 11.4557 10.4578 11.3824C10.3482 11.3092 10.2627 11.2051 10.2123 11.0833C10.1618 10.9614 10.1486 10.8274 10.1743 10.6981C10.2001 10.5687 10.2636 10.45 10.3568 10.3567C10.45 10.2635 10.5688 10.2 10.6981 10.1743C10.8275 10.1485 10.9615 10.1618 11.0833 10.2122C11.2051 10.2627 11.3093 10.3481 11.3825 10.4577C11.4558 10.5674 11.4949 10.6963 11.4949 10.8281C11.4947 11.0049 11.4245 11.1744 11.2995 11.2994C11.1745 11.4244 11.005 11.4947 10.8282 11.4948V11.4948ZM13.1381 2.862C13.0762 2.80008 13.0027 2.75096 12.9218 2.71745C12.8409 2.68394 12.7543 2.66669 12.6667 2.66669C12.5792 2.66669 12.4925 2.68394 12.4116 2.71745C12.3307 2.75096 12.2572 2.80008 12.1954 2.862L2.86202 12.1953C2.79949 12.2571 2.74978 12.3306 2.71577 12.4117C2.68175 12.4927 2.6641 12.5797 2.66382 12.6676C2.66355 12.7554 2.68066 12.8425 2.71416 12.9238C2.74767 13.005 2.79692 13.0789 2.85907 13.141C2.92122 13.2031 2.99505 13.2524 3.0763 13.2859C3.15755 13.3194 3.24463 13.3365 3.33252 13.3362C3.42041 13.3359 3.50738 13.3183 3.58842 13.2843C3.66946 13.2503 3.74298 13.2005 3.80473 13.138L13.1381 3.80467C13.2 3.74278 13.2491 3.6693 13.2826 3.58843C13.3161 3.50756 13.3334 3.42088 13.3334 3.33334C13.3334 3.2458 13.3161 3.15911 13.2826 3.07824C13.2491 2.99737 13.2 2.92389 13.1381 2.862V2.862Z" fill="#6C757D" />
-</svg>')
 ->nickname('tax')
 ->data('permission', 'tax list');
 
@@ -810,6 +808,7 @@ $menu->add('<span>'.__('messages.frontend_setting').'</span><span class="custom-
 ->nickname('frontend_setting')
 ->data('role', ['admin','demo_admin'])
 ->link->attr(["class" => ""]);
+*/
 
 $menu->add('<span>'.__('messages.setting').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.setting').'</span></span>', ['route' => 'setting.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
