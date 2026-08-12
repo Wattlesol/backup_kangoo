@@ -4,7 +4,7 @@ WORKDIR /var/www/html
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_HOME=/tmp/composer \
-    PHP_OPCACHE_VALIDATE_TIMESTAMPS=0
+    PHP_OPCACHE_VALIDATE_TIMESTAMPS=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

@@ -18,6 +18,7 @@ if [ "${APP_KEY:-}" = "" ]; then
 fi
 
 php artisan storage:link --force >/dev/null 2>&1 || true
+php artisan optimize:clear >/dev/null 2>&1 || true
 php artisan config:clear >/dev/null 2>&1 || true
 php artisan route:clear >/dev/null 2>&1 || true
 php artisan view:clear >/dev/null 2>&1 || true
