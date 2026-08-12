@@ -314,7 +314,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 
     });
 
-    Route::group(['middleware' => ['permission:slider list']], function () {
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
         Route::resource('slider', SliderController::class);
         Route::get('slider-index-data',[SliderController::class,'index_data'])->name('slider.index_data');
         Route::post('slider-bulk-action', [SliderController::class, 'bulk_action'])->name('slider.bulk-action');
@@ -370,7 +370,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 
     //Frontend Setting
 
-    Route::middleware(['auth', 'role:admin|demo_admin'])->group(function () {
+    Route::middleware(['auth', 'role:admin|demo_admin', 'permission:sanad legacy system access'])->group(function () {
         Route::get('frontend-setting/{page?}', [FrontendSettingController::class, 'frontendSettings'])->name('frontend_setting.index');
         Route::post('/layout-frontend-page', [FrontendSettingController::class, 'layoutPage'])->name('layout_frontend_page');
         Route::post('/landing-page-settings-updates', [FrontendSettingController::class, 'landingpagesettingsUpdates'])->name('landing_page_settings_updates');
@@ -402,21 +402,23 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('get-lang-file', [ App\Http\Controllers\LanguageController::class, 'getFile' ] )->name('getLangFile');
     Route::post('save-lang-file', [ App\Http\Controllers\LanguageController::class, 'saveFileContent' ] )->name('saveLangContent');
 
-    Route::group(['middleware' => ['permission:terms condition']], function () {
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
         Route::get('pages/term-condition',[ SettingController::class, 'termAndCondition'])->name('term-condition');
         Route::post('term-condition-save',[ SettingController::class, 'saveTermAndCondition'])->name('term-condition-save');
     });
 
-    Route::group(['middleware' => ['permission:privacy policy']], function () {
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
         Route::get('pages/privacy-policy',[ SettingController::class, 'privacyPolicy'])->name('privacy-policy');
         Route::post('privacy-policy-save',[ SettingController::class, 'savePrivacyPolicy'])->name('privacy-policy-save');
     });
 
-    Route::get('pages/help-support',[ SettingController::class, 'helpAndSupport'])->name('help-support');
-    Route::post('help-support-save',[ SettingController::class, 'saveHelpAndSupport'])->name('help-support-save');
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
+        Route::get('pages/help-support',[ SettingController::class, 'helpAndSupport'])->name('help-support');
+        Route::post('help-support-save',[ SettingController::class, 'saveHelpAndSupport'])->name('help-support-save');
 
-    Route::get('pages/refund-cancellation-policy',[ SettingController::class, 'refundCancellationPolicy'])->name('refund-cancellation-policy');
-    Route::post('refund-cancellation-policy-save',[ SettingController::class, 'saveRefundCancellationPolicy'])->name('refund-cancellation-policy-save');
+        Route::get('pages/refund-cancellation-policy',[ SettingController::class, 'refundCancellationPolicy'])->name('refund-cancellation-policy');
+        Route::post('refund-cancellation-policy-save',[ SettingController::class, 'saveRefundCancellationPolicy'])->name('refund-cancellation-policy-save');
+    });
 
     Route::post('general-setting-save',[ SettingController::class, 'generalSetting'])->name('generalsetting');
     Route::post('theme-setup-save',[ SettingController::class, 'themeSetup'])->name('themesetup');
@@ -426,7 +428,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     route::post('role-permission',[RoleController::class,'rolePermission'])->name('role_layout_page');
     Route::post('cookie-setup-save',[ SettingController::class, 'cookieSetup'])->name('cookiesetup');
 
-    Route::group(['middleware' => ['permission:document list|providerdocument list']], function () {
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
         Route::resource('document', DocumentsController::class);
         Route::get('document-index-data',[DocumentsController::class,'index_data'])->name('document.index_data');
         Route::post('document-bulk-action', [DocumentsController::class, 'bulk_action'])->name('document.bulk-action');
@@ -463,10 +465,12 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 
     Route::post('/razorpay-layout-page',[ PaymentGatewayController::class, 'rezorpaypaymentPage'])->name('razorpay_layout_page');
 
-    Route::resource('tax', TaxController::class);
-    Route::get('tax-index_data',[TaxController::class,'index_data'])->name('tax.index_data');
-    Route::post('tax-bulk-action', [TaxController::class, 'bulk_action'])->name('tax.bulk-action');
-    Route::post('tax/{id}', [TaxController::class, 'destroy'])->name('tax.destroy');
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
+        Route::resource('tax', TaxController::class);
+        Route::get('tax-index_data',[TaxController::class,'index_data'])->name('tax.index_data');
+        Route::post('tax-bulk-action', [TaxController::class, 'bulk_action'])->name('tax.bulk-action');
+        Route::post('tax/{id}', [TaxController::class, 'destroy'])->name('tax.destroy');
+    });
     Route::get('earning',[EarningController::class,'index'])->name('earning');
     Route::get('earning-data',[EarningController::class,'setEarningData'])->name('earningData');
     Route::post('earning/{id}', [EarningController::class, 'destroy'])->name('earning.destroy');
@@ -557,7 +561,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('handymandocument/{id}', [HandymanPayoutController::class,'document'])->name('handymandata.document');
     Route::post('handymandocument/{id}', [HandymanPayoutController::class,'documentstore'])->name('handymandata.document_store');
 
-    Route::group(['middleware' => ['permission:handymantype list']], function () {
+    Route::group(['middleware' => ['permission:handymantype list|handyman list|handyman add|handyman edit']], function () {
         Route::resource('handymantype', HandymanTypeController::class);
         Route::get('handyman-index_data',[HandymanTypeController::class,'index_data'])->name('handymantype.index_data');
         Route::post('handymantype-bulk-action', [HandymanTypeController::class, 'bulk_action'])->name('handymantype.bulk-action');
@@ -569,8 +573,10 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::resource('servicefaq', ServiceFaqController::class);
         Route::get('servicefaq-index-data',[ServiceFaqController::class,'index_data'])->name('servicefaq.index_data');
     });
-    Route::match(['get', 'post'], '/push-notification', [SettingController::class, 'PushNotification'])->name('pushNotification.index');
-    Route::post('send-push-notification', [ SettingController::class , 'sendPushNotification'])->name('sendPushNotification');
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
+        Route::match(['get', 'post'], '/push-notification', [SettingController::class, 'PushNotification'])->name('pushNotification.index');
+        Route::post('send-push-notification', [ SettingController::class , 'sendPushNotification'])->name('sendPushNotification');
+    });
     Route::post('save-earning-setting', [ SettingController::class , 'saveEarningTypeSetting'])->name('saveEarningTypeSetting');
     // Route::post('advance-earning-setting' , [ SettingController::class , 'advanceEarningSetting'])->name('advanceEarningSetting');
     Route::post('other-setting' , [ SettingController::class , 'otherSetting'])->name('otherSetting');

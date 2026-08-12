@@ -75,11 +75,17 @@
                             @endif
 
                             <div class="form-group col-md-4">
-                                {{ Form::label('handymantype_id', __('messages.select_name',[ 'select' => __('messages.handymantype') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
+                                <div class="d-flex align-items-center justify-content-between">
+                                    {{ Form::label('handymantype_id', __('messages.select_name',[ 'select' => __('messages.handymantype') ]),['class'=>'form-control-label'],false) }}
+                                    @if(auth()->user()->hasAnyRole(['admin','demo_admin']) || auth()->user()->can('handymantype add') || auth()->user()->can('handymantype list'))
+                                        <a href="{{ route('handymantype.create') }}" class="btn btn-sm btn-outline-primary mb-1">
+                                            <i class="fa fa-plus-circle"></i> {{ __('messages.add_form_title',['form' => __('messages.handymantype')]) }}
+                                        </a>
+                                    @endif
+                                </div>
                                 <br />
                                 {{ Form::select('handymantype_id', [optional($handymandata->handymantype)->id => optional($handymandata->handymantype)->name], optional($handymandata->handymantype)->id, [
                                         'class' => 'select2js form-group handymantype',
-                                        'required',
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.handymantype') ]),
                                         'data-ajax--url' => route('ajax-list', ['type' => 'handymantype']),
                                     ]) }}
