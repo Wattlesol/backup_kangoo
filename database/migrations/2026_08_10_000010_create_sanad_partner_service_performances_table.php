@@ -24,8 +24,8 @@ return new class extends Migration
             $table->unsignedInteger('completed_orders')->default(0);
             $table->timestamp('last_activity_at')->nullable();
             $table->timestamps();
-            $table->unique(['provider_id', 'service_id']);
-            $table->index(['service_id', 'quality_score']);
+            $table->unique(['provider_id', 'service_id'], 'sanad_psp_provider_service_unique');
+            $table->index(['service_id', 'quality_score'], 'sanad_psp_service_quality_idx');
         });
     }
 

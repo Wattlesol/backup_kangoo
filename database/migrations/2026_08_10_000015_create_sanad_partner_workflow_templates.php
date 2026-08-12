@@ -15,12 +15,12 @@ class CreateSanadPartnerWorkflowTemplates extends Migration
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            $table->index(['provider_id', 'is_active']);
+            $table->index(['provider_id', 'is_active'], 'sanad_pwt_provider_active_idx');
         });
 
         Schema::create('sanad_partner_workflow_template_steps', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('workflow_template_id')->constrained('sanad_partner_workflow_templates')->cascadeOnDelete();
+            $table->unsignedBigInteger('workflow_template_id');
             $table->string('stage_name');
             $table->string('role')->nullable();
             $table->unsignedInteger('execution_order')->default(1);
@@ -28,21 +28,24 @@ class CreateSanadPartnerWorkflowTemplates extends Migration
             $table->unsignedInteger('estimated_duration_minutes')->nullable();
             $table->json('required_skills')->nullable();
             $table->timestamps();
-            $table->index(['workflow_template_id', 'execution_order']);
+            $table->foreign('workflow_template_id', 'sanad_pwts_template_fk')->references('id')->on('sanad_partner_workflow_templates')->cascadeOnDelete();
+            $table->index(['workflow_template_id', 'execution_order'], 'sanad_pwts_template_order_idx');
         });
 
         Schema::create('sanad_partner_service_workflows', function (Blueprint $table) {
             $table->id();
             $table->foreignId('provider_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('service_id')->constrained('services')->cascadeOnDelete();
-            $table->foreignId('workflow_template_id')->constrained('sanad_partner_workflow_templates')->cascadeOnDelete();
+            $table->unsignedBigInteger('workflow_template_id');
             $table->boolean('is_default')->default(false);
             $table->timestamps();
+            $table->foreign('workflow_template_id', 'sanad_psw_template_fk')->references('id')->on('sanad_partner_workflow_templates')->cascadeOnDelete();
             $table->unique(['provider_id', 'service_id', 'workflow_template_id'], 'sanad_partner_service_workflow_unique');
         });
 
         Schema::table('sanad_partner_workflow_stages', function (Blueprint $table) {
-            $table->foreignId('workflow_template_id')->nullable()->after('booking_id')->constrained('sanad_partner_workflow_templates')->nullOnDelete();
+            $table->unsignedBigInteger('workflow_template_id')->nullable()->after('booking_id');
+            $table->foreign('workflow_template_id', 'sanad_pws_template_fk')->references('id')->on('sanad_partner_workflow_templates')->nullOnDelete();
         });
     }
 
