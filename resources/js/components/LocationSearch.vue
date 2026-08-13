@@ -26,7 +26,7 @@
                                stroke-linecap="round" stroke-linejoin="round"></path>
                          </svg>
                       </span>
-                      <input type="text" class="font-size-14 bg-transparent border-0" placeholder="Search Service" @keyup="getServiceList" v-model="keyword">
+                      <input type="text" class="font-size-14 bg-transparent border-0" :placeholder="$t('landingpage.search_service')" @keyup="getServiceList" v-model="keyword">
                          <div :class="`top-width dropdown-menu dropdown-menu-end user-dropdown mt-5 ${keyword.length > 0 ? 'show' : ''}`" aria-labelledby="dropdownMenuButton1">
                             <!-- <button class="btn btn-close" @click="closeDropdown"></button> -->
                             <span type="button" class="text-primary custom-btn-close" @click="closeDropdown">
@@ -74,7 +74,7 @@
            </div>
 
            <!-- <div class="py-2 px-3" v-for="setting in landingPageSettings" :key="setting.id">
-              <button class="btn btn-primary" v-if="setting.key === 'section_1' && getJsonValue(setting.value, 'enable_search') == 1">Search</button>
+              <button class="btn btn-primary" v-if="setting.key === 'section_1' && getJsonValue(setting.value, 'enable_search') == 1">{{ $t('landingpage.search') }}</button>
            </div> -->
 
            <div class="py-2 px-3" v-if="shouldShowSearchBox">
@@ -179,7 +179,7 @@
                                </div>
                                <div class="mb-4 col-md-6">
                                   <label class="form-label text-capitalize">{{ $t('landingpage.service_name') }}</label>
-                                  <input v-model="serviceName" type="text" class="form-control" placeholder="Write Service Name" aria-label="servicename" aria-describedby="basic-addon1">
+                                  <input v-model="serviceName" type="text" class="form-control" :placeholder="$t('landingpage.write_service_name')" aria-label="servicename" aria-describedby="basic-addon1">
                                   
                                </div>
                                <div class="mb-4 col-md-6">
@@ -195,7 +195,7 @@
                                </div>
                                <div class="mb-4 col-md-6">
                                   <label class="form-label text-capitalize">{{ $t('messages.price')}}</label>
-                                  <input v-model="price" type="number" class="form-control" placeholder="Price" aria-label="price" aria-describedby="basic-addon1" min="1">
+                                  <input v-model="price" type="number" class="form-control" :placeholder="$t('messages.price')" aria-label="price" aria-describedby="basic-addon1" min="1">
                                   
                                </div>
                                <div class="mb-4 col-md-6">
@@ -210,7 +210,7 @@
                                </div>
                                <div class="mb-4 col-md-12">
                                      <label class="form-label text-capitalize">{{ $t('messages.description')}}</label>
-                                     <textarea v-model="serviceDescription" class="form-control" rows="4" placeholder="Write Here..."></textarea>
+                                     <textarea v-model="serviceDescription" class="form-control" rows="4" :placeholder="$t('landingpage.write_here')"></textarea>
                                </div>
                                <div class="mb-4">
                                      <button type="submit" class="btn btn-primary" :disabled="isLoading">{{ $t('messages.submit')}}</button>
@@ -245,7 +245,7 @@ const baseUrl = document.querySelector('meta[name="baseUrl"]').getAttribute('con
 if(props.user_id){
 window.location.href = `${baseUrl}/post-job`;
 }else{
-window.location.href = `${baseUrl}/login-page`;
+window.location.href = `${baseUrl}/login`;
 }
 };
 
@@ -449,4 +449,3 @@ return null;
 }
 
 </script>
-

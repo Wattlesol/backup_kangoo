@@ -14,7 +14,7 @@ if (isset($_ENV['PHP_ERROR_REPORTING'])) {
     error_reporting(eval('return ' . $_ENV['PHP_ERROR_REPORTING'] . ';'));
 } elseif (version_compare(PHP_VERSION, '8.4.0', '>=')) {
     // Suppress deprecation warnings for PHP 8.4+ with Laravel 8
-    error_reporting(E_ALL & ~E_DEPRECATED);
+    error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 }
 
 /*

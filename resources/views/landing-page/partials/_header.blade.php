@@ -50,7 +50,10 @@
                            French
                         </a> -->
                         <?php
-                              $language_option = sitesetupSession('get')->language_option ?? ["nl","fr","it","pt","es","en"];
+                              $language_option = sitesetupSession('get')->language_option ?? ["ar","nl","fr","it","pt","es","en"];
+                              if (!in_array('ar', $language_option)) {
+                                 array_unshift($language_option, 'ar');
+                              }
                               if (!empty($language_option)) {
                                  $language_array = languagesArray($language_option);
                               }
@@ -144,7 +147,7 @@
                       <!-- Wishlist -->
                       @if(empty(auth()->user()) || auth()->user()->user_type !== 'user')
                         <li class="ms-sm-3 ms-2">
-                           <a href="{{route('user.login')}}" class="btn btn btn-outline-primary" role="button">
+                           <a href="{{route('login')}}" class="btn btn btn-outline-primary" role="button">
                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"
                                  fill="none">
                                  <path fill-rule="evenodd" clip-rule="evenodd"
@@ -156,7 +159,7 @@
                                     stroke="currentColor" stroke-width="1.42857" stroke-linecap="round"
                                     stroke-linejoin="round" />
                               </svg>
-                              Login
+                              {{ __('auth.login') }}
                            </a>
                         </li>
                       @else

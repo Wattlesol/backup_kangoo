@@ -154,6 +154,18 @@ class Booking extends Model
         }
 
         if($user->hasRole('handyman')) {
+            if (!empty($user->provider_id)) {
+                $query->where('provider_id', $user->provider_id);
+
+                return $query->whereHas('handymanAdded',function ($q) use($user){
+                    $q->where('handyman_id',$user->id);
+                });
+            }
+
+            if ($user->can('booking list')) {
+                return $query;
+            }
+
             return $query->whereHas('handymanAdded',function ($q) use($user){
                 $q->where('handyman_id',$user->id);
             });

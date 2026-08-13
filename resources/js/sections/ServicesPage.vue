@@ -40,7 +40,7 @@
                           </div>
                           <div class="flex-shrink-0">
                             <div class="search-form input-group flex-nowrap align-items-center">
-                              <input type="text" class="form-control rounded-3" v-model="search" placeholder="Search" :disabled="isEmpty">
+                              <input type="text" class="form-control rounded-3" v-model="search" :placeholder="$t('messages.search')" :disabled="isEmpty">
                               <span class="input-group-text search-icon position-absolute text-body">
                                 <svg class="icon-20" width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                   <circle cx="11.7669" cy="11.7666" r="8.98856" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

@@ -1122,8 +1122,12 @@ class HomeController extends Controller
         return redirect()->back();
     }
 
-    function authLogin()
+    function authLogin(\Illuminate\Http\Request $request)
     {
+        if ($request->hasAny(['email', 'password'])) {
+            return redirect()->route('auth.login');
+        }
+
         return view('auth.login');
     }
     function authRegister()

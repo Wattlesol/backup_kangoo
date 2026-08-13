@@ -515,7 +515,7 @@ Review Modal
                     </div>
                     <div class="mb-4">
                         <label class="form-label text-capitalize">{{__('messages.description')}}</label>
-                        <textarea class="form-control" rows="4" placeholder="Write Here..."></textarea>
+                        <textarea class="form-control" rows="4" placeholder="{{ __('landingpage.write_here') }}"></textarea>
                     </div>
                     <div class="mb-4">
                         <button type="submit" class="btn btn-primary">{{__('messages.submit')}}</button>

@@ -82,6 +82,15 @@ return [
     'advance_payment' => 'الدفع المسبق',
     'off' => 'خصم',
     'search' => 'بحث',
+    'search_service' => 'ابحث عن خدمة',
+    'write_service_name' => 'اكتب اسم الخدمة',
+    'write_here' => 'اكتب هنا...',
+    'request_post_job_services' => 'طلب خدمة عبر سند',
+    'title' => 'العنوان',
+    'create_service' => 'إنشاء خدمة',
+    'post_request_save' => 'حفظ الطلب',
+    'add_post_job' => 'إضافة طلب خدمة',
+    'accept_all' => 'قبول الكل',
     'select' => 'اختيار',
     'schedule_service' => 'جدولة الخدمة',
     'remove' => 'إزالة',
@@ -123,7 +132,9 @@ return [
     'Proceed_To_Payment' => 'المتابعة إلى الدفع',
     'min' => 'دقيقة',
     'services_booked' => 'الخدمات المحجوزة',
-    'our_clients' => 'عملائنا'
+    'our_clients' => 'عملاؤنا',
+    'search_products' => 'بحث المنتجات',
+    'search_products_placeholder' => 'ابحث عن المنتجات...',
     
 
 

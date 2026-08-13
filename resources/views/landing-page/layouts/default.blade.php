@@ -11,8 +11,10 @@
     }
 
     $userRole = auth()->check() ? auth()->user()->user_type : 'customer';
+    $currentLocale = app()->getLocale();
+    $isRtl = in_array($currentLocale, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']);
 @endphp
-<html lang="en" data-bs-theme="{{ $themeMode }}">
+<html lang="{{ $currentLocale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" data-bs-theme="{{ $themeMode }}">
 <head>
     @yield('before_head')
     @include('landing-page.partials._head')

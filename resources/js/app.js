@@ -154,9 +154,10 @@ function formatCurrency(number, noOfDecimal, currencyPosition, currencySymbol) {
 window.formatCurrency = formatCurrency;
 const i18n = createI18n({
   legacy: false,
-  locale: "en",
+  locale: window.currentLocale || document.documentElement.lang || "en",
+  fallbackLocale: "en",
   globalInjection: true,
-  messages: {en: window.localMessagesUpdate} || {},
+  messages: {[window.currentLocale || document.documentElement.lang || "en"]: window.localMessagesUpdate} || {},
 });
 
 window.i18n = i18n

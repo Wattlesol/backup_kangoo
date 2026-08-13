@@ -10,6 +10,9 @@ use App\Models\SanadDocumentVaultItem;
 use App\Http\Requests\UserRequest;
 use Yajra\DataTables\DataTables;
 use Hash;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
+use App\Support\SanadEmployeePermissions;
 
 class HandymanController extends Controller
 {
@@ -20,6 +23,9 @@ class HandymanController extends Controller
      */
     public function index(Request $request)
     {
+        if (in_array($request->status, ['request', 'unassigned'], true)) {
+            abort(404);
+        }
 
         $filter = [
             'status' => $request->status,
@@ -27,9 +33,6 @@ class HandymanController extends Controller
         $pageTitle = __('messages.list_form_title',['form' => __('messages.handyman')] );
         if($request->status == 'pending'){
             $pageTitle = __('messages.pending_list_form_title',['form' => __('messages.handyman')] );
-        }
-        if($request->status == 'unassigned'){
-            $pageTitle = __('messages.unassigned_list_form_title',['form' => __('messages.handyman')] );
         }
         $auth_user = authSession();
         $assets = ['datatable'];
@@ -72,6 +75,10 @@ class HandymanController extends Controller
 
     public function index_data(DataTables $datatable,Request $request)
     {
+        if (in_array($request->list_status, ['request', 'unassigned'], true)) {
+            abort(404);
+        }
+
         $query = User::query();
         $filter = $request->filter;
 
@@ -88,25 +95,11 @@ class HandymanController extends Controller
             $query->where('provider_id', auth()->user()->id);
         }
         if($request->list_status == null){
-            $query = $query->where('status',1)->whereNotNull('provider_id');
+            $query = $query->where('status',1);
         }
         if($request->list_status == 'pending'){
             $query = $query->where('status',0);
         }
-        if($request->list_status == 'unassigned'){
-            $query = $query->where('status',1)->where('provider_id',NULL)->where('user_type','handyman');
-        }
-        if ($request->list_status == 'request') {
-            $query = $query->where(function($query) {
-                $query->where('status', 0)
-                      ->where(function($query) {
-                          $query->whereNull('provider_id')
-                                ->orWhereNotNull('provider_id');
-                      })
-                      ->where('user_type', 'handyman');
-            });
-        }
-
         return $datatable->eloquent($query)
             ->addColumn('check', function ($row) {
                 return '<input type="checkbox" class="form-check-input select-table-row"  id="datatable-row-'.$row->id.'"  name="datatable_ids[]" value="'.$row->id.'" data-type="user" onclick="dataTableRowCheck('.$row->id.',this)">';
@@ -218,7 +211,22 @@ class HandymanController extends Controller
             $handymandata = new User;
         }
 
-        return view('handyman.create', compact('pageTitle' ,'handymandata' ,'auth_user' ));
+        $adminPermissionModules = SanadEmployeePermissions::modules('admin');
+        $partnerPermissionModules = SanadEmployeePermissions::modules('partner');
+        $employeePermissionContext = old('employee_permission_context', $this->employeePermissionContext($handymandata));
+        $selectedModulePermissions = old('module_permissions', $this->selectedEmployeeModulePermissions($handymandata, $employeePermissionContext));
+        $selectedSanadPermissions = old('sanad_permissions', $handymandata->sanad_permissions ?: []);
+
+        return view('handyman.create', compact(
+            'pageTitle',
+            'handymandata',
+            'auth_user',
+            'adminPermissionModules',
+            'partnerPermissionModules',
+            'employeePermissionContext',
+            'selectedModulePermissions',
+            'selectedSanadPermissions'
+        ));
     }
 
     /**
@@ -234,7 +242,6 @@ class HandymanController extends Controller
         }
         $data = $request->all();
         $data['skills'] = $this->linesToString($request->skills);
-        $data['sanad_permissions'] = array_values(array_filter($request->sanad_permissions ?: []));
         $data['sanad_employee_status'] = $request->sanad_employee_status ?: 'available';
         if (!$request->filled('designation') && $request->filled('sanad_job_title')) {
             $data['designation'] = $request->sanad_job_title;
@@ -244,7 +251,14 @@ class HandymanController extends Controller
             $user_id = $auth_user->id;
             $data['provider_id'] = $user_id;
         }
-        if($request->id == null && default_earning_type() === 'subscription'){
+        $employeeContext = $this->requestedEmployeeContext($request, $data['provider_id'] ?? null);
+        $selectedModules = $request->input('module_permissions', []);
+        $permissionMatrix = SanadEmployeePermissions::normalize($selectedModules, $employeeContext);
+        $spatiePermissions = SanadEmployeePermissions::spatiePermissions($permissionMatrix);
+        $data['sanad_permissions'] = SanadEmployeePermissions::workflowFlags($permissionMatrix);
+        $data['sanad_permission_matrix'] = $permissionMatrix;
+        unset($data['module_permissions'], $data['employee_permission_context']);
+        if($request->id == null && default_earning_type() === 'subscription' && !empty($data['provider_id'])){
             $exceed =  get_provider_plan_limit($data['provider_id'],'handyman');
             if(!empty($exceed)){
                 if($exceed == 1){
@@ -287,7 +301,12 @@ class HandymanController extends Controller
                 $message->to($user->email);
             });
         }
-        $user->assignRole($data['user_type']);
+        $user->assignRole('handyman');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        foreach ($spatiePermissions as $permissionName) {
+            Permission::firstOrCreate(['name' => $permissionName]);
+        }
+        $user->syncPermissions($spatiePermissions);
         storeMediaFile($user,$request->profile_image, 'profile_image');
         $message = __('messages.update_form',[ 'form' => __('messages.handyman') ] );
 		if($user->wasRecentlyCreated){
@@ -495,5 +514,22 @@ class HandymanController extends Controller
             })
             ->filter()
             ->implode(',');
+    }
+
+    private function employeePermissionContext(User $handymandata): string
+    {
+        return SanadEmployeePermissions::contextFor($handymandata, auth()->user());
+    }
+
+    private function requestedEmployeeContext(Request $request, $providerId = null): string
+    {
+        return SanadEmployeePermissions::contextFor(null, auth()->user(), $providerId);
+    }
+
+    private function selectedEmployeeModulePermissions(User $handymandata, string $context): array
+    {
+        $matrixSelected = SanadEmployeePermissions::selectedModulesFromMatrix($handymandata->sanad_permission_matrix, $context);
+
+        return $matrixSelected ?? SanadEmployeePermissions::selectedModulesFromLegacy($handymandata, $context);
     }
 }

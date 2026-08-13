@@ -19,7 +19,9 @@ class TranslationServiceProvider extends ServiceProvider
             $translations = collect();
             $language_option =["nl","fr","it","pt","es","en"];
 
-            if( Schema::hasTable('settings')) {
+            if(Cache::remember('schema_has_settings_table', 300, function () {
+                return Schema::hasTable('settings');
+            })) {
                 if(\Session::get('setup_data') == ''){
                     $setup_data = sitesetupSession('get');
                     if ($setup_data && isset($setup_data->language_option)) {

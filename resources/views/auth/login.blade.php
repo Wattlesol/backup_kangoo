@@ -23,7 +23,7 @@
                          <div class="col-lg-12">
                             <div class="form-group">
                                <label class="text-secondary">{{__('auth.email')}} <span class="text-danger">*</span></label>
-                               <input id="email" name="email" value="{{request('email')}}" class="form-control" type="email" placeholder="{{ __('auth.enter_name',['name' => __('auth.email')]) }}" required autofocus>
+                               <input id="email" name="email" value="{{ old('email') }}" class="form-control" type="email" placeholder="{{ __('auth.enter_name',['name' => __('auth.email')]) }}" required autofocus>
                                <small class="help-block with-errors text-danger"></small>
                             </div>
                          </div>
@@ -33,7 +33,7 @@
                                     <label class="text-secondary">{{__('auth.login_password')}} <span class="text-danger">*</span></label>
                                     <label><a href="{{route('auth.recover-password')}}">{{__('auth.forgot_password')}}</a></label>
                                 </div>                                    
-                               <input class="form-control" type="password" value="{{request('password')}}" placeholder="{{ __('auth.enter_name',['name' => __('auth.login_password') ]) }}" name="password"  required autocomplete="current-password">
+                               <input class="form-control" type="password" placeholder="{{ __('auth.enter_name',['name' => __('auth.login_password') ]) }}" name="password"  required autocomplete="current-password">
                                <small class="help-block with-errors text-danger"></small>
                             </div>
                          </div>                              

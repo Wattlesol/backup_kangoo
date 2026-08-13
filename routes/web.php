@@ -256,7 +256,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('handyman-change-password', [ HandymanController::class , 'changePassword'])->name('handyman.changepassword');
     Route::group(['middleware' => ['permission:handyman list']], function () {
         Route::resource('handyman', HandymanController::class);
-        Route::get('handyman/list/{status?}', [HandymanController::class,'index'])->name('handyman.pending');
+        Route::get('handyman/list/{status}', [HandymanController::class,'index'])->where('status', 'pending')->name('handyman.pending');
         Route::get('handyman-index-data',[HandymanController::class,'index_data'])->name('handyman.index_data');
         Route::post('handyman-bulk-action', [HandymanController::class, 'bulk_action'])->name('handyman.bulk-action');
         Route::get('handyman/approve/{id}',[ProviderController::class, 'approve'])->name('handyman.approve');
@@ -291,7 +291,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('booking_car_data/{car_id}/{package_id}/{service_id}', [BookingController::class, 'booking_car_data'])->name('booking.booking_car_data');
         Route::post('booking_breaks_data/{package_id}/{service_id}', [BookingController::class, 'booking_breaks_data'])->name('booking.booking_breaks_data');
         Route::get('booking_breaks_data_with_out_Data/{package_id}/{service_id}', [BookingController::class, 'booking_breaks_data_with_out_Data'])->name('booking.booking_breaks_data_with_out_Data');
-        Route::get('Handyman_booking',[ServicePackageController::class,'Handyman_booking'])->name('servicepackage.Handyman_booking');
+        Route::get('Handyman_booking',[ServicePackageController::class,'Handyman_booking'])->name('servicepackage.Handyman_booking')->middleware('sanad.module:orders,read');
         Route::post('servicepackage/rate/{service_id}', [ServicePackageController::class,'rate'])->name('servicepackage.rate');
         Route::get('booking/view/rate/{service_id}', [ServicePackageController::class,'view_rate'])->name('servicepackage.rate_view');
         Route::post('user_booking_service/rate/{service_id}', [ServicePackageController::class,'user_booking_service'])->name('servicepackage.user_booking_service');
@@ -353,8 +353,8 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('details/{id}',[BookingController::class,'bookingDetailsData'])->name('booking.detailsdata');
 
     // Setting
-    Route::get('setting/{page?}',[ SettingController::class, 'settings'])->name('setting.index');
-    Route::post('/layout-page',[ SettingController::class, 'layoutPage'])->name('layout_page');
+    Route::get('setting/{page?}',[ SettingController::class, 'settings'])->name('setting.index')->middleware('sanad.module:settings,read');
+    Route::post('/layout-page',[ SettingController::class, 'layoutPage'])->name('layout_page')->middleware('sanad.module:settings,write');
 
     // Route::post('settings/save',[ SettingController::class , 'settingsUpdates'])->name('settingsUpdates');
     // Route::post('dashboard-setting',[ SettingController::class , 'dashboardtogglesetting'])->name('togglesetting');
@@ -362,7 +362,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     // Route::post('handyman-dashboard-setting',[ SettingController::class , 'handymandashboardtogglesetting'])->name('handymantogglesetting');
     // Route::post('config-save',[ SettingController::class , 'configUpdate'])->name('configUpdate');
 
-    Route::post('env-setting', [ SettingController::class , 'envChanges'])->name('envSetting');
+    Route::post('env-setting', [ SettingController::class , 'envChanges'])->name('envSetting')->middleware('sanad.module:settings,write');
     Route::post('update-profile', [ SettingController::class , 'updateProfile'])->name('updateProfile');
     Route::post('change-password', [ SettingController::class , 'changePassword'])->name('changePassword');
     Route::post('setting/partner-documents/{id}', [ SettingController::class , 'uploadPartnerDocument'])->name('setting.partner-documents.upload');
@@ -420,29 +420,29 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('refund-cancellation-policy-save',[ SettingController::class, 'saveRefundCancellationPolicy'])->name('refund-cancellation-policy-save');
     });
 
-    Route::post('general-setting-save',[ SettingController::class, 'generalSetting'])->name('generalsetting');
-    Route::post('theme-setup-save',[ SettingController::class, 'themeSetup'])->name('themesetup');
-    Route::post('site-setup-save',[ SettingController::class, 'siteSetup'])->name('sitesetup');
-    Route::post('service-config-save',[ SettingController::class, 'serviceConfig'])->name('serviceConfig');
-    Route::post('social-media-save',[ SettingController::class, 'socialMedia'])->name('socialMedia');
-    route::post('role-permission',[RoleController::class,'rolePermission'])->name('role_layout_page');
-    Route::post('cookie-setup-save',[ SettingController::class, 'cookieSetup'])->name('cookiesetup');
+    Route::post('general-setting-save',[ SettingController::class, 'generalSetting'])->name('generalsetting')->middleware('sanad.module:settings,write');
+    Route::post('theme-setup-save',[ SettingController::class, 'themeSetup'])->name('themesetup')->middleware('sanad.module:settings,write');
+    Route::post('site-setup-save',[ SettingController::class, 'siteSetup'])->name('sitesetup')->middleware('sanad.module:settings,write');
+    Route::post('service-config-save',[ SettingController::class, 'serviceConfig'])->name('serviceConfig')->middleware('sanad.module:settings,write');
+    Route::post('social-media-save',[ SettingController::class, 'socialMedia'])->name('socialMedia')->middleware('sanad.module:settings,write');
+    route::post('role-permission',[RoleController::class,'rolePermission'])->name('role_layout_page')->middleware('sanad.module:settings,write');
+    Route::post('cookie-setup-save',[ SettingController::class, 'cookieSetup'])->name('cookiesetup')->middleware('sanad.module:settings,write');
 
-    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
-        Route::resource('document', DocumentsController::class);
-        Route::get('document-index-data',[DocumentsController::class,'index_data'])->name('document.index_data');
-        Route::post('document-bulk-action', [DocumentsController::class, 'bulk_action'])->name('document.bulk-action');
-        Route::post('document-action',[DocumentsController::class, 'action'])->name('document.action');
-        Route::post('document/{id}', [DocumentsController::class, 'destroy'])->name('document.destroy');
-    });
+    Route::resource('document', DocumentsController::class)->only(['index', 'show'])->middleware('sanad.module:documents,read');
+    Route::resource('document', DocumentsController::class)->only(['create', 'store', 'edit', 'update'])->middleware('sanad.module:documents,write');
+    Route::delete('document/{document}', [DocumentsController::class, 'destroy'])->name('document.destroy')->middleware('sanad.module:documents,delete');
+    Route::get('document-index-data',[DocumentsController::class,'index_data'])->name('document.index_data')->middleware('sanad.module:documents,read');
+    Route::post('document-bulk-action', [DocumentsController::class, 'bulk_action'])->name('document.bulk-action')->middleware('sanad.module:documents,delete');
+    Route::post('document-action',[DocumentsController::class, 'action'])->name('document.action')->middleware('sanad.module:documents,write');
+    Route::post('document/{id}', [DocumentsController::class, 'destroy'])->name('document.destroy.legacy')->middleware('sanad.module:documents,delete');
 
-    Route::group(['middleware' => ['permission:providerdocument list']], function () {
-        Route::resource('providerdocument', ProviderDocumentController::class);
-        Route::get('providerdocument-index-data',[ProviderDocumentController::class,'index_data'])->name('providerdocument.index_data');
-        Route::post('providerdocument-bulk-action', [ProviderDocumentController::class, 'bulk_action'])->name('providerdocument.bulk-action');
-        Route::post('providerdocument-action',[ProviderDocumentController::class, 'action'])->name('providerdocument.action');
-        Route::post('providerdocument/{id}', [ProviderDocumentController::class, 'destroy'])->name('providerdocument.destroy');
-    });
+    Route::resource('providerdocument', ProviderDocumentController::class)->only(['index', 'show'])->middleware('sanad.module:documents,read');
+    Route::resource('providerdocument', ProviderDocumentController::class)->only(['create', 'store', 'edit', 'update'])->middleware('sanad.module:documents,write');
+    Route::delete('providerdocument/{providerdocument}', [ProviderDocumentController::class, 'destroy'])->name('providerdocument.destroy')->middleware('sanad.module:documents,delete');
+    Route::get('providerdocument-index-data',[ProviderDocumentController::class,'index_data'])->name('providerdocument.index_data')->middleware('sanad.module:documents,read');
+    Route::post('providerdocument-bulk-action', [ProviderDocumentController::class, 'bulk_action'])->name('providerdocument.bulk-action')->middleware('sanad.module:documents,delete');
+    Route::post('providerdocument-action',[ProviderDocumentController::class, 'action'])->name('providerdocument.action')->middleware('sanad.module:documents,write');
+    Route::post('providerdocument/{id}', [ProviderDocumentController::class, 'destroy'])->name('providerdocument.destroy.legacy')->middleware('sanad.module:documents,delete');
 
     Route::resource('ratingreview', RatingReviewController::class);
     Route::post('ratingreview-action',[RatingReviewController::class, 'action'])->name('ratingreview.action');

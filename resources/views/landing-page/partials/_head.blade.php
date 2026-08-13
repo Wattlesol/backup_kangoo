@@ -9,6 +9,89 @@
 <link rel="stylesheet" href="{{ asset('css/landing-page-custom.min.css') }}">
 <link rel="stylesheet" href="{{ asset('css/store-dark-mode.css?v=' . time()) }}">
 <link rel="stylesheet" href="{{ asset('vendor/@fortawesome/fontawesome-free/css/all.min.css')}}">
+@if(in_array(app()->getLocale(), ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']))
+<style>
+    html[dir="rtl"] body,
+    html[dir="rtl"] .main-content {
+        direction: rtl;
+        text-align: right;
+    }
+
+    html[dir="rtl"] .landing-header {
+        direction: rtl;
+        flex-direction: row-reverse;
+    }
+
+    html[dir="rtl"] .landing-header > .d-flex:first-child {
+        flex-direction: row-reverse;
+    }
+
+    html[dir="rtl"] .landing-header .right-panel {
+        margin-right: auto;
+        margin-left: 0;
+    }
+
+    html[dir="rtl"] .iq-nav-menu {
+        margin-right: 0;
+        margin-left: auto;
+        padding-right: 0;
+        text-align: right;
+    }
+
+    html[dir="rtl"] .horizontal-nav .navbar-nav {
+        align-items: flex-start;
+    }
+
+    html[dir="rtl"] .top-header-left {
+        justify-content: flex-end;
+    }
+
+    html[dir="rtl"] .top-header .text-md-end {
+        text-align: left !important;
+    }
+
+    html[dir="rtl"] .dropdown-menu-end {
+        right: auto;
+        left: 0;
+        text-align: right;
+    }
+
+    html[dir="rtl"] .iq-title-box,
+    html[dir="rtl"] .iq-title-desc,
+    html[dir="rtl"] .categories-desc,
+    html[dir="rtl"] .card-text {
+        text-align: right;
+    }
+
+    html[dir="rtl"] .center,
+    html[dir="rtl"] .text-center {
+        text-align: center !important;
+    }
+
+    html[dir="rtl"] .search-form .form-control {
+        text-align: right;
+    }
+
+    html[dir="rtl"] .search-form .search-icon {
+        right: auto;
+        left: 1rem;
+    }
+
+    html[dir="rtl"] .input-group > .form-control {
+        border-radius: var(--bs-border-radius) !important;
+    }
+
+    html[dir="rtl"] .mobile-offcanvas {
+        right: 0;
+        left: auto;
+    }
+
+    html[dir="rtl"] .btn-close {
+        margin-right: auto;
+        margin-left: 0;
+    }
+</style>
+@endif
 
 <!-- Dynamic Theme CSS Integration -->
 @php
@@ -33,6 +116,7 @@ window.themeConfig = {
     mode: '{{ $themeMode }}',
     version: '{{ time() }}'
 };
+window.currentLocale = '{{ app()->getLocale() }}';
 </script>
 
 <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -57,8 +141,5 @@ window.themeConfig = {
             };
         </script>
     @endforeach
-
-
-
 
 

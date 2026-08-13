@@ -213,7 +213,7 @@
                             @if(auth()->check() && auth()->user()->user_type == 'user')
                                 <a href="{{ route('book.service', ['id' => $serviceData['service_detail']['id']]) }}" class="btn btn-lg btn-primary continue-button">{{__('messages.continue')}}({{ getPriceFormat($total) }})</a>
                             @else
-                                <a href="{{ route('user.login', ['service_id' =>$serviceData['service_detail']['id']]) }}" class="btn btn-lg btn-primary">{{__('messages.continue')}}({{ getPriceFormat($total) }})</a>
+                                <a href="{{ route('login', ['service_id' =>$serviceData['service_detail']['id']]) }}" class="btn btn-lg btn-primary">{{__('messages.continue')}}({{ getPriceFormat($total) }})</a>
                             @endif
                             </div>
                         </div>
@@ -395,7 +395,7 @@
                                     </form>
                                 @endif
                             @else
-                                <form method="GET" id="favoriteForm" action="{{ route('user.login') }}">
+                                <form method="GET" id="favoriteForm" action="{{ route('login') }}">
                                     @csrf
                                     <button type="submit" class="btn btn-light bg-white rounded-circle serv-whishlist text-primary p-0 avatar-30">
                                     <svg width="16" height="16" viewBox="0 0 12 13" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -420,7 +420,7 @@
                         @if(auth()->check() && auth()->user()->user_type == 'user')
                             <a href="{{ route('book.service', ['id' => $serviceData['service_detail']['id']]) }}" class="btn btn-primary w-100 continue-button">{{__('messages.continue')}}</a>
                         @else
-                            <a href="{{ route('user.login',['service_id' =>$serviceData['service_detail']['id']]) }}" class="btn btn-primary w-100">{{__('messages.continue')}}</a>
+                            <a href="{{ route('login',['service_id' =>$serviceData['service_detail']['id']]) }}" class="btn btn-primary w-100">{{__('messages.continue')}}</a>
                         @endif
                     </div>
 

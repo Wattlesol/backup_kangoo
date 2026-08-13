@@ -4,7 +4,10 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
+use Exception;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Session\TokenMismatchException;
 class Handler extends ExceptionHandler
 {
     /**
@@ -39,6 +42,20 @@ class Handler extends ExceptionHandler
         });
 
         $this->renderable(function(Exception $exception, $request) {
+            if ($exception instanceof TokenMismatchException) {
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Your session expired. Please refresh and try again.',
+                    ], 419);
+                }
+
+                return redirect()
+                    ->back()
+                    ->withInput($request->except(['password', 'password_confirmation']))
+                    ->withErrors('Your session expired. Please refresh the page and try again.');
+            }
+
             if($exception instanceof ModelNotFoundException) {
                 if( $request->is('api/*')){
                     return response()->json([

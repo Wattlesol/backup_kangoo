@@ -166,11 +166,10 @@
                                         </div>
 
                                         <div class="sanad-card-actions">
-                                            <a href="{{ route('providerdocument.show', ['providerdocument' => optional($partner)->id]) }}" class="btn btn-link btn-sm px-0">Open Partner Profile</a>
-                                            <button class="btn btn-sm btn-outline-primary sanad-collapse-toggle collapsed" type="button" data-toggle="collapse" data-target="#partner-drawer-{{ $index }}" aria-expanded="false" aria-controls="partner-drawer-{{ $index }}">
-                                                <span><i class="fas fa-list-alt mr-1"></i> Document checklist</span>
+                                            <a href="{{ route('provider.show', ['provider' => optional($partner)->id]) }}" class="btn btn-sm sanad-action-button sanad-profile-link">Open Partner Profile</a>
+                                            <button class="btn btn-sm sanad-action-button sanad-collapse-toggle collapsed" type="button" data-toggle="collapse" data-target="#partner-drawer-{{ $index }}" aria-expanded="false" aria-controls="partner-drawer-{{ $index }}">
+                                                <span class="sanad-collapse-label"><i class="fas fa-list-alt mr-1"></i> Document checklist</span>
                                                 <span class="sanad-collapse-count">{{ $card['documents']->count() }}</span>
-                                                <i class="fas fa-chevron-down sanad-collapse-caret ml-2"></i>
                                             </button>
                                         </div>
 
@@ -319,9 +318,6 @@
                                             </div>
                                             <div class="text-right">
                                                 <span class="badge badge-light">{{ Str::headline(optional($booking)->sanad_stage ?: optional($booking)->status ?: 'pending') }}</span>
-                                                @if($booking)
-                                                    <a href="{{ route('sanad.requests.show', $booking->id) }}" class="btn btn-sm btn-outline-primary d-block mt-2">Open Request</a>
-                                                @endif
                                             </div>
                                         </div>
 
@@ -344,19 +340,17 @@
                                         @endif
 
                                         <div class="sanad-card-actions">
-                                            <button class="btn btn-sm btn-outline-primary sanad-collapse-toggle collapsed" type="button" data-toggle="collapse" data-target="#request-documents-drawer-{{ $requestIndex }}" aria-expanded="false" aria-controls="request-documents-drawer-{{ $requestIndex }}">
-                                                <span><i class="fas fa-list-alt mr-1"></i> Submitted documents</span>
-                                                <span class="sanad-collapse-count">{{ $card['documents']->count() }}</span>
-                                                <i class="fas fa-chevron-down sanad-collapse-caret ml-2"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-primary sanad-collapse-toggle collapsed" type="button" data-toggle="collapse" data-target="#request-team-drawer-{{ $requestIndex }}" aria-expanded="false" aria-controls="request-team-drawer-{{ $requestIndex }}">
-                                                <span><i class="fas fa-tasks mr-1"></i> Document requests</span>
-                                                <span class="sanad-collapse-count">{{ $card['document_requests']->count() }}</span>
-                                                <i class="fas fa-chevron-down sanad-collapse-caret ml-2"></i>
+                                            @if($booking)
+                                                <a href="{{ route('sanad.requests.show', $booking->id) }}" class="btn btn-sm sanad-action-button sanad-profile-link">Open Request Details</a>
+                                            @endif
+                                            <button class="btn btn-sm sanad-action-button sanad-collapse-toggle collapsed" type="button" data-toggle="collapse" data-target="#request-documents-drawer-{{ $requestIndex }}" aria-expanded="false" aria-controls="request-documents-drawer-{{ $requestIndex }}">
+                                                <span class="sanad-collapse-label"><i class="fas fa-list-alt mr-1"></i> Document requests</span>
+                                                <span class="sanad-collapse-count">{{ $card['documents']->count() + $card['document_requests']->count() }}</span>
                                             </button>
                                         </div>
 
                                         <div class="collapse sanad-inline-drawer mt-3" id="request-documents-drawer-{{ $requestIndex }}">
+                                            <div class="sanad-drawer-heading">Submitted documents</div>
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover mb-0 sanad-document-table">
                                                     <thead>
@@ -447,9 +441,8 @@
                                                     </tbody>
                                                 </table>
                                             </div>
-                                        </div>
 
-                                        <div class="collapse sanad-inline-drawer mt-3" id="request-team-drawer-{{ $requestIndex }}">
+                                            <div class="sanad-drawer-heading mt-3">Additional document requests</div>
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover mb-0 sanad-document-table">
                                                     <thead>
@@ -506,8 +499,7 @@
         </div>
     </div>
 
-    @push('after-styles')
-        <style>
+    <style>
             .sanad-document-queue .card,
             .sanad-entity-card {
                 border: 1px solid #edf1f7;
@@ -626,16 +618,55 @@
                 align-items: center;
                 border-top: 1px solid #edf1f7;
                 display: flex;
-                gap: 10px;
+                flex-wrap: nowrap;
+                gap: 8px;
                 justify-content: space-between;
                 padding-top: 12px;
             }
+            .sanad-action-button {
+                align-items: center;
+                border: 1px solid transparent;
+                border-radius: 6px;
+                color: #5f58c9;
+                display: inline-flex;
+                font-size: 11px;
+                font-weight: 700;
+                justify-content: center;
+                letter-spacing: .04em;
+                line-height: 1.2;
+                min-height: 36px;
+                padding: 8px 9px;
+                text-transform: uppercase;
+                transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+            }
+            .sanad-action-button:hover,
+            .sanad-action-button:focus {
+                background: #2bb86a;
+                border-color: #2bb86a;
+                color: #fff;
+                text-decoration: none;
+            }
+            .sanad-card-actions .sanad-profile-link {
+                flex: 1 1 0;
+                min-width: 0;
+                text-align: center;
+                white-space: nowrap;
+            }
             .sanad-collapse-toggle {
                 align-items: center;
-                display: inline-flex;
+                display: inline-grid;
+                flex: 1 1 0;
                 gap: 8px;
-                justify-content: space-between;
-                min-width: 190px;
+                grid-template-columns: minmax(0, 1fr) auto;
+                justify-content: initial;
+                max-width: 100%;
+                min-width: 0;
+            }
+            .sanad-collapse-label {
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .sanad-collapse-count {
                 align-items: center;
@@ -663,6 +694,14 @@
                 border-radius: 8px;
                 overflow: hidden;
                 padding-top: 12px;
+            }
+            .sanad-drawer-heading {
+                color: #1f2937;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: .04em;
+                padding: 0 12px 8px;
+                text-transform: uppercase;
             }
             .sanad-document-grid {
                 display: grid;
@@ -778,20 +817,25 @@
                 display: flex;
                 flex-direction: column;
                 max-height: calc(100vh - 48px);
+                max-width: 100%;
                 overflow: hidden;
+                width: 100%;
             }
             .sanad-document-modal .modal-dialog {
-                max-width: 1100px;
-                width: calc(100vw - 48px);
+                margin-left: auto;
+                margin-right: auto;
+                max-width: 960px;
+                width: min(960px, calc(100vw - 48px));
             }
             .sanad-document-modal .modal-header,
             .sanad-document-modal .modal-footer {
                 border-color: #edf1f7;
             }
             .sanad-document-modal .modal-body {
-                max-width: 100%;
-                overflow: auto;
-                overflow-x: hidden;
+                flex: 1 1 auto;
+                min-height: 0;
+                min-width: 0;
+                overflow: hidden;
                 padding: 16px;
             }
             .sanad-document-modal .modal-footer {
@@ -804,23 +848,29 @@
                 border-radius: 8px;
                 display: flex;
                 justify-content: center;
-                max-height: calc(100vh - 230px);
+                height: 62vh;
                 min-height: 360px;
+                max-width: 100%;
                 overflow: hidden;
+                position: relative;
                 width: 100%;
             }
             .sanad-modal-preview img {
+                bottom: 0;
                 display: block;
                 height: 100%;
-                max-height: calc(100vh - 260px);
-                max-width: 100%;
+                left: 0;
+                max-height: none;
+                max-width: none;
                 object-fit: contain;
+                position: absolute;
+                right: 0;
+                top: 0;
                 width: 100%;
             }
             .sanad-modal-preview iframe {
                 border: 0;
-                height: calc(100vh - 260px);
-                min-height: 420px;
+                height: 100%;
                 width: 100%;
             }
             .sanad-modal-file {
@@ -916,7 +966,6 @@
                     width: 100%;
                 }
             }
-        </style>
-    @endpush
+    </style>
 
 </x-master-layout>

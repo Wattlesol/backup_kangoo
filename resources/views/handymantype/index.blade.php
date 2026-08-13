@@ -10,8 +10,8 @@
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
                             <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
-                            @if(auth()->user()->hasRole('provider') ||auth()->user()->hasRole('admin') )
-                            <a href="{{ route('handymantype.create') }}" class="float-right mr-1 btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> {{ trans('messages.add_form_title',['form' => trans('messages.handymantype')  ]) }}</a>
+                            @if(auth()->user()->hasAnyRole(['admin','demo_admin','provider']) || auth()->user()->can('handymantype add'))
+                            <a href="{{ route('handymantype.create') }}" class="float-right mr-1 btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> Add Employee Type</a>
                             @endif
                         </div>
                         

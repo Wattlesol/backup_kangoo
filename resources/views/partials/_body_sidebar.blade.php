@@ -1,7 +1,14 @@
 @php
 $url = '';
+$authUser = auth()->user();
+$isDirectSanadEmployee = $authUser && $authUser->user_type === 'handyman' && empty($authUser->provider_id);
+$sanadCan = function (string $module, string $action = 'read') {
+    $user = auth()->user();
 
-$MyNavBar = \Menu::make('MenuList', function ($menu) use($url){
+    return $user && $user->hasSanadModulePermission($module, $action);
+};
+
+$MyNavBar = \Menu::make('MenuList', function ($menu) use($url, $sanadCan, $isDirectSanadEmployee){
 
 $menu->add('<span>'.__('messages.main').'</span>', ['class' => 'category-main']);
 
@@ -57,6 +64,32 @@ if (in_array(auth()->user()->user_type, ['user', 'customer'], true)) {
     foreach ($customerItems as $item) {
         $menu->add('<span>'.$item['label'].'</span><span class="custom-tooltip"><span class="tooltip-text">'.$item['label'].'</span></span>', ['route' => $item['route']])
             ->prepend('<i class="fas '.$item['icon'].' mr-2"></i>')
+            ->link->attr(['class' => '']);
+    }
+
+    return;
+}
+
+if (auth()->user()->user_type == "handyman" && !empty(auth()->user()->provider_id)) {
+    $menu->add('<span>Partner Work</span>', ['class' => 'category-main'])
+        ->data('permission', ['booking list', 'document list', 'payment list']);
+
+    $partnerEmployeeItems = [
+        ['label' => 'My Assigned Orders', 'route' => 'sanad.requests.index', 'icon' => 'fa-clipboard-list', 'module' => 'my_tasks', 'permission' => 'booking list'],
+        ['label' => 'Request Documents', 'route' => 'sanad.documents.queue', 'icon' => 'fa-folder-open', 'module' => 'request_documents', 'permission' => 'document list'],
+        ['label' => 'Customer Chat', 'route' => ['sanad.requests.index', 'action_state' => 'open_chat'], 'icon' => 'fa-comments', 'module' => 'customer_chat', 'permission' => 'booking list'],
+        ['label' => 'Payment Status', 'route' => 'payment.index', 'icon' => 'fa-wallet', 'module' => 'payment_status', 'permission' => 'payment list'],
+        ['label' => 'Team Employees', 'route' => 'handyman.index', 'icon' => 'fa-users', 'module' => 'team_employees', 'permission' => 'handyman list'],
+    ];
+
+    foreach ($partnerEmployeeItems as $item) {
+        if (!$sanadCan($item['module'])) {
+            continue;
+        }
+
+        $menu->add('<span>'.$item['label'].'</span><span class="custom-tooltip"><span class="tooltip-text">'.$item['label'].'</span></span>', ['route' => $item['route']])
+            ->prepend('<i class="fas '.$item['icon'].' mr-2"></i>')
+            ->data('permission', $item['permission'])
             ->link->attr(['class' => '']);
     }
 
@@ -148,65 +181,85 @@ $menu->add('<span>'.__('messages.booking').'</span><span class="custom-tooltip">
 ->nickname('booking')
 ->data('permission', 'booking list');
 
-$menu->add('<span>Assignment</span><span class="custom-tooltip"><span class="tooltip-text">Assignment</span></span>', ['route' => 'sanad.assignments.index'])
-->data('role', ['admin', 'demo_admin'])
-->data('permission', 'booking list');
-$menu->add('<span>Request Documents</span><span class="custom-tooltip"><span class="tooltip-text">Request Documents</span></span>', ['route' => 'sanad.documents.queue'])
-->data('role', ['admin', 'demo_admin', 'employee'])
-->data('permission', 'document list');
+if ($sanadCan('assignment')) {
+    $menu->add('<span>Assignment</span><span class="custom-tooltip"><span class="tooltip-text">Assignment</span></span>', ['route' => 'sanad.assignments.index'])
+    ->data('role', ['admin', 'demo_admin', 'handyman'])
+    ->data('permission', 'booking list');
+}
 
-$menu->add('<span>AI Tools</span>', ['class' => 'category-main'])
-->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
-->data('permission', 'booking list');
+if ($sanadCan('request_documents')) {
+    $menu->add('<span>Request Documents</span><span class="custom-tooltip"><span class="tooltip-text">Request Documents</span></span>', ['route' => 'sanad.documents.queue'])
+    ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+    ->data('permission', 'document list');
+}
 
-$menu->add('<span>Knowledge Base</span><span class="custom-tooltip"><span class="tooltip-text">Knowledge Base</span></span>', ['route' => 'sanad.knowledge.index'])
-->prepend('<i class="fas fa-brain mr-2"></i>')
-->data('role', ['admin', 'demo_admin'])
-->data('permission', 'booking list')
-->link->attr(['class' => '']);
-
-$menu->add('<span>Sanad AI Assistant</span><span class="custom-tooltip"><span class="tooltip-text">Sanad AI Assistant</span></span>', ['route' => 'sanad.ai.index'])
-->prepend('<i class="fas fa-robot mr-2"></i>')
-->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
-->data('permission', 'booking list')
-->link->attr(['class' => '']);
-
-$menu->add('<span>AI Escalations</span><span class="custom-tooltip"><span class="tooltip-text">AI Escalations</span></span>', ['route' => 'sanad.ai.escalations.index'])
-->prepend('<i class="fas fa-user-check mr-2"></i>')
-->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
-->data('permission', 'booking list')
-->link->attr(['class' => '']);
-
-$menu->add('<span>Chat System</span><span class="custom-tooltip"><span class="tooltip-text">Chat System</span></span>', ['route' => ['sanad.requests.index', 'action_state' => 'open_chat']])
-->prepend('<i class="fas fa-comments mr-2"></i>')
-->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
-->data('permission', 'booking list')
-->link->attr(['class' => '']);
-
-$menu->add('<span>Performance</span>', ['class' => 'category-main'])
-->data('permission', ['handyman list', 'userrating list','handymanrating list']);
-
-$menu->add('<span>'.__('messages.QualityControl',['form' => __('messages.QualityControl')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'complaint.index_data'])
-->data('permission', 'handyman list')
+if (auth()->user()->user_type == "handyman" && !$isDirectSanadEmployee && $sanadCan('orders')) {
+    $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.package_booking').'</span></span>', ['route' => 'servicepackage.Handyman_booking'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 12C2 8.22876 2 6.34315 3.17157 5.17157C4.34315 4 6.22876 4 10 4H14C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12V14C22 17.7712 22 19.6569 20.8284 20.8284C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.8284C2 19.6569 2 17.7712 2 14V12Z" stroke="currentColor" stroke-width="1.5"/>
+<path d="M18 16L16 16M16 16L14 16M16 16L16 14M16 16L16 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M7 4V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M17 4V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M2.5 9H21.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+</svg>')
+->nickname('booking')->data('permission', 'booking list');
+}
+
+if ($sanadCan('ai_tools')) {
+    $menu->add('<span>AI Tools</span>', ['class' => 'category-main'])
+    ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+    ->data('permission', 'booking list');
+
+    $menu->add('<span>Knowledge Base</span><span class="custom-tooltip"><span class="tooltip-text">Knowledge Base</span></span>', ['route' => 'sanad.knowledge.index'])
+    ->prepend('<i class="fas fa-brain mr-2"></i>')
+    ->data('role', ['admin', 'demo_admin', 'handyman'])
+    ->data('permission', 'booking list')
+    ->link->attr(['class' => '']);
+
+    $menu->add('<span>Sanad AI Assistant</span><span class="custom-tooltip"><span class="tooltip-text">Sanad AI Assistant</span></span>', ['route' => 'sanad.ai.index'])
+    ->prepend('<i class="fas fa-robot mr-2"></i>')
+    ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+    ->data('permission', 'booking list')
+    ->link->attr(['class' => '']);
+
+    $menu->add('<span>AI Escalations</span><span class="custom-tooltip"><span class="tooltip-text">AI Escalations</span></span>', ['route' => 'sanad.ai.escalations.index'])
+    ->prepend('<i class="fas fa-user-check mr-2"></i>')
+    ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+    ->data('permission', 'booking list')
+    ->link->attr(['class' => '']);
+
+    $menu->add('<span>Chat System</span><span class="custom-tooltip"><span class="tooltip-text">Chat System</span></span>', ['route' => ['sanad.requests.index', 'action_state' => 'open_chat']])
+    ->prepend('<i class="fas fa-comments mr-2"></i>')
+    ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
+    ->data('permission', 'booking list')
+    ->link->attr(['class' => '']);
+}
+
+if ($sanadCan('quality_control')) {
+    $menu->add('<span>Performance</span>', ['class' => 'category-main'])
+    ->data('permission', ['handyman list', 'userrating list','handymanrating list']);
+
+    $menu->add('<span>'.__('messages.QualityControl',['form' => __('messages.QualityControl')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'complaint.index_data'])
+    ->data('permission', 'handyman list')
+    ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path fill-rule="evenodd" clip-rule="evenodd" d="M4.21533 16.0148C4.21533 16.4737 4.58728 16.8456 5.0461 16.8456H10.0307C10.4895 16.8456 10.8615 16.4737 10.8615 16.0148C10.8615 15.556 10.4895 15.1841 10.0307 15.1841H5.0461C4.58728 15.1841 4.21533 15.556 4.21533 16.0148ZM4.21533 11.0302C4.21533 11.489 4.58728 11.861 5.0461 11.861H15.0153C15.4741 11.861 15.8461 11.489 15.8461 11.0302C15.8461 10.5714 15.4741 10.1995 15.0153 10.1995H5.0461C4.58728 10.1995 4.21533 10.5714 4.21533 11.0302ZM4.21533 6.04561C4.21533 6.50443 4.58728 6.87638 5.0461 6.87638H15.0153C15.4741 6.87638 15.8461 6.50443 15.8461 6.04561C15.8461 5.58679 15.4741 5.21484 15.0153 5.21484H5.0461C4.58728 5.21484 4.21533 5.58679 4.21533 6.04561Z" fill="currentColor"/>
 <path d="M18.7671 13.1096V11.3835C18.7671 7.43151 18.7671 5.45548 17.9005 4.22774C17.0338 3 15.639 3 12.8493 3H7.9178C5.12812 3 3.73328 3 2.86664 4.22774C2 5.45548 2 7.43151 2 11.3835C2 15.3356 2 17.3116 2.86664 18.5394C3.73328 19.7671 5.12812 19.7671 7.9178 19.7671H12.8493H17.4061" stroke="currentColor" stroke-width="1.47945"/>
 <circle cx="18.5" cy="14.25" r="1.5" stroke="currentColor" stroke-width="1.5"/>
 <ellipse cx="18.5" cy="18.375" rx="2.625" ry="1.5" stroke="currentColor" stroke-width="1.5"/>
 </svg>')
-->link->attr(['class' => '']);
+    ->link->attr(['class' => '']);
+    $menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.user_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.user_ratings').'</span></span>', ['route' => 'booking-rating.index'])
+    ->prepend('<i class="fas fa-star mr-2"></i>')
+    ->nickname('user_ratings')
+    ->data('permission', 'userrating list')
+    ->link->attr(['class' => '']);
 
-$menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.user_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.user_ratings').'</span></span>', ['route' => 'booking-rating.index'])
-->prepend('<i class="fas fa-star mr-2"></i>')
-->nickname('user_ratings')
-->data('permission', 'userrating list')
-->link->attr(['class' => '']);
-
-$menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.handyman_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.handyman_ratings').'</span></span>', ['route' => 'handyman-rating.index'])
-->prepend('<i class="fas fa-star-half-alt mr-2"></i>')
-->nickname('handyman_ratings')
-->data('permission', 'handymanrating list')
-->link->attr(['class' => '']);
+    $menu->add('<span>'.trans('messages.list_form_title',['form' => trans('messages.handyman_ratings')]).'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.handyman_ratings').'</span></span>', ['route' => 'handyman-rating.index'])
+    ->prepend('<i class="fas fa-star-half-alt mr-2"></i>')
+    ->nickname('handyman_ratings')
+    ->data('permission', 'handymanrating list')
+    ->link->attr(['class' => '']);
+}
 
 if (auth()->user()->user_type == "user"){
 $menu->add('<span>'.__('messages.my_orders').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.my_orders').'</span></span>', ['route' => 'customer.orders'])
@@ -240,19 +293,6 @@ $menu->add('<span>'.__('messages.complaint').'</span><span class="custom-tooltip
 ->data('permission', 'booking list');
 }
 
-if (auth()->user()->user_type == "handyman"){
-    $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.package_booking').'</span></span>', ['route' => 'servicepackage.Handyman_booking'])
-->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2 12C2 8.22876 2 6.34315 3.17157 5.17157C4.34315 4 6.22876 4 10 4H14C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12V14C22 17.7712 22 19.6569 20.8284 20.8284C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.8284C2 19.6569 2 17.7712 2 14V12Z" stroke="currentColor" stroke-width="1.5"/>
-<path d="M18 16L16 16M16 16L14 16M16 16L16 14M16 16L16 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M7 4V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M17 4V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M2.5 9H21.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-</svg>')
-->nickname('booking')->data('permission', 'booking list');
-
-;
-}
 if (auth()->user()->user_type == "provider"){
     $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.package_booking').'</span></span>', ['route' => 'servicepackage.proiver_booking'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -297,6 +337,7 @@ $menu->add('<span>'.__('messages.CreateBooking').'</span><span class="custom-too
 ->nickname('booking')
 ->data('permission', 'booking create');
 
+if (false) {
 $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.package_booking').'</span></span>', ['route' => 'servicepackage.servicepackage_booking'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M2 12C2 8.22876 2 6.34315 3.17157 5.17157C4.34315 4 6.22876 4 10 4H14C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12V14C22 17.7712 22 19.6569 20.8284 20.8284C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.8284C2 19.6569 2 17.7712 2 14V12Z" stroke="currentColor" stroke-width="1.5"/>
@@ -307,6 +348,7 @@ $menu->add('<span>'.__('messages.package_booking').'</span><span class="custom-t
 </svg>')
 ->nickname('booking')
 ->data('permission', 'booking create');
+}
 
 // E-commerce Menu Section (Admin Only)
 if (false && auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
@@ -579,7 +621,8 @@ $menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messa
 </svg>')
 ->link->attr(['class' => '']);
 
-$menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messages.handymanrequest')]).'</span>', ['class' => 'sidebar-layout' ,'route' => ['handyman.pending','request']])
+if (false) {
+$menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messages.handymanrequest')]).'</span>', ['class' => 'sidebar-layout'])
 ->data('permission', 'pending handyman')
 ->prepend('<svg width="15" height="15" class="sidebar-menu-icon" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g clip-path="url(#clip0_2357_772)">
@@ -593,7 +636,7 @@ $menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messa
 </svg>')
 ->link->attr(['class' => '']);
 
-$menu->handyman->add('<span>'.__('messages.unassigned_list_form_title',['form' => __('messages.handyman')]).'</span>', ['class' => 'sidebar-layout' ,'route' => ['handyman.pending','unassigned']])
+$menu->handyman->add('<span>'.__('messages.unassigned_list_form_title',['form' => __('messages.handyman')]).'</span>', ['class' => 'sidebar-layout'])
 ->data('permission', 'pending handyman')
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path fill-rule="evenodd" clip-rule="evenodd" d="M4.21533 16.0148C4.21533 16.4737 4.58728 16.8456 5.0461 16.8456H10.0307C10.4895 16.8456 10.8615 16.4737 10.8615 16.0148C10.8615 15.556 10.4895 15.1841 10.0307 15.1841H5.0461C4.58728 15.1841 4.21533 15.556 4.21533 16.0148ZM4.21533 11.0302C4.21533 11.489 4.58728 11.861 5.0461 11.861H15.0153C15.4741 11.861 15.8461 11.489 15.8461 11.0302C15.8461 10.5714 15.4741 10.1995 15.0153 10.1995H5.0461C4.58728 10.1995 4.21533 10.5714 4.21533 11.0302ZM4.21533 6.04561C4.21533 6.50443 4.58728 6.87638 5.0461 6.87638H15.0153C15.4741 6.87638 15.8461 6.50443 15.8461 6.04561C15.8461 5.58679 15.4741 5.21484 15.0153 5.21484H5.0461C4.58728 5.21484 4.21533 5.58679 4.21533 6.04561Z" fill="currentColor"/>
@@ -602,6 +645,7 @@ $menu->handyman->add('<span>'.__('messages.unassigned_list_form_title',['form' =
 <path d="M18.0562 17.9518C17.9345 17.952 17.8165 17.9096 17.7227 17.832C17.6289 17.7544 17.5653 17.6464 17.5427 17.5267C17.5202 17.4071 17.5402 17.2833 17.5993 17.1769C17.6584 17.0704 17.7528 16.988 17.8663 16.9439L18.4924 16.6997V15.4914C18.4924 15.3531 18.5473 15.2204 18.6452 15.1225C18.743 15.0247 18.8757 14.9697 19.0141 14.9697C19.1524 14.9697 19.2851 15.0247 19.383 15.1225C19.4808 15.2204 19.5358 15.3531 19.5358 15.4914V17.0566C19.5359 17.1616 19.5042 17.2642 19.445 17.351C19.3858 17.4377 19.3018 17.5046 19.204 17.5428L18.2461 17.9174C18.1855 17.9405 18.1211 17.9521 18.0562 17.9518Z" fill="currentColor"/>
 </svg>')
 ->link->attr(['class' => '']);
+}
 
 $menu->handyman->add('<span>'.__('messages.list_form_title',['form' => __('messages.handyman_earning')]).'</span>', ['class' => 'sidebar-layout' ,'route' => 'handymanEarning'])
 ->data('role', 'provider')
@@ -896,14 +940,16 @@ $menu->add('<span>'.__('messages.frontend_setting').'</span><span class="custom-
 ->link->attr(["class" => ""]);
 */
 
-$menu->add('<span>'.__('messages.setting').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.setting').'</span></span>', ['route' => 'setting.index'])
+if ($sanadCan('settings')) {
+    $menu->add('<span>'.__('messages.setting').'</span><span class="custom-tooltip"><span class="tooltip-text">'.__('messages.setting').'</span></span>', ['route' => 'setting.index'])
 ->prepend('<svg class="mr-2" width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
 <path d="M13.7654 2.15224C13.3978 2 12.9319 2 12 2C11.0681 2 10.6022 2 10.2346 2.15224C9.74457 2.35523 9.35522 2.74458 9.15223 3.23463C9.05957 3.45834 9.0233 3.7185 9.00911 4.09799C8.98826 4.65568 8.70226 5.17189 8.21894 5.45093C7.73564 5.72996 7.14559 5.71954 6.65219 5.45876C6.31645 5.2813 6.07301 5.18262 5.83294 5.15102C5.30704 5.08178 4.77518 5.22429 4.35436 5.5472C4.03874 5.78938 3.80577 6.1929 3.33983 6.99993C2.87389 7.80697 2.64092 8.21048 2.58899 8.60491C2.51976 9.1308 2.66227 9.66266 2.98518 10.0835C3.13256 10.2756 3.3397 10.437 3.66119 10.639C4.1338 10.936 4.43789 11.4419 4.43786 12C4.43783 12.5581 4.13375 13.0639 3.66118 13.3608C3.33965 13.5629 3.13248 13.7244 2.98508 13.9165C2.66217 14.3373 2.51966 14.8691 2.5889 15.395C2.64082 15.7894 2.87379 16.193 3.33973 17C3.80568 17.807 4.03865 18.2106 4.35426 18.4527C4.77508 18.7756 5.30694 18.9181 5.83284 18.8489C6.07289 18.8173 6.31632 18.7186 6.65204 18.5412C7.14547 18.2804 7.73556 18.27 8.2189 18.549C8.70224 18.8281 8.98826 19.3443 9.00911 19.9021C9.02331 20.2815 9.05957 20.5417 9.15223 20.7654C9.35522 21.2554 9.74457 21.6448 10.2346 21.8478C10.6022 22 11.0681 22 12 22C12.9319 22 13.3978 22 13.7654 21.8478C14.2554 21.6448 14.6448 21.2554 14.8477 20.7654C14.9404 20.5417 14.9767 20.2815 14.9909 19.902C15.0117 19.3443 15.2977 18.8281 15.781 18.549C16.2643 18.2699 16.8544 18.2804 17.3479 18.5412C17.6836 18.7186 17.927 18.8172 18.167 18.8488C18.6929 18.9181 19.2248 18.7756 19.6456 18.4527C19.9612 18.2105 20.1942 17.807 20.6601 16.9999C21.1261 16.1929 21.3591 15.7894 21.411 15.395C21.4802 14.8691 21.3377 14.3372 21.0148 13.9164C20.8674 13.7243 20.6602 13.5628 20.3387 13.3608C19.8662 13.0639 19.5621 12.558 19.5621 11.9999C19.5621 11.4418 19.8662 10.9361 20.3387 10.6392C20.6603 10.4371 20.8675 10.2757 21.0149 10.0835C21.3378 9.66273 21.4803 9.13087 21.4111 8.60497C21.3592 8.21055 21.1262 7.80703 20.6602 7C20.1943 6.19297 19.9613 5.78945 19.6457 5.54727C19.2249 5.22436 18.693 5.08185 18.1671 5.15109C17.9271 5.18269 17.6837 5.28136 17.3479 5.4588C16.8545 5.71959 16.2644 5.73002 15.7811 5.45096C15.2977 5.17191 15.0117 4.65566 14.9909 4.09794C14.9767 3.71848 14.9404 3.45833 14.8477 3.23463C14.6448 2.74458 14.2554 2.35523 13.7654 2.15224Z" stroke="currentColor" stroke-width="1.5"/>
 </svg>
 ')
-->nickname('setting')
-->data('permission', 'system setting');
+    ->nickname('setting')
+    ->data('permission', 'system setting');
+}
 
 })->filter(function ($item) {
 return checkMenuRoleAndPermission($item);

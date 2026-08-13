@@ -1,5 +1,45 @@
 @extends('landing-page.layouts.default')
 @section('content')
+@php
+    $isArabic = app()->getLocale() === 'ar';
+    $landingText = [
+        'section_1.title' => 'منصتك الفورية لإنجاز خدمات سند',
+        'section_1.description' => 'أنجز معاملاتك وخدماتك الحكومية والتجارية بثقة. سند يربطك بشركاء وموظفين مختصين لمتابعة الطلبات وتنفيذها بكفاءة.',
+        'section_2.title' => 'التصنيفات الأكثر طلبًا',
+        'section_3.title' => 'الخدمات الأعلى تقييمًا',
+        'section_4.title' => 'الخدمات المميزة',
+        'section_5.title' => 'انضم إلى شبكة شركاء سند',
+        'section_5.description' => 'وسع أعمالك مع سند وقدم خدمات موثوقة للعملاء من خلال منصة منظمة وآمنة لإدارة الطلبات والتنفيذ.',
+        'section_6.title' => 'تابع خدماتك عبر تطبيق سند',
+        'section_6.description' => 'استعرض الخدمات، تابع حالة الطلبات، واستقبل التحديثات المهمة مباشرة من التطبيق.',
+        'section_7.title' => 'تشغيل منظم وتجربة تنفيذ احترافية',
+        'section_7.description' => 'تدفق عمل واضح يجمع التخطيط، الإسناد، المتابعة، والتحديثات الفورية لضمان تنفيذ الطلبات بجودة عالية.',
+        'section_8.title' => 'مشاهداتك الأخيرة وما يناسبك',
+        'section_8.description' => 'ارجع بسرعة إلى الخدمات التي اطلعت عليها وتابع الخيارات الأنسب لاحتياجك.',
+        'section_9.title' => 'عملاؤنا يثقون بنا',
+        'section_9.description' => 'ثقة مستمرة من العملاء بفضل متابعة دقيقة، تنفيذ موثوق، وتجربة خدمة واضحة من البداية إلى النهاية.',
+        'package_list' => 'باقات الخدمات',
+        'special_offer' => 'عرض خاص',
+        'buy_now' => 'اشترِ الآن',
+        'top_rated_services_section' => 'قسم الخدمات الأعلى تقييمًا',
+        'featured_services_section' => 'قسم الخدمات المميزة',
+        'recently_viewed_services_section' => 'قسم الخدمات التي شاهدتها مؤخرًا',
+        'rating' => 'التقييم',
+        'or' => 'أو',
+    ];
+
+    $landingValue = function (string $section, string $field) use ($sectionData, $isArabic, $landingText) {
+        if ($isArabic) {
+            return data_get($sectionData, "$section.{$field}_ar")
+                ?? $landingText["$section.$field"]
+                ?? data_get($sectionData, "$section.$field");
+        }
+
+        return data_get($sectionData, "$section.$field");
+    };
+
+    $landingLabel = fn (string $key) => $isArabic ? ($landingText[$key] ?? $key) : null;
+@endphp
 
 <!-- Banner -->
 <div class="padding-top-bottom-90 bg-light">
@@ -11,7 +51,7 @@
                 <div class="iq-title-box mb-5">
                     <div class="iq-title-box">
                         <h2 class="text-capitalize line-count-3">
-                            {{ $sectionData['section_1']['title']}}
+                            {{ $landingValue('section_1', 'title') }}
                             <!-- Your Instant Connection to Right -->
                             <span class="highlighted-text">
                             <span class="highlighted-text-swipe"></span>
@@ -29,7 +69,7 @@
                             </span>
                         </h2>
                         <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">
-                            {{ $sectionData['section_1']['description']}}
+                            {{ $landingValue('section_1', 'description') }}
                         </p>
                     </div>
                 </div>
@@ -61,7 +101,7 @@
                                                    <div class="d-flex align-items-center gap-1 flex-wrap">
                                                          <div class="star-rating">
                                                             {{-- <rating-component :readonly="true" :showrating="false" :ratingvalue="{{json_encode($providers_service_rating)}}" /> --}}
-                                                            <span>Rating: {{ round($providers_service_rating,1) }}</span>
+                                                            <span>{{ $isArabic ? $landingText['rating'] : 'Rating' }}: {{ round($providers_service_rating,1) }}</span>
                                                          </div>
                                                          <h6 class="m-0 font-size-12 rating-text lh-1">({{ round($providers_service_rating,1) }})</h6>
                                                    </div>
@@ -90,7 +130,7 @@
     <div class="container">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="iq-title-box mb-0">
-                <h3 class="text-capitalize line-count-1">{{ $sectionData['section_2']['title'] }}
+                <h3 class="text-capitalize line-count-1">{{ $landingValue('section_2', 'title') }}
                     <div class="highlighted-text">
                         <span class="highlighted-text-swipe"></span>
                         <span class="highlighted-image">
@@ -118,7 +158,7 @@
             <div>
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="iq-title-box mb-0">
-                    <h3 class="text-capitalize line-count-1">{{ $sectionData['section_3']['title'] }}
+                    <h3 class="text-capitalize line-count-1">{{ $landingValue('section_3', 'title') }}
                     <div class="highlighted-text">
                         <span class="highlighted-text-swipe"></span>
                         <span class="highlighted-image">
@@ -135,7 +175,7 @@
             </div>
 
             {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'ac'"/> --}}
-            <div class="text-center p-4">Top Rated Services Section</div>
+            <div class="text-center p-4">{{ $isArabic ? $landingText['top_rated_services_section'] : 'Top Rated Services Section' }}</div>
             </div>
         @endif
 
@@ -144,7 +184,7 @@
                         <div>
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                 <div class="iq-title-box mb-0">
-                                    <h3 class="text-capitalize line-count-1">Packagee List
+                                    <h3 class="text-capitalize line-count-1">{{ $isArabic ? $landingText['package_list'] : 'Package List' }}
                                         <div class="highlighted-text">
                                             <span class="highlighted-text-swipe"></span>
                                             <span class="highlighted-image">
@@ -170,12 +210,12 @@
                                 <div class="card text-center iq-rmb-30">
                                     <div class="card-body position-relative">
                                         <!-- Special Offer Badge -->
-                                        <span class="badge bg-danger position-absolute top-0 start-0 m-2">Special Offer</span>
+                                        <span class="badge bg-danger position-absolute top-0 start-0 m-2">{{ $isArabic ? $landingText['special_offer'] : 'Special Offer' }}</span>
 
                                         <!-- Card Content -->
                                         <h5 class="card-title">{{ $vaule->name }}</h5>
                                         <p class="card-text">{{ $vaule->description }}</p>
-                                        <a href="{{ route('service-package.detail', $vaule->id) }}" class="btn btn-primary">Buy Now</a>
+                                        <a href="{{ route('service-package.detail', $vaule->id) }}" class="btn btn-primary">{{ $isArabic ? $landingText['buy_now'] : 'Buy Now' }}</a>
                                     </div>
                                 </div>
                             </div>
@@ -192,7 +232,7 @@
             <div class="mt-5">
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div class="iq-title-box mb-0">
-                    <h3 class="text-capitalize line-count-1">{{ $sectionData['section_4']['title'] }}
+                    <h3 class="text-capitalize line-count-1">{{ $landingValue('section_4', 'title') }}
                         <div class="highlighted-text"><div class="swiper-pagination"></div>
                             <span class="highlighted-text-swipe"></span>
                             <span class="highlighted-image">
@@ -208,7 +248,7 @@
                     <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{__('messages.view_all')}}</a>
                 </div>
                 {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'cleaning'"/> --}}
-                <div class="text-center p-4">Featured Services Section</div>
+                <div class="text-center p-4">{{ $isArabic ? $landingText['featured_services_section'] : 'Featured Services Section' }}</div>
             </div>
         @endif
     </div>
@@ -228,7 +268,7 @@
                         <div class="col-lg-2 col-md-none"></div>
                         <div class="col-lg-8 col-md-12">
                             <div class="iq-title-box text-center center">
-                                <h3 class="text-capitalize line-count-1">{{ $sectionData['title'] }}
+                                <h3 class="text-capitalize line-count-1">{{ $landingValue('section_8', 'title') }}
                                 <span class="highlighted-text">
                                     <span class="highlighted-text-swipe"></span>
                                     <span class="highlighted-image">
@@ -240,7 +280,7 @@
                                     </span>
                                 </span>
                                 </h3>
-                                <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $sectionData['section_8']['description'] }}</p>
+                                <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $landingValue('section_8', 'description') }}</p>
 
                             </div>
                         </div>
@@ -250,7 +290,7 @@
                     <div class="row">
                         <div class="col-12">
                         {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'recently_view'"/> --}}
-                        <div class="text-center p-4">Recently Viewed Services Section</div>
+                        <div class="text-center p-4">{{ $isArabic ? $landingText['recently_viewed_services_section'] : 'Recently Viewed Services Section' }}</div>
                         </div>
                     </div>
                 </div>
@@ -284,13 +324,13 @@
             <div class="col-md-2"></div>
                 <div class="col-lg-8 col-md-12">
                     <div class="iq-title-box mb-5 text-center px-3">
-                            <h2 class="text-capitalize line-count-2">{{ $sectionData['section_5']['title'] }}</h2>
-                            <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $sectionData['section_5']['description'] }}</p>
+                            <h2 class="text-capitalize line-count-2">{{ $landingValue('section_5', 'title') }}</h2>
+                            <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $landingValue('section_5', 'description') }}</p>
                     </div>
                     <div class="text-center d-flex justify-content-center align-items-center pt-3 flex-column flex-md-row px-3">
                             <a class="bg-primary py-3 px-5 fw-bolder text-white rounded-3 letter-spacing-64"
                                 href="mailto:{{ $sectionData['section_5']['email'] }}">{{ $sectionData['section_5']['email'] }}</a>
-                            <span class="px-3">Or</span>
+                            <span class="px-3">{{ $isArabic ? $landingText['or'] : 'Or' }}</span>
                             <a href="tel:{{ $sectionData['section_5']['contact_number'] }}">
                                 <h6 class="text-decoration-underline">{{ $sectionData['section_5']['contact_number'] }}</h6>
                             </a>
@@ -326,7 +366,7 @@
        <div class="row">
             <div class="col-12">
                 <div class="iq-title-box text-center center mb-2">
-                    <h3 class="text-capitalize line-count-1">{{ $sectionData['section_9']['title'] }}
+                    <h3 class="text-capitalize line-count-1">{{ $landingValue('section_9', 'title') }}
                     <span class="highlighted-text">
                         <!-- <span class="highlighted-text-swipe">our trusted clients</span> -->
                         <span class="highlighted-image">
@@ -345,7 +385,7 @@
                     <div class="d-inline-flex align-items-center flex-sm-row flex-column bg-body py-3 px-5 rounded-5 gap-2">
                         <div class="vertical-center lh-1">
                             {{-- <rating-component :readonly="true" :showrating="false" :ratingvalue="{{json_encode($totalRating)}}" /> --}}
-                            <span>Rating: {{ round($totalRating,1) }}</span>
+                            <span>{{ $isArabic ? $landingText['rating'] : 'Rating' }}: {{ round($totalRating,1) }}</span>
                             {{-- {{>components/widgets/filter-rating rating="4"}} --}}
                         </div>
                         @if (isset($sectionData['section_9']['overall_rating']) && $sectionData['section_9']['overall_rating'] == 'on')
@@ -353,7 +393,7 @@
                         <h6>{{__('landingpage.overall_rating')}}</h6>
                         @endif
                     </div>
-                    <h6 class="mt-4"> {{ $sectionData['section_9']['description'] }}</h6>
+                    <h6 class="mt-4"> {{ $landingValue('section_9', 'description') }}</h6>
                 </div>
             </div>
             <div class="col-12">
@@ -378,8 +418,8 @@
                       <div class="row align-items-center">
                          <div class="col-lg-6 position-relative my-5">
                             <div class="iq-title-box">
-                               <h2 class="text-capitalize text-white line-count-2">{{ $sectionData['section_6']['title'] }}</h2>
-                               <p class="mt-3 mb-0 text-white line-count-3">{{ $sectionData['section_6']['description'] }}
+                               <h2 class="text-capitalize text-white line-count-2">{{ $landingValue('section_6', 'title') }}</h2>
+                               <p class="mt-3 mb-0 text-white line-count-3">{{ $landingValue('section_6', 'description') }}
                                </p>
                             </div>
                             <div class="d-flex align-items-center gap-3 flex-wrap">
@@ -433,7 +473,7 @@
         <div class="row align-items-center">
             <div class="col-lg-5">
                 <div class="iq-title-box mb-0">
-                    <h3 class="text-capitalize line-count-2">{{ $sectionData['section_7']['title'] }}
+                    <h3 class="text-capitalize line-count-2">{{ $landingValue('section_7', 'title') }}
                     <span class="highlighted-text">
                         <span class="highlighted-text-swipe"></span>
                         <span class="highlighted-image">
@@ -448,7 +488,7 @@
                 </div>
             </div>
             <div class="col-lg-7 mt-lg-0 mt-3">
-                <p class="m-0 line-count-3">{{ $sectionData['section_7']['description'] }}</p>
+                <p class="m-0 line-count-3">{{ $landingValue('section_7', 'description') }}</p>
             </div>
         </div>
         @php
@@ -471,8 +511,16 @@
                         <div class="mb-4 pb-4 border-bottom">
                             @include('landing-page.components.widgets.icon-box', [
                                 'iconboxNumber' => $i + 1,
-                                'iconboxTitle' => $sectionData['section_7']['subtitle'][$i],
-                                'iconboxDescription' => $sectionData['section_7']['subdescription'][$i]
+                                'iconboxTitle' => $isArabic
+                                    ? (data_get($sectionData, "section_7.subtitle_ar.$i") ?? ['الإدارة إلى الشريك', 'الشريك إلى الموظف', 'الموظف إلى العميل'][$i] ?? $sectionData['section_7']['subtitle'][$i])
+                                    : $sectionData['section_7']['subtitle'][$i],
+                                'iconboxDescription' => $isArabic
+                                    ? (data_get($sectionData, "section_7.subdescription_ar.$i") ?? [
+                                        'تتابع الإدارة طلبات العملاء وتنسق مع الشركاء لضمان تنفيذ الخدمة بنجاح.',
+                                        'ينسق الشريك الطلب مع الموظف المناسب ويتابع جودة التنفيذ.',
+                                        'ينفذ الموظف الطلب ويحدث الحالة حتى اكتمال الخدمة.'
+                                    ][$i] ?? $sectionData['section_7']['subdescription'][$i])
+                                    : $sectionData['section_7']['subdescription'][$i]
                             ])
                         </div>
                     @endfor

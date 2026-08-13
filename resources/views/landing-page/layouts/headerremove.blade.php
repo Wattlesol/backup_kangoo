@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+@php
+    $currentLocale = app()->getLocale();
+    $isRtl = in_array($currentLocale, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']);
+@endphp
+<html lang="{{ $currentLocale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" data-bs-theme="light">
 <head>
     @yield('before_head')
     @include('landing-page.partials._head') 

@@ -125,14 +125,7 @@ class ThemeSetting extends Model
      */
     public static function getColor($group, $key, $default = '#000000')
     {
-        if (!self::tableExists()) {
-            return $default;
-        }
-
-        $setting = self::where('setting_group', $group)
-            ->where('setting_key', $key)
-            ->where('is_active', true)
-            ->first();
+        $setting = self::getByGroup($group)->firstWhere('setting_key', $key);
 
         return $setting ? $setting->setting_value : $default;
     }
@@ -194,7 +187,9 @@ class ThemeSetting extends Model
     private static function tableExists()
     {
         try {
-            return Schema::hasTable('theme_settings');
+            return Cache::remember('schema_has_theme_settings_table', 300, function () {
+                return Schema::hasTable('theme_settings');
+            });
         } catch (Throwable $e) {
             return false;
         }

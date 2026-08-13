@@ -8,7 +8,7 @@
         </div>
         <div class="row row-cols-xl-4 row-cols-md-3 row-cols-sm-2 row-cols-1 justify-content-center mt-5 " >
 
-           <span v-if="categoryDetails.length ==0 && isLoading==0"> Data Not Available </span>
+           <span v-if="categoryDetails.length ==0 && isLoading==0">{{ $t('messages.data') }}</span>
 
             <!-- <CategoryShimmer  v-for="item in 8" :key="item"></CategoryShimmer> -->
           

@@ -27,10 +27,10 @@
                 <div class="iq-sidebar-widget">
                     <!-- Search -->
                     <div class="widget">
-                        <h5 class="widget-title">Search Products</h5>
+                        <h5 class="widget-title">{{ __('landingpage.search_products') }}</h5>
                         <form method="GET" action="{{ route('products.search') }}">
                             <div class="input-group">
-                                <input type="text" class="form-control" name="q" placeholder="Search products..." value="{{ $search }}">
+                                <input type="text" class="form-control" name="q" placeholder="{{ __('landingpage.search_products_placeholder') }}" value="{{ $search }}">
                                 <button class="btn btn-primary" type="submit">
                                     <i class="fas fa-search"></i>
                                 </button>

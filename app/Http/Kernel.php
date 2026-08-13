@@ -70,6 +70,7 @@ class Kernel extends HttpKernel
         'theme.inject' => \App\Http\Middleware\ThemeInjectionMiddleware::class,
         'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
         'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+        'sanad.module' => \App\Http\Middleware\EnsureSanadModulePermission::class,
         'maintenance' => \App\Http\Middleware\MaintenanceMode::class,
         'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
     ];

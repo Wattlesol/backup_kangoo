@@ -27,7 +27,7 @@ class AppSettingsTableSeeder extends Seeder
                 'id' => 1,
                 'inquriy_email' => 'hello@iqonic.design',
                 'instagram_url' => 'https://www.instagram.com/iqonicdesign/?igshid=YmMyMTA2M2Y%3D',
-                'language_option' => '["nl","fr","it","pt","es","en"]',
+                'language_option' => '["ar","nl","fr","it","pt","es","en"]',
                 'linkedin_url' => 'https://www.linkedin.com/company/iqonicthemes/',
                 'remember_token' => NULL,
                 'site_copyright' => '© 2024 All Rights Reserved by IQONIC Design',

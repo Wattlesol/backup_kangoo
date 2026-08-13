@@ -20,19 +20,15 @@
                         {{ Form::model($handymandata,['method' => 'POST','route'=>'handyman.store', 'enctype'=>'multipart/form-data', 'data-toggle'=>"validator" ,'id'=>'handyman'] ) }}
                         {{ Form::hidden('id') }}
                         {{ Form::hidden('user_type','handyman') }}
+                        {{ Form::hidden('employee_permission_context', $employeePermissionContext ?? 'admin', ['id' => 'employee_permission_context']) }}
                         @php
                             $sanadSkillsText = old('skills', str_replace(',', "\n", (string) $handymandata->skills));
-                            $sanadPermissions = old('sanad_permissions', $handymandata->sanad_permissions ?: []);
-                            $permissionOptions = [
-                                'view_orders' => 'View Orders',
-                                'upload_documents' => 'Upload Documents',
-                                'customer_chat' => 'Customer Chat',
-                                'government_submission' => 'Government Submission',
-                                'close_stage' => 'Close Stage',
-                                'approve_stage' => 'Approve Stage',
-                                'view_financial_data' => 'View Financial Data',
-                                'manage_employees' => 'Manage Employees',
-                            ];
+                            $modulePermissionActions = ['read' => 'Read', 'write' => 'Write', 'delete' => 'Delete'];
+                            $employeePermissionContext = $employeePermissionContext ?? 'admin';
+                            $selectedModulePermissions = $selectedModulePermissions ?? [];
+                            $visiblePermissionContexts = auth()->user()->user_type === 'provider'
+                                ? ['partner' => $partnerPermissionModules]
+                                : ['admin' => $adminPermissionModules];
                             $employeeStatuses = [
                                 'available' => 'Available',
                                 'busy' => 'Busy',
@@ -40,6 +36,8 @@
                                 'on_leave' => 'On Leave',
                                 'training' => 'Training',
                             ];
+                            $saudiCountry = \App\Models\Country::where('code', 'SA')->orWhere('name', 'Saudi Arabia')->first();
+                            $selectedCountryId = old('country_id', $handymandata->country_id ?: optional($saudiCountry)->id);
                         @endphp
                         <div class="row">
                             <div class="form-group col-md-4">
@@ -92,34 +90,29 @@
                             </div>
                             @if(auth()->user()->hasAnyRole(['admin','demo_admin']))
                             <div class="form-group col-md-4">
-                                {{ Form::label('provider_id', __('messages.select_name',[ 'select' => __('messages.providers') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
+                                {{ Form::label('provider_id', __('messages.select_name',[ 'select' => __('messages.providers') ]),['class'=>'form-control-label'],false) }}
                                 <br />
                                 {{ Form::select('provider_id', [optional($handymandata->providers)->id => optional($handymandata->providers)->display_name], optional($handymandata->providers)->id, [
                                         'class' => 'select2js form-group providers',
-                                        'required',
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.providers') ]),
                                         'data-ajax--url' => route('ajax-list', ['type' => 'provider']),
                                     ]) }}
+                                <small class="text-muted">Leave empty for a direct Sanad admin employee.</small>
                             </div>
                             @endif
                             @if(auth()->user()->user_type !== 'provider')
                             <div class="form-group col-md-4">
-                                {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.provider_address') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                <br />
-                                {{ Form::select('service_address_id', [], old('service_address_id'), [
-                                        'class' => 'select2js form-group service_address_id',
-                                        'id' =>'service_address_id',
-                                        'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.provider_address') ]),
-                                    ]) }}
+                                {{ Form::label('address', __('messages.address'), ['class' => 'form-control-label']) }}
+                                {{ Form::text('address', old('address', $handymandata->address), ['class' => 'form-control', 'placeholder' => __('messages.address')]) }}
                             </div>
 
                             <div class="form-group col-md-4">
-                                {{ Form::label('country_id', __('messages.select_name',[ 'select' => __('messages.country') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
+                                {{ Form::label('country_id', __('messages.country').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                 <br />
-                                {{ Form::select('country_id', [optional($handymandata->country)->id => optional($handymandata->country)->name], optional($handymandata->country)->id, [
-                                        'class' => 'select2js form-group country',
-                                        'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.country') ]),
-                                        'data-ajax--url' => route('ajax-list', ['type' => 'country']),
+                                {{ Form::select('country_id', [$selectedCountryId => 'Saudi Arabia'], $selectedCountryId, [
+                                        'class' => 'form-control country',
+                                        'id' => 'country_id',
+                                        'required',
                                     ]) }}
                             </div>
                             @endif
@@ -127,7 +120,7 @@
                             <div class="form-group col-md-4">
                                 {{ Form::label('state_id', __('messages.select_name',[ 'select' => __('messages.state') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                 <br />
-                                {{ Form::select('state_id', [], [
+                                {{ Form::select('state_id', [], old('state_id', $handymandata->state_id), [
                                         'class' => 'select2js form-group state_id',
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.state') ]),
                                     ]) }}
@@ -144,9 +137,10 @@
 
                             <div class="form-group col-md-4">
                                 {{ Form::label('contact_number',__('messages.contact_number').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
-                                {{ Form::text('contact_number',old('contact_number'),['placeholder' => __('messages.contact_number'),'class' =>'form-control contact_number',
-                                //'maxlength' => 20, // Maximum 20 characters allowed
-                                //'pattern' => '^(\+|-)?\d+$', // Accepts '+' and numeric characters only
+                                {{ Form::text('contact_number',old('contact_number'),['placeholder' => '+9665XXXXXXXX','class' =>'form-control contact_number',
+                                'maxlength' => 13,
+                                'pattern' => '^(\\+9665\\d{8}|05\\d{8}|5\\d{8})$',
+                                'title' => 'Enter a valid Saudi mobile number, for example +9665XXXXXXXX, 05XXXXXXXX, or 5XXXXXXXX',
                                 'required']) }}
                                 <small class="help-block with-errors text-danger" id="contact_number_err"></small>
                             </div>
@@ -190,15 +184,60 @@
                                             {{ Form::textarea('skills', $sanadSkillsText, ['class' => 'form-control', 'rows' => 3, 'placeholder' => "One skill per line"]) }}
                                         </div>
                                         <div class="form-group col-md-12">
-                                            <label class="form-control-label">Permissions</label>
-                                            <div class="sanad-permission-grid">
-                                                @foreach($permissionOptions as $value => $label)
-                                                    <label>
-                                                        <input type="checkbox" name="sanad_permissions[]" value="{{ $value }}" {{ in_array($value, $sanadPermissions, true) ? 'checked' : '' }}>
-                                                        {{ $label }}
-                                                    </label>
-                                                @endforeach
+                                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                                <div>
+                                                    <label class="form-control-label mb-1">Permission Matrix</label>
+                                                    @if(auth()->user()->user_type === 'provider')
+                                                        <div class="text-muted small">Partner employees receive partner/task modules and remain scoped to their partner work.</div>
+                                                    @else
+                                                        <div class="text-muted small">Direct Sanad employees receive admin-panel modules limited by the permissions selected here.</div>
+                                                    @endif
+                                                </div>
                                             </div>
+                                            @foreach($visiblePermissionContexts as $context => $permissionModules)
+                                                <div class="sanad-permission-matrix" data-permission-context="{{ $context }}">
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm table-bordered mb-0">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Module</th>
+                                                                    <th>Description</th>
+                                                                    @foreach($modulePermissionActions as $actionLabel)
+                                                                        <th class="text-center">{{ $actionLabel }}</th>
+                                                                    @endforeach
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach($permissionModules as $moduleKey => $module)
+                                                                    <tr>
+                                                                        <td class="font-weight-bold">{{ $module['label'] }}</td>
+                                                                        <td class="text-muted">{{ $module['description'] }}</td>
+                                                                        @foreach($modulePermissionActions as $actionKey => $actionLabel)
+                                                                            @php
+                                                                                $isAvailable = !empty($module['permissions'][$actionKey] ?? []) || !empty($module['flags'][$actionKey] ?? []);
+                                                                                $isChecked = !empty($selectedModulePermissions[$moduleKey][$actionKey]);
+                                                                            @endphp
+                                                                            <td class="text-center">
+                                                                                @if($isAvailable)
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        class="form-check-input sanad-permission-checkbox"
+                                                                                        name="module_permissions[{{ $moduleKey }}][{{ $actionKey }}]"
+                                                                                        value="1"
+                                                                                        {{ $isChecked ? 'checked' : '' }}
+                                                                                    >
+                                                                                @else
+                                                                                    <span class="text-muted">-</span>
+                                                                                @endif
+                                                                            </td>
+                                                                        @endforeach
+                                                                    </tr>
+                                                                @endforeach
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            @endforeach
                                         </div>
                                     </div>
                                 </div>
@@ -231,10 +270,6 @@
                             </div>
                             @endif
 
-                            <div class="form-group col-md-12">
-                                {{ Form::label('address',__('messages.address'), ['class' => 'form-control-label']) }}
-                                {{ Form::textarea('address', null, ['class'=>"form-control textarea" , 'rows'=>3  , 'placeholder'=> __('messages.address') ]) }}
-                            </div>
                         </div>
                         {{ Form::submit( __('messages.save'), ['class'=>'btn btn-md btn-primary float-right']) }}
                         {{ Form::close() }}
@@ -254,16 +289,24 @@
         .sanad-employee-operations .gap-2 {
             gap: 8px;
         }
-        .sanad-permission-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 10px;
-        }
-        .sanad-permission-grid label {
+        .sanad-permission-matrix {
             border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 8px;
             background: #fff;
-            padding: 10px 12px;
+            overflow: hidden;
+        }
+        .sanad-permission-matrix th,
+        .sanad-permission-matrix td {
+            vertical-align: middle;
+        }
+        .sanad-permission-matrix th:nth-child(1) {
+            width: 220px;
+        }
+        .sanad-permission-matrix th:nth-child(n+3) {
+            width: 86px;
+        }
+        .sanad-permission-checkbox {
+            position: static;
             margin: 0;
         }
     </style>
@@ -271,16 +314,11 @@
     (function($) {
         "use strict";
         $(document).ready(function() {
-            var country_id = "{{ isset($handymandata->country_id) ? $handymandata->country_id : 0 }}";
+            var country_id = "{{ $selectedCountryId ?: 0 }}";
             var state_id = "{{ isset($handymandata->state_id) ? $handymandata->state_id : 0 }}";
             var city_id = "{{ isset($handymandata->city_id) ? $handymandata->city_id : 0 }}";
 
-            var provider_id = "{{ isset($handymandata->provider_id) ? $handymandata->provider_id : '' }}";
-            var service_address_id =
-                "{{ isset($handymandata->service_address_id) ? $handymandata->service_address_id : 0 }}";
-
             stateName(country_id, state_id);
-            providerAddress(provider_id, service_address_id)
             $(document).on('change', '#country_id', function() {
                 var country = $(this).val();
                 $('#state_id').empty();
@@ -292,31 +330,23 @@
                 $('#city_id').empty();
                 cityName(state, city_id);
             })
-            $(document).on('change', '#provider_id', function() {
-                var provider_id = $(this).val();
-                $('#service_address_id').empty();
-                providerAddress(provider_id, service_address_id);
-            })
-
         })
-        $(document).on('keyup', '.contact_number', function() {
+        $(document).on('keyup blur', '.contact_number', function() {
             var contactNumberInput = document.getElementById('contact_number');
             var inputValue = contactNumberInput.value;
-            inputValue = inputValue.replace(/[^0-9+\- ]/g, '');
-            if (inputValue.length > 15) {
-                inputValue = inputValue.substring(0, 15);
-                $('#contact_number_err').text('Contact number should not exceed 15 characters');
+            inputValue = inputValue.replace(/[^0-9+]/g, '');
+            if (inputValue.length > 13) {
+                inputValue = inputValue.substring(0, 13);
             } else {
                 $('#contact_number_err').text('');
             }
             contactNumberInput.value = inputValue;
-            if (inputValue.match(/^[0-9+\- ]+$/)) {
+            if (inputValue === '' || inputValue.match(/^(\+9665\d{8}|05\d{8}|5\d{8})$/)) {
                 $('#contact_number_err').text('');
             } else {
-                $('#contact_number_err').text('Please enter a valid mobile number');
+                $('#contact_number_err').text('Enter a valid Saudi mobile number');
             }
         });
-
 
         function stateName(country, state = "") {
             var state_route = "{{ route('ajax-list', [ 'type' => 'state','country_id' =>'']) }}" + country;
@@ -330,8 +360,12 @@
                         placeholder: "{{ trans('messages.select_name',['select' => trans('messages.state')]) }}",
                         data: result.results
                     });
-                    if (state != null) {
+                    if (state != null && state != 0) {
                         $("#state_id").val(state).trigger('change');
+                    } else if (result.results && result.results.length > 0) {
+                        var firstStateId = result.results[0].id;
+                        $("#state_id").val(firstStateId).trigger('change');
+                        cityName(firstStateId);
                     }
                 }
             });
@@ -349,32 +383,13 @@
                         placeholder: "{{ trans('messages.select_name',['select' => trans('messages.city')]) }}",
                         data: result.results
                     });
-                    if (city != null || city != 0) {
+                    if (city != null && city != 0) {
                         $("#city_id").val(city).trigger('change');
                     }
                 }
             });
         }
 
-        function providerAddress(provider_id, service_address_id = "") {
-            var provider_address_route =
-                "{{ route('ajax-list', [ 'type' => 'provider_address','provider_id' =>'']) }}" + provider_id;
-            provider_address_route = provider_address_route.replace('amp;', '');
-
-            $.ajax({
-                url: provider_address_route,
-                success: function(result) {
-                    $('#service_address_id').select2({
-                        width: '100%',
-                        placeholder: "{{ trans('messages.select_name',['select' => trans('messages.provider_address')]) }}",
-                        data: result.results
-                    });
-                    if (service_address_id != "") {
-                        $('#service_address_id').val(service_address_id).trigger('change');
-                    }
-                }
-            });
-        }
     })(jQuery);
     </script>
     @endsection

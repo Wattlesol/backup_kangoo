@@ -31,7 +31,7 @@ class SanadWebController extends Controller
 {
     public function assignments(Request $request, SanadAssignmentService $assignmentService)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+        abort_unless($this->canUseAssignmentModule(), 403);
         $query = Booking::with(['customer', 'service', 'provider'])->latest();
         if ($request->assignment_state === 'unassigned') $query->whereNull('provider_id');
         if ($request->assignment_state === 'assigned') $query->whereNotNull('provider_id');
@@ -62,7 +62,7 @@ class SanadWebController extends Controller
 
     public function confirmAssignment(Request $request, $id, SanadAssignmentService $assignmentService)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+        abort_unless($this->canUseAssignmentModule(true), 403);
         $booking = Booking::findOrFail($id);
         $request->validate(['provider_id' => 'required|exists:users,id', 'reason' => 'nullable|string|max:2000']);
         if ($booking->provider_id && !$request->reason) return back()->withErrors('A reason is required when reassigning an order.');
@@ -93,6 +93,7 @@ class SanadWebController extends Controller
     }
     public function dashboard()
     {
+        abort_unless($this->canUseSanadModule('dashboard'), 403);
         $auth_user = authSession();
         $user = auth()->user();
         $role = $this->sanadRole($user);
@@ -121,6 +122,7 @@ class SanadWebController extends Controller
 
     public function aiConsole(Request $request)
     {
+        abort_unless($this->canUseSanadModule('ai_tools'), 403);
         $user = auth()->user();
         $knowledgeItems = SanadAiKnowledgeItem::withCount('chunks')
             ->where('title', 'not like', '%Smoke Test%')
@@ -249,6 +251,7 @@ class SanadWebController extends Controller
 
     public function askAi(Request $request, SanadAiRagService $rag)
     {
+        abort_unless($this->canUseSanadModule('ai_tools', 'write'), 403);
         $request->validate([
             'question' => 'required|string',
             'booking_id' => 'nullable|integer',
@@ -282,7 +285,7 @@ class SanadWebController extends Controller
 
     public function aiEscalations(Request $request)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'handyman']), 403);
+        abort_unless($this->canUseSanadModule('ai_tools'), 403);
 
         $baseQuery = $this->realAiInteractionsQuery()
             ->with(['user', 'booking.customer', 'booking.service']);
@@ -324,7 +327,7 @@ class SanadWebController extends Controller
 
     public function reviewAiEscalation(Request $request, $id)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'handyman']), 403);
+        abort_unless($this->canUseSanadModule('ai_tools', 'write'), 403);
 
         $request->validate([
             'review_action' => 'required|in:approve,edit_approve,resolve,needs_revision',
@@ -374,6 +377,7 @@ class SanadWebController extends Controller
 
     public function indexRequests(Request $request)
     {
+        abort_unless($this->canUseOrdersModule(), 403);
         $query = Booking::with(['customer', 'provider', 'service', 'payment', 'handymanAdded.handyman', 'sanadDocuments', 'sanadBuzzAlerts', 'sanadChatThreads'])
             ->myBooking()
             ->latest();
@@ -482,6 +486,7 @@ class SanadWebController extends Controller
 
     public function showRequest($id)
     {
+        abort_unless($this->canUseOrdersModule(), 403);
         $bookingdata = Booking::with(['customer', 'provider', 'service', 'payment.paymentHistory', 'handymanAdded.handyman', 'sanadRequestActions.actor'])
             ->myBooking()
             ->findOrFail($id);
@@ -529,6 +534,18 @@ class SanadWebController extends Controller
 
         if (in_array($request->action, ['quality_approve', 'quality_reject', 'quality_rework'], true) && !auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
             return redirect()->back()->withErrors('Only admins can record Sanad quality control decisions.');
+        }
+        if ($request->action === 'add_internal_note') {
+            $this->abortUnlessEmployeeFlag('internal_notes');
+        }
+        if ($request->action === 'complete_current_stage') {
+            $this->abortUnlessEmployeeFlag('complete_stage');
+        }
+        if (in_array($request->action, ['request_missing_documents', 'request_admin_review'], true)) {
+            $this->abortUnlessEmployeeFlag('review_documents');
+        }
+        if ($request->action === 'mark_completed' && auth()->user()->user_type === 'handyman') {
+            abort(403);
         }
 
         $previousStatus = $booking->status;
@@ -631,6 +648,10 @@ class SanadWebController extends Controller
 
     public function updatePaymentStatus(Request $request, $id)
     {
+        abort_unless($this->canUseSanadModule('payments'), 403);
+        if (auth()->user()->user_type === 'handyman') {
+            abort(403);
+        }
         $booking = Booking::with('payment')->myBooking()->findOrFail($id);
         $request->validate([
             'payment_status' => 'required|string|in:pending,paid,failed,advanced_paid,pending_by_admin,refunded',
@@ -656,6 +677,8 @@ class SanadWebController extends Controller
 
     public function assignEmployees(Request $request, $id)
     {
+        abort_unless($this->canUseTeamEmployeeModule(true), 403);
+        $this->abortUnlessEmployeeFlag('team_collaboration');
         $booking = Booking::with('handymanAdded')->myBooking()->findOrFail($id);
         $request->validate([
             'handyman_id' => 'nullable|array',
@@ -709,6 +732,8 @@ class SanadWebController extends Controller
 
     public function updateRequestLifecycle(Request $request, $id)
     {
+        abort_unless($this->canUseOrdersModule(true), 403);
+        $this->abortUnlessEmployeeFlag('complete_stage');
         $request->validate([
             'sanad_stage' => 'required|string',
             'sanad_priority' => 'nullable|string|in:low,normal,high,urgent',
@@ -755,7 +780,8 @@ class SanadWebController extends Controller
 
     public function storeDocument(Request $request, $id)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'provider', 'user']), 403);
+        abort_unless($this->canUseDocumentReviewModule(true), 403);
+        $this->abortUnlessEmployeeFlag('upload_documents');
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
             'document_type' => 'required|string|max:255',
@@ -770,8 +796,10 @@ class SanadWebController extends Controller
             'retention_until' => 'nullable|date',
         ]);
 
-        $source = $request->source ?: (auth()->user()->hasRole('provider') ? 'partner' : 'customer');
+        $isPartnerSideUser = auth()->user()->hasRole('provider') || (auth()->user()->user_type === 'handyman' && !empty(auth()->user()->provider_id));
+        $source = $request->source ?: ($isPartnerSideUser ? 'partner' : 'customer');
         if (auth()->user()->hasRole('provider') && (int) $request->provider_id !== auth()->id()) abort(403);
+        if (auth()->user()->user_type === 'handyman' && !empty(auth()->user()->provider_id) && (int) $booking->provider_id !== (int) auth()->user()->provider_id) abort(403);
         $allowedDocuments = $this->serviceDocumentOptions($booking->service);
         if ($allowedDocuments->isNotEmpty() && auth()->user()->hasAnyRole(['provider', 'user']) && $request->document_key !== 'custom') {
             $submittedType = trim((string) $request->document_type);
@@ -830,7 +858,8 @@ class SanadWebController extends Controller
 
     public function reviewDocument(Request $request, $id, $documentId)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+        abort_unless($this->canUseDocumentReviewModule(true), 403);
+        $this->abortUnlessEmployeeFlag('review_documents');
         $booking = Booking::myBooking()->findOrFail($id);
         $document = $this->visibleDocumentsQuery($booking)->findOrFail($documentId);
         $request->validate([
@@ -870,7 +899,7 @@ class SanadWebController extends Controller
 
     public function documentQueue(Request $request)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+        abort_unless($this->canUseDocumentReviewModule(), 403);
 
         $partnerCards = ProviderDocument::with(['providers', 'document', 'media'])
             ->whereHas('providers', function ($query) {
@@ -1010,7 +1039,7 @@ class SanadWebController extends Controller
 
     public function reviewPartnerDocument(Request $request, $documentId)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+        abort_unless($this->canUseDocumentReviewModule(true), 403);
 
         $request->validate([
             'verification_status' => 'nullable|in:pending,approved,rejected',
@@ -1038,6 +1067,7 @@ class SanadWebController extends Controller
 
     public function storeBuzz(Request $request, $id)
     {
+        $this->abortUnlessEmployeeFlag('send_buzz');
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
             'recipient_role' => 'nullable|string|max:255',
@@ -1074,6 +1104,8 @@ class SanadWebController extends Controller
 
     public function storeChatMessage(Request $request, $id)
     {
+        abort_unless($this->canUseChatModule(true), 403);
+        $this->abortUnlessEmployeeFlag('customer_chat');
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
             'message' => 'required|string|max:2000',
@@ -1084,9 +1116,13 @@ class SanadWebController extends Controller
         ]);
 
         $threadType = $request->thread_type ?: 'shared';
-        if ($threadType === 'internal') abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+        if ($threadType === 'internal') {
+            abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']) || auth()->user()->user_type === 'handyman', 403);
+            $this->abortUnlessEmployeeFlag('internal_notes');
+        }
         if ($threadType === 'partner_internal') {
-            abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'provider']), 403);
+            abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'provider']) || auth()->user()->user_type === 'handyman', 403);
+            $this->abortUnlessEmployeeFlag('internal_notes');
         }
         $visibleTo = match ($threadType) {
             'internal' => ['admin', 'demo_admin', 'employee'],
@@ -1118,7 +1154,8 @@ class SanadWebController extends Controller
 
     public function createDocumentRequest(Request $request, $id)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'provider']), 403);
+        abort_unless($this->canUseDocumentReviewModule(true), 403);
+        $this->abortUnlessEmployeeFlag('review_documents');
         $booking = Booking::myBooking()->findOrFail($id);
         if (auth()->user()->hasRole('provider') && (int) $booking->provider_id !== auth()->id()) abort(403);
         $request->validate(['document_name' => 'required|string|max:255', 'requested_from' => 'required|in:customer,partner', 'reason' => 'required|string|max:2000', 'instructions' => 'nullable|string|max:4000', 'due_at' => 'nullable|date']);
@@ -1139,6 +1176,7 @@ class SanadWebController extends Controller
 
     public function markChatRead(Request $request, $id, $threadId)
     {
+        abort_unless($this->canUseChatModule(), 403);
         $booking = Booking::myBooking()->findOrFail($id);
         $thread = SanadChatThread::where('booking_id', $booking->id)->findOrFail($threadId);
         abort_unless($thread->thread_type === 'shared' || auth()->user()->hasAnyRole(['admin','demo_admin','employee']), 403);
@@ -1148,11 +1186,13 @@ class SanadWebController extends Controller
 
     public function uploadDocumentRequest(Request $request, $id, $documentRequestId)
     {
+        abort_unless($this->canUseDocumentReviewModule(true), 403);
         $booking = Booking::myBooking()->findOrFail($id);
         $item = $booking->sanadDocumentRequests()->findOrFail($documentRequestId);
-        abort_unless(in_array(auth()->id(), array_filter([$booking->customer_id, $booking->provider_id, $item->requested_by])), 403);
+        abort_unless(in_array(auth()->id(), array_filter([$booking->customer_id, $booking->provider_id, $item->requested_by])) || $this->employeeHasFlag('upload_documents'), 403);
         $request->validate(['document' => 'required|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240']);
-        $document = SanadDocumentVaultItem::create(['booking_id' => $booking->id, 'service_id' => $booking->service_id, 'provider_id' => auth()->user()->hasRole('provider') ? auth()->id() : null, 'owner_id' => $booking->customer_id, 'uploaded_by' => auth()->id(), 'document_type' => $item->document_name, 'document_key' => $item->document_key, 'source' => auth()->user()->hasRole('provider') ? 'partner' : 'customer', 'required' => $item->required]);
+        $isPartnerSideUser = auth()->user()->hasRole('provider') || (auth()->user()->user_type === 'handyman' && !empty(auth()->user()->provider_id));
+        $document = SanadDocumentVaultItem::create(['booking_id' => $booking->id, 'service_id' => $booking->service_id, 'provider_id' => $isPartnerSideUser ? $booking->provider_id : null, 'owner_id' => $booking->customer_id, 'uploaded_by' => auth()->id(), 'document_type' => $item->document_name, 'document_key' => $item->document_key, 'source' => $isPartnerSideUser ? 'partner' : 'customer', 'required' => $item->required]);
         storeMediaFile($document, $request->file('document'), 'document');
         $item->update(['document_id' => $document->id, 'status' => 'submitted']);
         $this->audit($request, 'sanad.document_request.submitted', $item);
@@ -1161,7 +1201,8 @@ class SanadWebController extends Controller
 
     public function reviewDocumentRequest(Request $request, $id, $documentRequestId)
     {
-        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']), 403);
+        abort_unless($this->canUseDocumentReviewModule(true), 403);
+        $this->abortUnlessEmployeeFlag('review_documents');
         $item = Booking::myBooking()->findOrFail($id)->sanadDocumentRequests()->findOrFail($documentRequestId);
         $request->validate(['status' => 'required|in:approved,rejected,replacement_requested,pending', 'review_reason' => 'nullable|string|max:2000']);
         if (in_array($request->status, ['rejected','replacement_requested'], true) && !$request->review_reason) return back()->withErrors('A reason is required.');
@@ -1564,6 +1605,116 @@ class SanadWebController extends Controller
             'tags' => $tags,
             'confidence' => $confidence,
         ];
+    }
+
+    private function canUseAssignmentModule(bool $write = false): bool
+    {
+        return $this->canUseSanadModule('assignment', $write ? 'write' : 'read');
+    }
+
+    private function canUseDocumentReviewModule(bool $write = false): bool
+    {
+        return $this->canUseSanadModule('request_documents', $write ? 'write' : 'read')
+            || ($write && $this->canUseSanadModule('upload_documents', 'write'));
+    }
+
+    private function canUseOrdersModule(bool $write = false): bool
+    {
+        $action = $write ? 'write' : 'read';
+
+        return $this->canUseSanadModule('orders', $action)
+            || $this->canUseSanadModule('my_tasks', $action);
+    }
+
+    private function canUseChatModule(bool $write = false): bool
+    {
+        return $this->canUseSanadModule('customer_chat', $write ? 'write' : 'read');
+    }
+
+    private function canUseTeamEmployeeModule(bool $write = false): bool
+    {
+        $action = $write ? 'write' : 'read';
+
+        return $this->canUseSanadModule('employee', $action)
+            || $this->canUseSanadModule('team_employees', $action);
+    }
+
+    private function canUseSanadModule(string $module, string $action = 'read'): bool
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return true;
+        }
+
+        if ($user->hasRole('provider')) {
+            return in_array($module, [
+                'dashboard',
+                'my_tasks',
+                'request_documents',
+                'upload_documents',
+                'customer_chat',
+                'buzz_customer',
+                'stage_progress',
+                'payment_status',
+                'internal_notes',
+                'partner_profile',
+                'team_employees',
+            ], true);
+        }
+
+        if ($user->user_type !== 'handyman') {
+            return false;
+        }
+
+        return $user->hasSanadModulePermission($module, $action);
+    }
+
+    private function abortUnlessEmployeeFlag(string $flag): void
+    {
+        if (auth()->user()->user_type !== 'handyman') {
+            return;
+        }
+
+        abort_unless($this->employeeHasFlag($flag) || $this->employeeHasModuleForFlag($flag), 403);
+    }
+
+    private function employeeHasFlag(string $flag): bool
+    {
+        $user = auth()->user();
+
+        if (!$user || $user->user_type !== 'handyman') {
+            return false;
+        }
+
+        return in_array($flag, $user->sanad_permissions ?: [], true);
+    }
+
+    private function employeeHasModuleForFlag(string $flag): bool
+    {
+        $map = [
+            'send_buzz' => [['buzz_customer', 'write'], ['customer_chat', 'write']],
+            'complete_stage' => [['stage_progress', 'write'], ['orders', 'write'], ['my_tasks', 'write']],
+            'review_documents' => [['request_documents', 'write']],
+            'upload_documents' => [['upload_documents', 'write'], ['request_documents', 'write']],
+            'view_payment_status' => [['payments', 'read'], ['payment_status', 'read']],
+            'internal_notes' => [['internal_notes', 'write'], ['customer_chat', 'write']],
+            'team_collaboration' => [['employee', 'write'], ['team_employees', 'write']],
+            'manage_employees' => [['employee', 'write'], ['team_employees', 'write']],
+            'customer_chat' => [['customer_chat', 'write']],
+        ];
+
+        foreach ($map[$flag] ?? [] as [$module, $action]) {
+            if ($this->canUseSanadModule($module, $action)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function audit(Request $request, $action, $model, array $metadata = [])

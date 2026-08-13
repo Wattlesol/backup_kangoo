@@ -128,7 +128,7 @@ const saveFavourite = async(values) => {
       }
    }
    else{
-      window.location.href = baseUrl + '/login-page';
+      window.location.href = baseUrl + '/login';
    }
 };
 const deleteFavourite = async(values) => {
@@ -162,7 +162,7 @@ const deleteFavourite = async(values) => {
    }
 };
 const redirectToLogin = () => {
-   window.location.href = baseUrl + '/login-page';
+   window.location.href = baseUrl + '/login';
 }
 
 const storeRecentlyViewed = async () => {

@@ -15,7 +15,7 @@
     </div>
     <div class="mt-3">
       <a v-if="auth_user_id !== null" :href="`${baseUrl}/book-service?id=${serviceid}&package_id=${packageid}`" class="fw-500">{{ buttontext }}</a>
-      <a v-else :href="`${baseUrl}/login-page`" class="fw-500">{{ buttontext }}</a>
+      <a v-else :href="`${baseUrl}/login`" class="fw-500">{{ buttontext }}</a>
     </div>
   </div>
 </template>

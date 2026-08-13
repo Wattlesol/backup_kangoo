@@ -9,6 +9,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Permission\Traits\HasRoles;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Support\SanadEmployeePermissions;
 
 class User extends Authenticatable implements HasMedia
 {
@@ -28,7 +29,7 @@ class User extends Authenticatable implements HasMedia
         'login_type','service_address_id' , 'uid','is_subscribe',
         'social_image','is_available','designation','last_online_time',
         'known_languages','skills','description','why_choose_me','is_email_verified','language',
-        'sanad_job_title','sanad_department','sanad_employee_status','sanad_permissions',
+        'sanad_job_title','sanad_department','sanad_employee_status','sanad_permissions','sanad_permission_matrix',
         'sanad_working_hours','sanad_daily_capacity','sanad_quality_score','sanad_sla_compliance_rate','sanad_acceptance_rate','sanad_cancellation_rate','sanad_average_completion_minutes'
     ];
 
@@ -64,6 +65,7 @@ class User extends Authenticatable implements HasMedia
         'slots_for_all_services' => 'integer',
         'is_email_verified'    => 'integer',
         'sanad_permissions'    => 'array',
+        'sanad_permission_matrix' => 'array',
         'sanad_daily_capacity' => 'integer',
         'sanad_quality_score' => 'decimal:2',
         'sanad_sla_compliance_rate' => 'decimal:2',
@@ -169,6 +171,28 @@ class User extends Authenticatable implements HasMedia
 
     protected function getUserByKeyValue($key,$value){
         return $this->where($key, $value)->first();
+    }
+
+    public function sanadPermissionContext(): string
+    {
+        return $this->sanad_permission_matrix['context']
+            ?? (!empty($this->provider_id) ? 'partner' : 'admin');
+    }
+
+    public function hasSanadModulePermission(string $module, string $action = 'read'): bool
+    {
+        return SanadEmployeePermissions::userCan($this, $module, $action);
+    }
+
+    public function hasAnySanadModulePermission(array $modules, string $action = 'read'): bool
+    {
+        foreach ($modules as $module) {
+            if ($this->hasSanadModulePermission($module, $action)) {
+                return true;
+            }
+        }
+
+        return false;
     }
     public function providerTaxMapping(){
         return $this->hasMany(ProviderTaxMapping::class, 'provider_id','id');

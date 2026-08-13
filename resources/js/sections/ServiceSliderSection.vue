@@ -70,7 +70,7 @@
     </div>
 </SwiperSlide>
 </Swiper>
-<span v-if="IS_LOADER ==false && serviceDetails.length == 0"> Data Not Available </span>
+<span v-if="IS_LOADER ==false && serviceDetails.length == 0">{{ $t('messages.data') }}</span>
 </section>
 </template>
 
