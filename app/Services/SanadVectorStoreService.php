@@ -19,7 +19,7 @@ class SanadVectorStoreService
         $item->chunks()->delete();
 
         foreach ($this->chunk($item->content) as $index => $content) {
-            $embedding = $this->ai->embed($content) ?: $this->localEmbedding($content);
+            $embedding = $this->ai->embed($content, 'passage') ?: $this->localEmbedding($content);
             $chunk = SanadAiKnowledgeChunk::create([
                 'knowledge_item_id' => $item->id,
                 'chunk_index' => $index,
@@ -41,13 +41,10 @@ class SanadVectorStoreService
 
     public function search(string $question, string $audience = 'customer', int $limit = 5): Collection
     {
-        $queryEmbedding = $this->ai->embed($question) ?: $this->localEmbedding($question);
-        $chromaMatches = $this->searchChroma($queryEmbedding, $audience, $limit);
-        if ($chromaMatches->isNotEmpty()) {
-            return $chromaMatches;
-        }
+        $queryEmbedding = $this->ai->embed($question, 'query') ?: $this->localEmbedding($question);
+        $chromaMatches = $this->searchChroma($queryEmbedding, $audience, 15);
 
-        $chunks = SanadAiKnowledgeChunk::with('knowledgeItem')
+        $dbChunks = SanadAiKnowledgeChunk::with('knowledgeItem')
             ->whereHas('knowledgeItem', function ($query) use ($audience) {
                 $query->where('is_active', true)
                     ->where(function ($visibilityQuery) use ($audience) {
@@ -58,16 +55,65 @@ class SanadVectorStoreService
             })
             ->get();
 
-        return $chunks
-            ->map(fn ($chunk) => [
+        $candidates = collect();
+
+        foreach ($dbChunks as $chunk) {
+            $item = $chunk->knowledgeItem;
+            if (!$item || !$item->is_active) {
+                continue;
+            }
+
+            $chromaMatch = $chromaMatches->first(fn ($m) => data_get($m, 'chunk.id') === $chunk->id);
+            $vectorScore = $chromaMatch ? (float) $chromaMatch['score'] : $this->cosine($queryEmbedding, $chunk->embedding ?: []);
+            $keywordScores = $this->computeKeywordScore($question, $item, $chunk);
+
+            $hybridScore = round((0.50 * $vectorScore) + (0.30 * $keywordScores['content']) + (0.20 * $keywordScores['title']), 4);
+
+            $candidates->push([
                 'chunk' => $chunk,
-                'item' => $chunk->knowledgeItem,
-                'score' => $this->cosine($queryEmbedding, $chunk->embedding ?: []),
-            ])
+                'item' => $item,
+                'score' => $hybridScore,
+                'vector_score' => $vectorScore,
+                'keyword_score' => $keywordScores['content'],
+            ]);
+        }
+
+        return $candidates
             ->filter(fn ($match) => $match['score'] > 0)
             ->sortByDesc('score')
             ->take($limit)
             ->values();
+    }
+
+    private function computeKeywordScore(string $question, SanadAiKnowledgeItem $item, SanadAiKnowledgeChunk $chunk): array
+    {
+        $stopWords = ['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'to', 'in', 'for', 'how', 'what', 'can', 'you', 'me', 'tell', 'take', 'it', 'be', 'this', 'that'];
+        $rawTerms = preg_split('/[^\pL\pN]+/u', Str::lower($question));
+        $terms = collect($rawTerms)->filter(fn ($t) => mb_strlen($t) >= 3 && !in_array($t, $stopWords, true))->values();
+
+        if ($terms->isEmpty()) {
+            return ['content' => 0.0, 'title' => 0.0];
+        }
+
+        $titleHaystack = Str::lower($item->title . ' ' . $item->category);
+        $contentHaystack = Str::lower($item->title . ' ' . $item->content . ' ' . ($chunk->content ?? ''));
+
+        $titleMatches = 0;
+        $contentMatches = 0;
+
+        foreach ($terms as $term) {
+            if (Str::contains($titleHaystack, $term)) {
+                $titleMatches++;
+            }
+            if (Str::contains($contentHaystack, $term)) {
+                $contentMatches++;
+            }
+        }
+
+        return [
+            'content' => min(1.0, $contentMatches / $terms->count()),
+            'title' => min(1.0, $titleMatches / $terms->count()),
+        ];
     }
 
     public function reindexAll(): int
@@ -88,19 +134,61 @@ class SanadVectorStoreService
 
     private function chunk(string $content): array
     {
-        $text = trim(preg_replace('/\s+/', ' ', strip_tags($content)));
-        $size = max(300, (int) config('sanad.ai.chunk_size', 900));
-        $overlap = max(0, min((int) config('sanad.ai.chunk_overlap', 120), $size - 1));
-        $chunks = [];
+        $cleaned = strip_tags($content);
+        $cleaned = preg_replace('/\[×\]\(javascript:.*?\)/i', '', $cleaned);
+        $cleaned = preg_replace('/\[([^\]]+)\]\([^)]+\)/', '$1', $cleaned);
+        $cleaned = preg_replace('/Source:\s*https?:\/\/\S+/i', '', $cleaned);
+        $cleaned = preg_replace('/https?:\/\/\S+/', '', $cleaned);
 
-        for ($offset = 0; $offset < mb_strlen($text); $offset += $size - $overlap) {
-            $chunk = trim(mb_substr($text, $offset, $size));
-            if ($chunk !== '') {
-                $chunks[] = $chunk;
+        // Split text by markdown headings (# Heading) or double newlines (\n\n)
+        $sections = preg_split('/(?=(?:^|\n)\s*#{1,4}\s+)/u', $cleaned);
+        $chunks = [];
+        $maxChunkSize = max(400, (int) config('sanad.ai.chunk_size', 800));
+
+        foreach ($sections as $section) {
+            $section = trim($section);
+            if ($section === '') {
+                continue;
+            }
+
+            // Extract heading if present
+            $currentHeader = '';
+            if (preg_match('/^(#{1,4}\s+.*)$/m', $section, $hMatch)) {
+                $currentHeader = trim(preg_replace('/^#+\s*/', '', $hMatch[1]));
+            }
+
+            // Split section by paragraphs
+            $paragraphs = preg_split('/\n{2,}/u', $section);
+            $currentChunk = '';
+
+            foreach ($paragraphs as $paragraph) {
+                $paragraph = trim(preg_replace('/\s+/', ' ', $paragraph));
+                if ($paragraph === '') {
+                    continue;
+                }
+
+                if (mb_strlen($currentChunk . ' ' . $paragraph) > $maxChunkSize && mb_strlen($currentChunk) > 100) {
+                    $finalChunk = trim($currentChunk);
+                    if ($currentHeader && !Str::contains($finalChunk, $currentHeader)) {
+                        $finalChunk = "[$currentHeader] " . $finalChunk;
+                    }
+                    $chunks[] = $finalChunk;
+                    $currentChunk = $paragraph;
+                } else {
+                    $currentChunk = $currentChunk === '' ? $paragraph : $currentChunk . ' ' . $paragraph;
+                }
+            }
+
+            if (trim($currentChunk) !== '') {
+                $finalChunk = trim($currentChunk);
+                if ($currentHeader && !Str::contains($finalChunk, $currentHeader)) {
+                    $finalChunk = "[$currentHeader] " . $finalChunk;
+                }
+                $chunks[] = $finalChunk;
             }
         }
 
-        return $chunks ?: [$text];
+        return $chunks ?: [trim(preg_replace('/\s+/', ' ', $cleaned))];
     }
 
     private function localEmbedding(string $text, int $dimensions = 256): array

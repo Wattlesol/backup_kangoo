@@ -53,4 +53,11 @@ class SanadDocumentVaultItem extends Model implements HasMedia
     public function service() { return $this->belongsTo(Service::class); }
     public function provider() { return $this->belongsTo(User::class, 'provider_id'); }
     public function reviewer() { return $this->belongsTo(User::class, 'reviewed_by'); }
+
+    public function publicDocumentUrl(): ?string
+    {
+        return $this->getFirstMediaUrl('document')
+            ?: $this->getFirstMediaUrl('sanad_document')
+            ?: $this->file_path;
+    }
 }

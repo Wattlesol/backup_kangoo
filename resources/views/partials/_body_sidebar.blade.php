@@ -26,6 +26,7 @@ if (auth()->user()->user_type == "provider") {
 
     $providerItems = [
         ['label' => 'Assigned Orders', 'route' => 'provider.order.index', 'icon' => 'fa-clipboard-list'],
+        ['label' => 'Chat Workspace', 'route' => 'sanad.chat.workspace', 'icon' => 'fa-comments'],
         ['label' => 'Operations Board', 'route' => 'provider.kanban.index', 'icon' => 'fa-columns'],
         ['label' => 'Sanad Services', 'route' => 'provider.services.index', 'icon' => 'fa-toggle-on'],
         ['label' => 'Employee Workflows', 'route' => 'provider.workflows.index', 'icon' => 'fa-project-diagram'],
@@ -53,11 +54,9 @@ if (in_array(auth()->user()->user_type, ['user', 'customer'], true)) {
         ['label' => 'Create New Request', 'route' => 'customer-portal.requests.create', 'icon' => 'fa-plus-circle'],
         ['label' => 'My Requests', 'route' => 'customer-portal.requests.index', 'icon' => 'fa-clipboard-list'],
         ['label' => 'Document Vault', 'route' => 'customer-portal.vault', 'icon' => 'fa-folder-open'],
-        ['label' => 'Messages', 'route' => 'customer-portal.messages', 'icon' => 'fa-comments'],
-        ['label' => 'Notifications', 'route' => 'customer-portal.notifications', 'icon' => 'fa-bell'],
+        ['label' => 'Chat System', 'route' => 'customer-portal.messages', 'icon' => 'fa-comments'],
         ['label' => 'Billing', 'route' => 'customer-portal.billing', 'icon' => 'fa-file-invoice-dollar'],
         ['label' => 'Complaints & Support', 'route' => 'customer-portal.support', 'icon' => 'fa-headset'],
-        ['label' => 'Sanad AI Assistant', 'route' => 'customer-portal.ai', 'icon' => 'fa-robot'],
         ['label' => 'Customer Profile', 'route' => 'customer-portal.profile', 'icon' => 'fa-user-shield'],
     ];
 
@@ -76,8 +75,9 @@ if (auth()->user()->user_type == "handyman" && !empty(auth()->user()->provider_i
 
     $partnerEmployeeItems = [
         ['label' => 'My Assigned Orders', 'route' => 'sanad.requests.index', 'icon' => 'fa-clipboard-list', 'module' => 'my_tasks', 'permission' => 'booking list'],
+        ['label' => 'Chat Workspace', 'route' => 'sanad.chat.workspace', 'icon' => 'fa-comments', 'module' => 'customer_chat', 'permission' => 'booking list'],
         ['label' => 'Request Documents', 'route' => 'sanad.documents.queue', 'icon' => 'fa-folder-open', 'module' => 'request_documents', 'permission' => 'document list'],
-        ['label' => 'Customer Chat', 'route' => ['sanad.requests.index', 'action_state' => 'open_chat'], 'icon' => 'fa-comments', 'module' => 'customer_chat', 'permission' => 'booking list'],
+        ['label' => 'Customer Chat', 'route' => 'sanad.chat.workspace', 'icon' => 'fa-comments', 'module' => 'customer_chat', 'permission' => 'booking list'],
         ['label' => 'Payment Status', 'route' => 'payment.index', 'icon' => 'fa-wallet', 'module' => 'payment_status', 'permission' => 'payment list'],
         ['label' => 'Team Employees', 'route' => 'handyman.index', 'icon' => 'fa-users', 'module' => 'team_employees', 'permission' => 'handyman list'],
     ];
@@ -216,19 +216,7 @@ if ($sanadCan('ai_tools')) {
     ->data('permission', 'booking list')
     ->link->attr(['class' => '']);
 
-    $menu->add('<span>Sanad AI Assistant</span><span class="custom-tooltip"><span class="tooltip-text">Sanad AI Assistant</span></span>', ['route' => 'sanad.ai.index'])
-    ->prepend('<i class="fas fa-robot mr-2"></i>')
-    ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
-    ->data('permission', 'booking list')
-    ->link->attr(['class' => '']);
-
-    $menu->add('<span>AI Escalations</span><span class="custom-tooltip"><span class="tooltip-text">AI Escalations</span></span>', ['route' => 'sanad.ai.escalations.index'])
-    ->prepend('<i class="fas fa-user-check mr-2"></i>')
-    ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
-    ->data('permission', 'booking list')
-    ->link->attr(['class' => '']);
-
-    $menu->add('<span>Chat System</span><span class="custom-tooltip"><span class="tooltip-text">Chat System</span></span>', ['route' => ['sanad.requests.index', 'action_state' => 'open_chat']])
+    $menu->add('<span>Unified Inbox</span><span class="custom-tooltip"><span class="tooltip-text">Unified Inbox</span></span>', ['route' => 'sanad.chat.workspace'])
     ->prepend('<i class="fas fa-comments mr-2"></i>')
     ->data('role', ['admin', 'demo_admin', 'employee', 'handyman'])
     ->data('permission', 'booking list')
@@ -259,6 +247,7 @@ if ($sanadCan('quality_control')) {
     ->nickname('handyman_ratings')
     ->data('permission', 'handymanrating list')
     ->link->attr(['class' => '']);
+
 }
 
 if (auth()->user()->user_type == "user"){

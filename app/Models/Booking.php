@@ -135,6 +135,10 @@ class Booking extends Model
         return $this->hasMany(SanadRequestAction::class, 'booking_id', 'id');
     }
 
+    public function sanadAiInteractions(){
+        return $this->hasMany(SanadAiInteraction::class, 'booking_id', 'id');
+    }
+
     public function sanadWorkflowStages(){
         return $this->hasMany(SanadPartnerWorkflowStage::class, 'booking_id', 'id')->orderBy('execution_order')->orderBy('id');
     }

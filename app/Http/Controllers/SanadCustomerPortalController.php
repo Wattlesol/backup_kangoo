@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SanadConversationUpdated;
 use App\Models\Booking;
 use App\Models\BookingActivity;
 use App\Models\BookingRating;
@@ -202,8 +203,9 @@ class SanadCustomerPortalController extends Controller
             ->findOrFail($id);
         $thread = $this->customerThread($booking);
         $complaints = SanadCustomerComplaint::where('booking_id', $booking->id)->latest()->get();
+        $vaultDocuments = SanadDocumentVaultItem::where('owner_id', Auth::id())->where('source', 'vault')->latest()->get();
 
-        return view('customer-portal.request-show', compact('booking', 'thread', 'complaints'));
+        return view('customer-portal.request-show', compact('booking', 'thread', 'complaints', 'vaultDocuments'));
     }
 
     public function uploadRequestDocument(Request $request, $id)
@@ -240,22 +242,48 @@ class SanadCustomerPortalController extends Controller
         $documentRequest = SanadDocumentRequest::where('booking_id', $booking->id)
             ->where('requested_from', 'customer')
             ->findOrFail($documentRequestId);
-        $request->validate(['file' => ['required', 'file', 'max:10240']]);
 
-        $document = SanadDocumentVaultItem::create([
-            'booking_id' => $booking->id,
-            'service_id' => $booking->service_id,
-            'owner_id' => Auth::id(),
-            'uploaded_by' => Auth::id(),
-            'document_type' => $documentRequest->document_name,
-            'document_key' => $documentRequest->document_key,
-            'required' => $documentRequest->required,
-            'source' => 'request',
-            'verification_status' => 'pending',
-            'visible_to' => ['user', 'customer', 'admin', 'employee'],
-            'file_name' => $request->file('file')->getClientOriginalName(),
+        $request->validate([
+            'file' => ['required_without:vault_document_id', 'nullable', 'file', 'max:10240'],
+            'vault_document_id' => ['required_without:file', 'nullable', 'integer'],
         ]);
-        $document->addMedia($request->file('file'))->toMediaCollection('sanad_document');
+
+        if ($request->filled('vault_document_id')) {
+            $vault = SanadDocumentVaultItem::where('owner_id', Auth::id())->findOrFail($request->vault_document_id);
+            $document = SanadDocumentVaultItem::create([
+                'booking_id' => $booking->id,
+                'service_id' => $booking->service_id,
+                'owner_id' => Auth::id(),
+                'uploaded_by' => Auth::id(),
+                'document_type' => $documentRequest->document_name,
+                'document_key' => $documentRequest->document_key,
+                'required' => $documentRequest->required,
+                'source' => 'request',
+                'verification_status' => 'pending',
+                'visible_to' => ['user', 'customer', 'admin', 'employee'],
+                'file_name' => $vault->file_name,
+            ]);
+            $media = $vault->getFirstMedia('sanad_document');
+            if ($media && file_exists($media->getPath())) {
+                $document->addMedia($media->getPath())->preservingOriginal()->toMediaCollection('sanad_document');
+            }
+        } else {
+            $document = SanadDocumentVaultItem::create([
+                'booking_id' => $booking->id,
+                'service_id' => $booking->service_id,
+                'owner_id' => Auth::id(),
+                'uploaded_by' => Auth::id(),
+                'document_type' => $documentRequest->document_name,
+                'document_key' => $documentRequest->document_key,
+                'required' => $documentRequest->required,
+                'source' => 'request',
+                'verification_status' => 'pending',
+                'visible_to' => ['user', 'customer', 'admin', 'employee'],
+                'file_name' => $request->file('file')->getClientOriginalName(),
+            ]);
+            $document->addMedia($request->file('file'))->toMediaCollection('sanad_document');
+        }
+
         $documentRequest->update(['status' => 'submitted', 'document_id' => $document->id]);
         $this->audit('customer_document_request_submitted', $documentRequest, ['document_id' => $document->id]);
 
@@ -305,16 +333,91 @@ class SanadCustomerPortalController extends Controller
         return back()->withSuccess('Vault document deleted.');
     }
 
-    public function messages()
+    public function messages(Request $request)
     {
-        $bookingIds = $this->customerRequests($this->customer())->pluck('id');
-        $threads = SanadChatThread::with(['messages.sender'])
-            ->whereIn('booking_id', $bookingIds)
-            ->where('thread_type', 'shared')
-            ->latest('last_message_at')
-            ->paginate(12);
+        $user = $this->customer();
+        $bookingIds = $this->customerRequests($user)->pluck('id');
 
-        return view('customer-portal.messages', compact('threads'));
+        $query = Booking::whereIn('id', $bookingIds)->with([
+            'customer',
+            'service',
+            'provider',
+            'sanadChatThreads.messages.sender',
+            'sanadBuzzAlerts.replies.sender',
+            'sanadDocumentRequests.document',
+        ]);
+
+        if ($request->action_state === 'open_chat') {
+            $query->whereHas('sanadChatThreads', fn ($chatQuery) => $chatQuery->where('status', 'open'));
+        }
+        if ($request->action_state === 'unread_buzz') {
+            $query->whereHas('sanadBuzzAlerts', fn ($buzzQuery) => $buzzQuery->where('status', 'unread'));
+        }
+        if ($request->action_state === 'pending_documents') {
+            $query->whereHas('sanadDocumentRequests', fn ($docQuery) => $docQuery->whereIn('status', ['pending', 'submitted', 'replacement_requested']));
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('sanad_reference', 'like', "%{$search}%")
+                    ->orWhereHas('service', fn ($serviceQuery) => $serviceQuery->where('name', 'like', "%{$search}%")->orWhere('name_en', 'like', "%{$search}%"));
+            });
+        }
+
+        $conversations = $query->latest('updated_at')->paginate(20)->withQueryString();
+
+        $selectedBooking = null;
+        if ($request->filled('booking_id')) {
+            $selectedBooking = Booking::whereIn('id', $bookingIds)->with([
+                'customer',
+                'service',
+                'provider',
+                'sanadDocumentRequests.document',
+                'sanadBuzzAlerts.replies.sender',
+            ])->find($request->booking_id);
+        }
+        $selectedBooking = $selectedBooking ?: $conversations->first();
+
+        $thread = $selectedBooking ? $this->customerThread($selectedBooking) : null;
+        $messages = $thread
+            ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document'])->get()
+            : collect();
+        $visibleMessages = $messages->reject(fn ($message) => in_array($message->message_type, ['buzz', 'document_request'], true) || $message->buzz_alert_id || $message->document_request_id);
+        $buzzAlerts = $selectedBooking ? $selectedBooking->sanadBuzzAlerts()->with('replies.sender')->latest()->get() : collect();
+        $documentRequests = $selectedBooking ? $selectedBooking->sanadDocumentRequests()->with('document')->latest()->get() : collect();
+        $vaultDocuments = SanadDocumentVaultItem::where('owner_id', Auth::id())->where('source', 'vault')->latest()->get();
+
+        $timeline = collect();
+        foreach ($buzzAlerts as $buzz) {
+            $timeline->push((object)['type' => 'buzz', 'created_at' => $buzz->created_at, 'data' => $buzz]);
+        }
+        foreach ($documentRequests as $docReq) {
+            $timeline->push((object)['type' => 'document', 'created_at' => $docReq->created_at, 'data' => $docReq]);
+        }
+        foreach ($visibleMessages as $msg) {
+            $timeline->push((object)['type' => 'message', 'created_at' => $msg->created_at, 'data' => $msg]);
+        }
+        $timeline = $timeline->sortBy('created_at')->values();
+
+        return view('sanad.chat-workspace', [
+            'pageTitle' => 'Sanad Messages & Chat Workspace',
+            'auth_user' => Auth::user(),
+            'conversations' => $conversations,
+            'selectedBooking' => $selectedBooking,
+            'thread' => $thread,
+            'messages' => $visibleMessages,
+            'buzzAlerts' => $buzzAlerts,
+            'documentRequests' => $documentRequests,
+            'timeline' => $timeline,
+            'vaultDocuments' => $vaultDocuments,
+            'aiEscalations' => collect(),
+            'reviewExamples' => collect(),
+            'isAdmin' => false,
+            'canCreateBuzz' => false,
+            'canRequestDocuments' => false,
+            'highlightBuzzId' => $request->filled('buzz_id') ? (int) $request->input('buzz_id') : null,
+            'isCustomerPortal' => true,
+        ]);
     }
 
     public function sendMessage(Request $request, $id)
@@ -323,28 +426,77 @@ class SanadCustomerPortalController extends Controller
         $data = $request->validate([
             'message' => ['nullable', 'string', 'max:3000'],
             'attachment' => ['nullable', 'file', 'max:10240'],
+            'vault_document_id' => ['nullable', 'integer'],
+            'buzz_alert_id' => ['nullable', 'integer'],
         ]);
 
-        if (blank($data['message'] ?? null) && !$request->hasFile('attachment')) {
-            return back()->withErrors(['message' => 'Message or attachment is required.']);
+        if (blank($data['message'] ?? null) && !$request->hasFile('attachment') && !$request->filled('vault_document_id')) {
+            return back()->withErrors(['message' => 'Message, attachment, or vault document is required.']);
         }
 
         $thread = $this->customerThread($booking);
+        $buzz = null;
+        if ($request->filled('buzz_alert_id')) {
+            $buzz = SanadBuzzAlert::where('booking_id', $booking->id)
+                ->where(function ($query) {
+                    $query->where('recipient_id', Auth::id())
+                        ->orWhereIn('recipient_role', ['user', 'customer']);
+                })
+                ->findOrFail($request->buzz_alert_id);
+        }
+        $isAttachment = $request->hasFile('attachment') || $request->filled('vault_document_id');
         $message = SanadChatMessage::create([
             'thread_id' => $thread->id,
             'sender_id' => Auth::id(),
             'sender_role' => 'user',
             'message' => $this->filterContactInformation($data['message'] ?? ''),
-            'message_type' => $request->hasFile('attachment') ? 'attachment' : 'text',
+            'message_type' => $buzz ? 'buzz_reply' : ($isAttachment ? 'attachment' : 'text'),
+            'buzz_alert_id' => optional($buzz)->id,
             'visible_to' => ['user', 'customer', 'admin', 'employee'],
         ]);
         if ($request->hasFile('attachment')) {
             $message->addMedia($request->file('attachment'))->toMediaCollection('sanad_chat_attachment');
+        } elseif ($request->filled('vault_document_id')) {
+            $vault = SanadDocumentVaultItem::where('owner_id', Auth::id())->find($request->vault_document_id);
+            if ($vault) {
+                $media = $vault->getFirstMedia('sanad_document');
+                if ($media && file_exists($media->getPath())) {
+                    $message->addMedia($media->getPath())->preservingOriginal()->toMediaCollection('sanad_chat_attachment');
+                }
+            }
         }
         $thread->update(['last_message_at' => now()]);
+        if ($buzz) {
+            $buzz->increment('reply_count');
+            $buzz->forceFill(['last_reply_at' => now()])->save();
+        }
         $this->audit('customer_message_sent', $message, ['booking_id' => $booking->id]);
+        $this->broadcastConversationUpdate($booking->id, $buzz ? 'buzz.reply_created' : 'chat.message_created', [
+            'message_id' => $message->id,
+            'buzz_alert_id' => optional($buzz)->id,
+        ]);
 
         return back()->withSuccess('Message sent.');
+    }
+
+    public function replyToBuzz(Request $request, $id, $buzzId)
+    {
+        $request->merge(['buzz_alert_id' => $buzzId]);
+
+        return $this->sendMessage($request, $id);
+    }
+
+    private function broadcastConversationUpdate(int $bookingId, string $type, array $payload = []): void
+    {
+        try {
+            broadcast(new SanadConversationUpdated($bookingId, $type, $payload))->toOthers();
+        } catch (\Throwable $exception) {
+            \Log::warning('Sanad customer conversation broadcast failed', [
+                'booking_id' => $bookingId,
+                'type' => $type,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     public function notifications()
@@ -513,7 +665,7 @@ class SanadCustomerPortalController extends Controller
             'booking_id' => $booking->id,
             'thread_type' => 'shared',
         ], [
-            'participant_roles' => ['user', 'customer', 'admin', 'employee'],
+            'participant_roles' => ['user', 'customer', 'admin', 'employee', 'provider'],
             'created_by' => Auth::id(),
             'status' => 'open',
             'last_message_at' => now(),

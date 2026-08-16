@@ -184,9 +184,14 @@
                                                 $rowFlags[] = 'Payment';
                                             }
                                         @endphp
+                                        @php
+                                            $openRoute = request('action_state') === 'open_chat'
+                                                ? route('sanad.chat.workspace', ['booking_id' => $requestItem->id, 'action_state' => 'open_chat'])
+                                                : route('sanad.requests.show', $requestItem->id);
+                                        @endphp
                                         <tr>
                                             <td>
-                                                <a href="{{ route('sanad.requests.show', $requestItem->id) }}" class="btn-link btn-link-hover">
+                                                <a href="{{ $openRoute }}" class="btn-link btn-link-hover">
                                                     #{{ $requestItem->sanad_reference ?: str_pad($requestItem->id, 6, '0', STR_PAD_LEFT) }}
                                                 </a>
                                                 <small>{{ Str::headline($requestItem->status ?: 'pending') }}</small>
@@ -219,7 +224,7 @@
                                             </td>
                                             <td>{{ optional($requestItem->updated_at)->diffForHumans() }}</td>
                                             <td class="text-right">
-                                                <a href="{{ route('sanad.requests.show', $requestItem->id) }}" class="btn btn-sm btn-primary">Open</a>
+                                                <a href="{{ $openRoute }}" class="btn btn-sm btn-primary">{{ request('action_state') === 'open_chat' ? 'Open Chat' : 'Open' }}</a>
                                             </td>
                                         </tr>
                                     @empty

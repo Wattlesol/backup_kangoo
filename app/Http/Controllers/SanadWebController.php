@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SanadConversationUpdated;
 use App\Models\Booking;
 use App\Models\BookingHandymanMapping;
 use App\Models\Payment;
 use App\Models\SanadAiInteraction;
 use App\Models\SanadAiKnowledgeItem;
+use App\Models\SanadAiReviewExample;
 use App\Services\SanadAiRagService;
+use App\Services\SanadCrawlerIngestionService;
+use App\Services\SanadVectorStoreService;
 use App\Services\SanadKnowledgeIngestionService;
 use App\Models\SanadAuditLog;
 use App\Models\SanadBuzzAlert;
@@ -58,6 +62,247 @@ class SanadWebController extends Controller
             }
         }
         return view('sanad.assignments', compact('orders', 'recommendations', 'partners', 'latestDecisions'));
+    }
+
+    public function chatWorkspace(Request $request)
+    {
+        abort_unless($this->canUseChatModule(), 403);
+
+        $user = auth()->user();
+        $isAdmin = $user->hasAnyRole(['admin', 'demo_admin']);
+        $query = Booking::myBooking()->with([
+            'customer',
+            'service',
+            'provider',
+            'sanadChatThreads.messages.sender',
+            'sanadBuzzAlerts.replies.sender',
+            'sanadDocumentRequests.document',
+            'sanadAiInteractions',
+        ]);
+
+        if ($request->action_state === 'open_chat') {
+            $query->whereHas('sanadChatThreads', fn ($chatQuery) => $chatQuery->where('status', 'open'));
+        }
+        if ($request->action_state === 'unread_buzz') {
+            $query->whereHas('sanadBuzzAlerts', fn ($buzzQuery) => $buzzQuery->where('status', 'unread'));
+        }
+        if ($request->action_state === 'pending_documents') {
+            $query->whereHas('sanadDocumentRequests', fn ($docQuery) => $docQuery->whereIn('status', ['pending', 'submitted', 'replacement_requested']));
+        }
+        if ($request->action_state === 'ai_escalations' && $isAdmin) {
+            $query->whereHas('sanadAiInteractions', function ($aiQuery) {
+                $aiQuery->where('requires_escalation', true)
+                    ->orWhereIn('status', ['escalated', 'handover_required', 'needs_revision']);
+            });
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('sanad_reference', 'like', "%{$search}%")
+                    ->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('display_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
+                    ->orWhereHas('service', fn ($serviceQuery) => $serviceQuery->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        $conversations = $query->latest('updated_at')->paginate(20)->withQueryString();
+        $selectedBooking = null;
+        if ($request->filled('booking_id')) {
+            $selectedBooking = Booking::myBooking()->with([
+                'customer',
+                'service',
+                'provider',
+                'sanadDocumentRequests.document',
+                'sanadBuzzAlerts.replies.sender',
+                'sanadAiInteractions.user',
+            ])->find($request->booking_id);
+        }
+        $selectedBooking = $selectedBooking ?: $conversations->first();
+
+        $thread = $selectedBooking ? $this->visibleChatThread($selectedBooking) : null;
+        $messages = $thread
+            ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document', 'aiInteraction'])->get()
+            : collect();
+        $visibleMessages = $messages->reject(fn ($message) => in_array($message->message_type, ['buzz', 'document_request'], true) || $message->buzz_alert_id || $message->document_request_id);
+        $buzzAlerts = $selectedBooking ? $this->visibleBuzzQuery($selectedBooking)->with('replies.sender')->latest()->get() : collect();
+        $documentRequests = $selectedBooking ? $selectedBooking->sanadDocumentRequests()->with('document')->latest()->get() : collect();
+        $aiEscalations = $isAdmin
+            ? SanadAiInteraction::query()
+                ->when(request('action_state') !== 'ai_escalations' && $selectedBooking, function ($q) use ($selectedBooking) {
+                    $q->where('booking_id', $selectedBooking->id);
+                })
+                ->where(function ($aiQuery) {
+                    $aiQuery->where('requires_escalation', true)
+                        ->orWhereIn('status', ['escalated', 'handover_required', 'needs_revision']);
+                })
+                ->latest()
+                ->take(50)
+                ->get()
+            : collect();
+        $reviewExamples = $isAdmin ? SanadAiReviewExample::with('promotedKnowledgeItem')->latest()->take(8)->get() : collect();
+
+        $timeline = collect();
+        foreach ($buzzAlerts as $buzz) {
+            $timeline->push((object)['type' => 'buzz', 'created_at' => $buzz->created_at, 'data' => $buzz]);
+        }
+        foreach ($documentRequests as $docReq) {
+            $timeline->push((object)['type' => 'document', 'created_at' => $docReq->created_at, 'data' => $docReq]);
+        }
+        foreach ($visibleMessages as $msg) {
+            $timeline->push((object)['type' => 'message', 'created_at' => $msg->created_at, 'data' => $msg]);
+        }
+        $timeline = $timeline->sortBy('created_at')->values();
+
+        return view('sanad.chat-workspace', [
+            'pageTitle' => 'Sanad Chat Workspace',
+            'auth_user' => authSession(),
+            'conversations' => $conversations,
+            'selectedBooking' => $selectedBooking,
+            'thread' => $thread,
+            'messages' => $visibleMessages,
+            'buzzAlerts' => $buzzAlerts,
+            'documentRequests' => $documentRequests,
+            'timeline' => $timeline,
+            'aiEscalations' => $aiEscalations,
+            'reviewExamples' => $reviewExamples,
+            'isAdmin' => $isAdmin,
+            'canCreateBuzz' => $this->employeeHasFlag('send_buzz') || $isAdmin || $user->hasRole('provider'),
+            'canRequestDocuments' => $this->employeeHasFlag('review_documents') || $isAdmin || $user->hasRole('provider'),
+            'highlightBuzzId' => $request->filled('buzz_id') ? (int) $request->input('buzz_id') : null,
+        ]);
+    }
+
+    public function chatWorkspaceSnapshot(Request $request)
+    {
+        abort_unless($this->canUseChatModule(), 403);
+
+        $booking = Booking::myBooking()->with(['customer', 'service', 'provider'])->findOrFail($request->booking_id);
+        $thread = $this->visibleChatThread($booking);
+        $messages = $thread
+            ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document', 'aiInteraction'])->get()
+            : collect();
+        $visibleMessages = $messages->reject(fn ($message) => in_array($message->message_type, ['buzz', 'document_request'], true) || $message->buzz_alert_id || $message->document_request_id);
+        $buzzAlerts = $this->visibleBuzzQuery($booking)->with('replies.sender')->latest()->get();
+        $documentRequests = $booking->sanadDocumentRequests()->with('document')->latest()->get();
+        $isAdmin = auth()->user()->hasAnyRole(['admin', 'demo_admin']);
+        $aiEscalations = $isAdmin
+            ? SanadAiInteraction::query()
+                ->when(request('action_state') !== 'ai_escalations' && $booking, function ($q) use ($booking) {
+                    $q->where('booking_id', $booking->id);
+                })
+                ->where(function ($aiQuery) {
+                    $aiQuery->where('requires_escalation', true)
+                        ->orWhereIn('status', ['escalated', 'handover_required', 'needs_revision']);
+                })
+                ->latest()
+                ->take(50)
+                ->get()
+            : collect();
+
+        $timelineData = collect();
+        foreach ($buzzAlerts as $buzz) {
+            $timelineData->push([
+                'type' => 'buzz',
+                'id' => 'buzz-' . $buzz->id,
+                'timestamp' => optional($buzz->created_at)->timestamp ?: 0,
+                'created_at' => optional($buzz->created_at)->format('Y-m-d H:i'),
+                'priority' => Str::headline($buzz->priority),
+                'status' => Str::headline($buzz->status),
+                'message' => $buzz->message,
+                'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
+                'replies' => $buzz->replies->map(fn ($r) => [
+                    'sender' => optional($r->sender)->display_name ?: Str::headline($r->sender_role ?: 'user'),
+                    'message' => $r->message,
+                    'created_at' => optional($r->created_at)->format('Y-m-d H:i'),
+                ])->values(),
+            ]);
+        }
+        foreach ($documentRequests as $doc) {
+            $timelineData->push([
+                'type' => 'document',
+                'id' => 'doc-' . $doc->id,
+                'timestamp' => optional($doc->created_at)->timestamp ?: 0,
+                'created_at' => optional($doc->created_at)->format('Y-m-d H:i'),
+                'status' => Str::headline($doc->status),
+                'document_name' => $doc->document_name,
+                'requested_from' => Str::headline($doc->requested_from ?: 'customer'),
+                'instructions' => $doc->instructions ?: $doc->reason,
+                'due_at' => optional($doc->due_at)->format('Y-m-d'),
+                'due_label' => $doc->due_at ? $doc->due_at->diffForHumans() : null,
+                'has_file' => (bool) $doc->document,
+                'file_url' => $doc->document ? $doc->document->publicDocumentUrl() : null,
+            ]);
+        }
+        foreach ($visibleMessages as $message) {
+            $timelineData->push([
+                'type' => 'message',
+                'id' => 'msg-' . $message->id,
+                'timestamp' => optional($message->created_at)->timestamp ?: 0,
+                'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
+                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender_role' => $message->sender_role,
+                'message' => $message->message,
+                'attachment_url' => $message->getFirstMediaUrl('sanad_chat_attachment') ?: $message->getFirstMediaUrl('attachment'),
+                'attachment_name' => optional($message->getFirstMedia('sanad_chat_attachment'))->file_name,
+            ]);
+        }
+        $timelineData = $timelineData->sortBy('timestamp')->values();
+
+        return response()->json([
+            'status' => true,
+            'request' => [
+                'id' => $booking->id,
+                'reference' => $booking->sanad_reference ?: '#' . $booking->id,
+                'customer' => optional($booking->customer)->display_name ?: optional($booking->customer)->email,
+                'service' => optional($booking->service)->name,
+                'stage' => Str::headline($booking->sanad_stage ?: $booking->status),
+                'priority' => Str::headline($booking->sanad_priority ?: 'normal'),
+                'updated_at' => optional($booking->updated_at)->toIso8601String(),
+            ],
+            'timeline' => $timelineData,
+            'messages' => $visibleMessages->map(fn ($message) => [
+                'id' => $message->id,
+                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender_role' => $message->sender_role,
+                'message' => $message->message,
+                'message_type' => $message->message_type ?: 'text',
+                'buzz_alert_id' => $message->buzz_alert_id,
+                'document_request_id' => $message->document_request_id,
+                'ai_interaction_id' => $isAdmin ? $message->ai_interaction_id : null,
+                'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
+                'attachment_url' => $message->getFirstMediaUrl('sanad_chat_attachment') ?: $message->getFirstMediaUrl('attachment'),
+            ])->values(),
+            'buzz_alerts' => $buzzAlerts->map(fn ($buzz) => [
+                'id' => $buzz->id,
+                'priority' => Str::headline($buzz->priority),
+                'status' => Str::headline($buzz->status),
+                'message' => $buzz->message,
+                'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
+                'reply_count' => $buzz->reply_count,
+                'created_at' => optional($buzz->created_at)->format('Y-m-d H:i'),
+                'replies' => $buzz->replies->map(fn ($reply) => [
+                    'sender' => optional($reply->sender)->display_name ?: Str::headline($reply->sender_role ?: 'user'),
+                    'message' => $reply->message,
+                    'created_at' => optional($reply->created_at)->format('Y-m-d H:i'),
+                ])->values(),
+            ])->values(),
+            'documents' => $documentRequests->map(fn ($documentRequest) => [
+                'id' => $documentRequest->id,
+                'document_name' => $documentRequest->document_name,
+                'status' => Str::headline($documentRequest->status),
+                'instructions' => $documentRequest->instructions ?: $documentRequest->reason,
+                'requested_from' => Str::headline($documentRequest->requested_from),
+                'due_at' => optional($documentRequest->due_at)->format('Y-m-d'),
+                'due_label' => $documentRequest->due_at ? $documentRequest->due_at->diffForHumans() : null,
+                'file_url' => $documentRequest->document ? $documentRequest->document->publicDocumentUrl() : null,
+            ])->values(),
+            'ai_escalations' => $aiEscalations->map(fn ($interaction) => [
+                'id' => $interaction->id,
+                'question' => $interaction->question,
+                'answer' => $interaction->answer,
+                'confidence' => round(($interaction->confidence ?? 0) * 100),
+                'status' => Str::headline($interaction->status),
+            ])->values(),
+        ]);
     }
 
     public function confirmAssignment(Request $request, $id, SanadAssignmentService $assignmentService)
@@ -168,35 +413,63 @@ class SanadWebController extends Controller
         ]);
     }
 
-    public function storeAiKnowledge(Request $request, SanadAiRagService $rag, SanadKnowledgeIngestionService $ingestion)
+    public function storeAiKnowledge(Request $request, SanadAiRagService $rag, SanadKnowledgeIngestionService $ingestion, SanadCrawlerIngestionService $crawler)
     {
         if (!auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => false, 'message' => 'Only admins can manage Sanad AI knowledge.'], 403);
+            }
             return redirect()->back()->withErrors('Only admins can manage Sanad AI knowledge.');
         }
 
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'content' => 'nullable|string',
-            'knowledge_pdfs' => 'nullable|array',
-            'knowledge_pdfs.*' => 'file|mimes:pdf|max:20480',
-            'google_doc_url' => 'nullable|url|max:1000',
-            'visible_to' => 'nullable|array',
-        ]);
-
-        $ingested = $ingestion->extract(
-            $request->input('content'),
-            $request->file('knowledge_pdfs', []),
-            $request->input('google_doc_url')
-        );
-
-        if ($ingested['content'] === '') {
-            return redirect()->back()->withErrors('Add content, upload a readable PDF, or provide a public Google Docs link.');
+        try {
+            $request->validate([
+                'title' => 'required_without:website_url|nullable|string|max:255',
+                'content' => 'nullable|string',
+                'knowledge_pdfs' => 'nullable|array',
+                'knowledge_pdfs.*' => 'file|mimes:pdf|max:20480',
+                'google_doc_url' => 'nullable|url|max:1000',
+                'website_url' => 'nullable|url|max:1000',
+                'crawl_mode' => 'nullable|in:single_url,same_domain',
+                'crawl_page_limit' => 'nullable|integer|min:1|max:50',
+                'visible_to' => 'nullable|array',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => false, 'message' => implode(' ', Arr::flatten($ve->errors()))], 422);
+            }
+            throw $ve;
         }
 
-        $classification = $this->classifyKnowledge($request->title, $ingested['content']);
+        try {
+            $isScrape = $request->filled('website_url');
+            $ingested = $isScrape
+                ? $crawler->scrape($request->input('website_url'), $request->input('crawl_mode', 'single_url'), (int) $request->input('crawl_page_limit', 10))
+                : $ingestion->extract(
+                    $request->input('content'),
+                    $request->file('knowledge_pdfs', []),
+                    $request->input('google_doc_url')
+                );
+        } catch (\Throwable $e) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => false, 'message' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->withErrors($e->getMessage());
+        }
+
+        if ($ingested['content'] === '') {
+            $errorMsg = 'Add content, upload a readable PDF, provide a public Google Docs link, or scrape a readable website URL.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => false, 'message' => $errorMsg], 422);
+            }
+            return redirect()->back()->withErrors($errorMsg);
+        }
+
+        $title = $request->title ?: ($isScrape ? parse_url($request->input('website_url'), PHP_URL_HOST) : null);
+        $classification = $this->classifyKnowledge($title, $ingested['content']);
 
         $item = SanadAiKnowledgeItem::create([
-            'title' => $request->title,
+            'title' => $title,
             'category' => $classification['category'],
             'content' => $ingested['content'],
             'visible_to' => $request->visible_to ?: config('sanad.document_visibility'),
@@ -204,6 +477,7 @@ class SanadWebController extends Controller
                 'tags' => $classification['tags'],
                 'ingestion' => $ingested['metadata'],
                 'agent_confidence' => $classification['confidence'],
+                'source_url' => data_get($ingested, 'metadata.source_url'),
             ],
             'is_active' => true,
             'created_by' => optional(auth()->user())->id,
@@ -211,9 +485,162 @@ class SanadWebController extends Controller
 
         $rag->indexKnowledgeItem($item);
 
-        $this->audit($request, 'sanad.ai.knowledge_created', $item);
+        $this->audit($request, $isScrape ? 'sanad.ai.knowledge_scraped' : 'sanad.ai.knowledge_created', $item);
 
-        return redirect()->back()->withSuccess('Sanad AI knowledge item added.');
+        $msg = $isScrape ? 'Website scraped and indexed.' : 'Sanad AI knowledge item added.';
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => $msg,
+                'item' => [
+                    'id' => $item->id,
+                    'title' => $item->title,
+                    'content' => Str::limit($item->content, 130),
+                    'category' => $item->category ?: 'General',
+                    'chunks_count' => $item->chunks_count ?? 1,
+                    'visible_to' => $item->visible_to,
+                    'is_active' => $item->is_active,
+                ],
+            ]);
+        }
+
+        return redirect()->back()->withSuccess($msg);
+    }
+
+    public function scrapeKnowledgeAsync(Request $request)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+
+        $request->validate([
+            'website_url' => 'required|url|max:1000',
+            'crawl_mode' => 'nullable|in:single_url,same_domain',
+            'crawl_page_limit' => 'nullable|integer|min:1|max:50',
+            'title' => 'nullable|string|max:255',
+            'visible_to' => 'nullable|array',
+        ]);
+
+        $url = $request->input('website_url');
+        $title = $request->input('title') ?: parse_url($url, PHP_URL_HOST);
+        $mode = $request->input('crawl_mode', 'single_url');
+        $limit = (int) $request->input('crawl_page_limit', 10);
+
+        $item = SanadAiKnowledgeItem::create([
+            'title' => $title,
+            'category' => 'Scraping',
+            'content' => 'Scraping and indexing content...',
+            'visible_to' => $request->visible_to ?: config('sanad.document_visibility'),
+            'metadata' => [
+                'status' => 'processing',
+                'progress_step' => 'Scraping & Indexing...',
+                'source_url' => $url,
+                'crawl_mode' => $mode,
+                'page_limit' => $limit,
+            ],
+            'is_active' => false,
+            'created_by' => optional(auth()->user())->id,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'item_id' => $item->id,
+            'item' => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'category' => 'Scraping',
+                'content' => 'Scraping and indexing content...',
+                'status' => 'processing',
+                'progress_step' => 'Scraping & Indexing...',
+                'source_url' => $url,
+                'crawl_mode' => $mode,
+                'page_limit' => $limit,
+            ],
+        ]);
+    }
+
+    public function runKnowledgeScrape(Request $request, $id, SanadAiRagService $rag, SanadCrawlerIngestionService $crawler)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+
+        $item = SanadAiKnowledgeItem::findOrFail($id);
+        $url = data_get($item->metadata, 'source_url');
+        $mode = data_get($item->metadata, 'crawl_mode', 'single_url');
+        $limit = (int) data_get($item->metadata, 'page_limit', 10);
+
+        $metadata = $item->metadata ?: [];
+        $metadata['progress_step'] = 'Crawling URL and extracting content...';
+        $item->update(['metadata' => $metadata]);
+
+        try {
+            $ingested = $crawler->scrape($url, $mode, $limit);
+        } catch (\Throwable $e) {
+            $metadata['status'] = 'failed';
+            $metadata['error'] = $e->getMessage();
+            $metadata['progress_step'] = 'Failed: ' . $e->getMessage();
+            $item->update([
+                'metadata' => $metadata,
+                'content' => 'Scrape failed: ' . $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage(),
+                'item_id' => $item->id,
+            ], 422);
+        }
+
+        $classification = $this->classifyKnowledge($item->title, $ingested['content']);
+
+        $metadata['status'] = 'completed';
+        $metadata['progress_step'] = 'Indexed';
+        $metadata['tags'] = $classification['tags'];
+        $metadata['ingestion'] = $ingested['metadata'];
+        $metadata['agent_confidence'] = $classification['confidence'];
+        $metadata['scraped_at'] = now()->toIso8601String();
+
+        $item->update([
+            'category' => $classification['category'],
+            'content' => $ingested['content'],
+            'metadata' => $metadata,
+            'is_active' => true,
+        ]);
+
+        $rag->indexKnowledgeItem($item);
+        $this->audit($request, 'sanad.ai.knowledge_scraped', $item);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Website scraped and indexed.',
+            'item' => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'content' => Str::limit($item->content, 130),
+                'category' => $item->category ?: 'General',
+                'chunks_count' => $item->chunks_count ?? 1,
+                'visible_to' => $item->visible_to,
+                'is_active' => $item->is_active,
+                'status' => 'completed',
+            ],
+        ]);
+    }
+
+    public function knowledgeScrapeStatus($id)
+    {
+        $item = SanadAiKnowledgeItem::findOrFail($id);
+        return response()->json([
+            'status' => true,
+            'item' => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'category' => $item->category,
+                'content' => Str::limit($item->content, 130),
+                'status' => data_get($item->metadata, 'status', 'completed'),
+                'progress_step' => data_get($item->metadata, 'progress_step', 'Done'),
+                'error' => data_get($item->metadata, 'error'),
+                'chunks_count' => $item->chunks_count ?? 1,
+                'is_active' => $item->is_active,
+            ],
+        ]);
     }
 
     public function updateAiKnowledge(Request $request, $id, SanadAiRagService $rag)
@@ -246,25 +673,50 @@ class SanadWebController extends Controller
         $rag->indexKnowledgeItem($item);
         $this->audit($request, 'sanad.ai.knowledge_updated', $item);
 
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Sanad AI knowledge item updated.',
+                'item' => [
+                    'id' => $item->id,
+                    'title' => $item->title,
+                    'content' => Str::limit($item->content, 130),
+                    'category' => $item->category ?: 'General',
+                    'chunks_count' => $item->chunks_count ?? 1,
+                    'visible_to' => $item->visible_to,
+                    'is_active' => $item->is_active,
+                ],
+            ]);
+        }
+
         return redirect()->back()->withSuccess('Sanad AI knowledge item updated.');
     }
 
     public function askAi(Request $request, SanadAiRagService $rag)
     {
         abort_unless($this->canUseSanadModule('ai_tools', 'write'), 403);
-        $request->validate([
-            'question' => 'required|string',
-            'booking_id' => 'nullable|integer',
-        ]);
+        $question = trim((string) $request->input('question'));
+        if ($question === '') {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Please enter a valid question.',
+                ], 422);
+            }
+            return redirect()->back()->with('error', 'Please enter a valid question.');
+        }
 
-        $booking = $request->booking_id ? Booking::find($request->booking_id) : null;
-        $answer = $rag->answer($request->question, $booking, optional(auth()->user())->user_type ?: 'admin');
+        $bookingId = $request->filled('booking_id') ? (int) $request->input('booking_id') : null;
+        $booking = $bookingId ? Booking::find($bookingId) : null;
+        $startedAt = microtime(true);
+        $answer = $rag->answer($question, $booking, optional(auth()->user())->user_type ?: 'admin');
+        $responseMs = (int) round((microtime(true) - $startedAt) * 1000);
         $confidence = $answer['confidence'];
         $requiresEscalation = $answer['requires_escalation'];
 
         $interaction = SanadAiInteraction::create([
             'user_id' => optional(auth()->user())->id,
-            'booking_id' => $request->booking_id,
+            'booking_id' => $bookingId,
             'question' => $request->question,
             'answer' => $answer['answer'],
             'confidence' => $confidence,
@@ -275,10 +727,30 @@ class SanadWebController extends Controller
                 'live_context' => $answer['live_context'],
                 'provider' => $answer['provider_metadata'] ?? [],
                 'langsmith_run_id' => $answer['langsmith_run_id'] ?? null,
+                'response_ms' => $responseMs,
             ],
         ]);
 
         $this->audit($request, 'sanad.ai.asked', $interaction);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'interaction' => [
+                    'id' => $interaction->id,
+                    'question' => $interaction->question,
+                    'answer' => $interaction->answer,
+                    'confidence' => $interaction->confidence,
+                    'requires_escalation' => $interaction->requires_escalation,
+                    'status' => $interaction->status,
+                    'sources' => data_get($interaction->metadata, 'sources', []),
+                    'response_ms' => $responseMs,
+                    'user_name' => optional(auth()->user())->display_name ?: optional(auth()->user())->email ?: 'Admin',
+                    'user_avatar' => Str::upper(Str::substr(optional(auth()->user())->display_name ?: 'A', 0, 1)),
+                    'created_at' => $interaction->created_at->format('Y-m-d H:i'),
+                ],
+            ]);
+        }
 
         return redirect()->back()->withSuccess('Sanad AI response recorded.');
     }
@@ -330,16 +802,30 @@ class SanadWebController extends Controller
         abort_unless($this->canUseSanadModule('ai_tools', 'write'), 403);
 
         $request->validate([
-            'review_action' => 'required|in:approve,edit_approve,resolve,needs_revision',
+            'review_action' => 'required|in:approve,edit_approve,resolve,needs_revision,delete',
             'answer' => 'nullable|string',
             'review_note' => 'nullable|string|max:2000',
         ]);
+
+        $interaction = SanadAiInteraction::findOrFail($id);
+
+        if ($request->review_action === 'delete') {
+            $interaction->delete();
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'AI escalation deleted successfully.',
+                    'interaction_id' => (int) $id,
+                    'action' => 'delete',
+                ]);
+            }
+            return back()->withSuccess('AI escalation deleted successfully.');
+        }
 
         if ($request->review_action === 'edit_approve' && !trim((string) $request->answer)) {
             return back()->withErrors('Add the corrected answer before saving and approving.');
         }
 
-        $interaction = SanadAiInteraction::findOrFail($id);
         $previous = Arr::only($interaction->toArray(), ['answer', 'status', 'requires_escalation']);
         $metadata = $interaction->metadata ?: [];
         $action = $request->review_action;
@@ -366,13 +852,177 @@ class SanadWebController extends Controller
         $interaction->metadata = $metadata;
         $interaction->save();
 
+        if (in_array($action, ['approve', 'edit_approve'], true)) {
+            $this->recordAiReviewExample($interaction, $previous, $action, $request->review_note);
+            $this->publishApprovedAiResponseToChat($interaction);
+            if ($interaction->booking_id) {
+                $this->broadcastConversationUpdate($interaction->booking_id, 'ai_response.approved', ['ai_interaction_id' => $interaction->id]);
+            }
+        }
+
         $this->audit($request, 'sanad.ai.escalation_reviewed', $interaction, [
             'action' => $action,
             'previous' => $previous,
             'current' => Arr::only($interaction->toArray(), ['answer', 'status', 'requires_escalation']),
         ]);
 
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'AI escalation review saved.',
+                'interaction_id' => $interaction->id,
+                'action' => $action,
+            ]);
+        }
+
         return back()->withSuccess('AI escalation review saved.');
+    }
+
+    public function deleteAiEscalation(Request $request, $id)
+    {
+        abort_unless($this->canUseSanadModule('ai_tools', 'write'), 403);
+
+        $interaction = SanadAiInteraction::findOrFail($id);
+        $interaction->delete();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'AI escalation deleted successfully.',
+                'interaction_id' => (int) $id,
+                'action' => 'delete',
+            ]);
+        }
+
+        return back()->withSuccess('AI escalation deleted successfully.');
+    }
+
+    public function promoteAiReviewExample(Request $request, $id, SanadVectorStoreService $vectorStore)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+        abort_unless($this->canUseSanadModule('ai_tools', 'write'), 403);
+
+        $example = SanadAiReviewExample::findOrFail($id);
+        if ($example->promoted_knowledge_item_id) {
+            return back()->withErrors('This review example has already been promoted.');
+        }
+
+        $item = SanadAiKnowledgeItem::create([
+            'title' => 'Reviewed AI Answer: ' . Str::limit($example->question, 80),
+            'category' => 'Reviewed Escalations',
+            'content' => "Question:\n{$example->question}\n\nApproved answer:\n{$example->corrected_answer}",
+            'visible_to' => ['admin', 'demo_admin', 'employee', 'provider', 'user'],
+            'metadata' => [
+                'source' => 'ai_review_example',
+                'review_example_id' => $example->id,
+                'ai_interaction_id' => $example->ai_interaction_id,
+                'redaction_policy' => 'request_context_summarized',
+            ],
+            'is_active' => true,
+            'created_by' => auth()->id(),
+        ]);
+        $vectorStore->indexKnowledgeItem($item);
+
+        $example->update([
+            'status' => 'promoted',
+            'promoted_knowledge_item_id' => $item->id,
+            'promoted_at' => now(),
+        ]);
+
+        $this->audit($request, 'sanad.ai.review_example_promoted', $example, [
+            'knowledge_item_id' => $item->id,
+        ]);
+
+        return back()->withSuccess('Reviewed answer promoted into Sanad AI knowledge.');
+    }
+
+    private function recordAiReviewExample(SanadAiInteraction $interaction, array $previous, string $action, ?string $reviewNote): SanadAiReviewExample
+    {
+        $metadata = $interaction->metadata ?: [];
+
+        return SanadAiReviewExample::updateOrCreate(
+            ['ai_interaction_id' => $interaction->id],
+            [
+                'booking_id' => $interaction->booking_id,
+                'reviewed_by' => auth()->id(),
+                'actor_role' => optional($interaction->user)->user_type ?: data_get($metadata, 'actor_role'),
+                'question' => $interaction->question,
+                'original_answer' => $previous['answer'] ?? null,
+                'corrected_answer' => $interaction->answer,
+                'confidence' => $interaction->confidence,
+                'review_action' => $action,
+                'status' => 'ready',
+                'context_summary' => $this->summarizeAiReviewContext($interaction),
+                'sources' => data_get($metadata, 'sources', []),
+                'metadata' => [
+                    'langchain_dataset_stage' => 'curated_review_example',
+                    'review_note' => $reviewNote,
+                    'sensitive_data_policy' => 'summarized_context_only',
+                    'created_from_status' => $previous['status'] ?? null,
+                ],
+            ]
+        );
+    }
+
+    private function summarizeAiReviewContext(SanadAiInteraction $interaction): array
+    {
+        $booking = $interaction->booking;
+        if (!$booking) {
+            return [];
+        }
+
+        return [
+            'request_reference' => $booking->sanad_reference ?: '#' . $booking->id,
+            'stage' => $booking->sanad_stage ?: $booking->status,
+            'priority' => $booking->sanad_priority,
+            'service' => optional($booking->service)->name,
+            'payment_status' => optional($booking->payment)->payment_status,
+            'has_customer' => (bool) $booking->customer_id,
+            'has_partner' => (bool) $booking->provider_id,
+        ];
+    }
+
+    private function publishApprovedAiResponseToChat(SanadAiInteraction $interaction): void
+    {
+        $bookingId = $interaction->booking_id;
+        if (!$bookingId) {
+            $latestBooking = Booking::latest()->first();
+            $bookingId = $latestBooking ? $latestBooking->id : null;
+        }
+
+        if (!$bookingId || !$interaction->answer) {
+            return;
+        }
+
+        $thread = SanadChatThread::firstOrCreate(
+            ['booking_id' => $bookingId, 'thread_type' => 'shared'],
+            ['participant_roles' => ['admin','demo_admin','employee','provider','user','customer'], 'created_by' => auth()->id()]
+        );
+
+        SanadChatMessage::updateOrCreate(
+            ['ai_interaction_id' => $interaction->id, 'message_type' => 'ai_response'],
+            [
+                'thread_id' => $thread->id,
+                'sender_id' => auth()->id(),
+                'sender_role' => 'system',
+                'message' => $interaction->answer,
+                'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+            ]
+        );
+        $thread->update(['last_message_at' => now()]);
+    }
+
+    private function broadcastConversationUpdate(int $bookingId, string $type, array $payload = []): void
+    {
+        try {
+            broadcast(new SanadConversationUpdated($bookingId, $type, $payload))->toOthers();
+        } catch (\Throwable $exception) {
+            \Log::warning('Sanad conversation broadcast failed', [
+                'booking_id' => $bookingId,
+                'type' => $type,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     public function indexRequests(Request $request)
@@ -1070,7 +1720,6 @@ class SanadWebController extends Controller
         $this->abortUnlessEmployeeFlag('send_buzz');
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
-            'recipient_role' => 'nullable|string|max:255',
             'priority' => 'nullable|string|in:low,normal,high,urgent',
             'message' => 'required|string|max:1000',
         ]);
@@ -1078,14 +1727,32 @@ class SanadWebController extends Controller
         $alert = SanadBuzzAlert::create([
             'booking_id' => $booking->id,
             'sender_id' => optional(auth()->user())->id,
-            'recipient_role' => $request->recipient_role ?: 'admin',
+            'recipient_id' => $booking->customer_id,
+            'recipient_role' => 'customer',
             'priority' => $request->priority ?: 'urgent',
             'message' => $request->message,
         ]);
 
-        $this->audit($request, 'sanad.buzz.created', $alert);
+        $thread = SanadChatThread::firstOrCreate(
+            ['booking_id' => $booking->id, 'thread_type' => 'shared'],
+            ['participant_roles' => ['admin','demo_admin','employee','provider','user'], 'created_by' => auth()->id()]
+        );
+        SanadChatMessage::create([
+            'thread_id' => $thread->id,
+            'sender_id' => auth()->id(),
+            'sender_role' => optional(auth()->user())->user_type,
+            'message' => $request->message,
+            'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+            'message_type' => 'buzz',
+            'buzz_alert_id' => $alert->id,
+            'recipient_id' => $alert->recipient_id,
+        ]);
+        $thread->update(['last_message_at' => now()]);
 
-        return redirect()->back()->withSuccess('Sanad Buzz alert sent.');
+        $this->audit($request, 'sanad.buzz.created', $alert);
+        $this->broadcastConversationUpdate($booking->id, 'buzz.created', ['buzz_alert_id' => $alert->id]);
+
+        return redirect()->to(route('sanad.chat.workspace', ['booking_id' => $booking->id, 'buzz_id' => $alert->id]))->withSuccess('Sanad Buzz alert sent.');
     }
 
     public function acknowledgeBuzz(Request $request, $id, $alertId)
@@ -1098,6 +1765,7 @@ class SanadWebController extends Controller
         $alert->save();
 
         $this->audit($request, 'sanad.buzz.acknowledged', $alert);
+        $this->broadcastConversationUpdate($booking->id, 'buzz.acknowledged', ['buzz_alert_id' => $alert->id]);
 
         return redirect()->back()->withSuccess('Sanad Buzz alert acknowledged.');
     }
@@ -1109,11 +1777,106 @@ class SanadWebController extends Controller
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
             'message' => 'required|string|max:2000',
+            'delivery_mode' => 'nullable|in:message,buzz,document',
+            'buzz_priority' => 'nullable|string|in:low,normal,high,urgent',
+            'document_key' => 'nullable|string|max:255',
+            'document_name' => 'nullable|string|max:255',
+            'requested_from' => 'nullable|in:customer',
+            'due_at' => 'nullable|date',
             'visible_to' => 'nullable|array',
             'visible_to.*' => 'string',
             'thread_type' => 'nullable|in:shared,internal,partner_internal',
+            'message_type' => 'nullable|in:text,attachment,buzz_reply,document_request,ai_response',
+            'buzz_alert_id' => 'nullable|integer',
+            'document_request_id' => 'nullable|integer',
+            'ai_interaction_id' => 'nullable|integer',
             'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
         ]);
+
+        if ($request->input('delivery_mode') === 'buzz') {
+            $this->abortUnlessEmployeeFlag('send_buzz');
+
+            $alert = SanadBuzzAlert::create([
+                'booking_id' => $booking->id,
+                'sender_id' => optional(auth()->user())->id,
+                'recipient_id' => $booking->customer_id,
+                'recipient_role' => 'customer',
+                'priority' => $request->buzz_priority ?: 'urgent',
+                'message' => $request->message,
+            ]);
+
+            $thread = SanadChatThread::where('booking_id', $booking->id)->where('thread_type', 'shared')->latest()->first() ?: SanadChatThread::create([
+                'booking_id' => $booking->id,
+                'thread_type' => 'shared',
+                'participant_roles' => ['admin','demo_admin','employee','provider','user','customer'],
+                'created_by' => optional(auth()->user())->id,
+            ]);
+
+            SanadChatMessage::create([
+                'thread_id' => $thread->id,
+                'sender_id' => optional(auth()->user())->id,
+                'sender_role' => optional(auth()->user())->user_type,
+                'message' => $request->message,
+                'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+                'message_type' => 'buzz',
+                'buzz_alert_id' => $alert->id,
+                'recipient_id' => $booking->customer_id,
+            ]);
+            $thread->update(['last_message_at' => now()]);
+
+            $this->audit($request, 'sanad.buzz.created_from_chat', $alert);
+            $this->broadcastConversationUpdate($booking->id, 'buzz.created', ['buzz_alert_id' => $alert->id]);
+
+            return redirect()->to(route('sanad.chat.workspace', ['booking_id' => $booking->id, 'buzz_id' => $alert->id]))->withSuccess('Customer Buzz sent.');
+        }
+
+        if ($request->input('delivery_mode') === 'document') {
+            abort_unless($this->canUseDocumentReviewModule(true), 403);
+            $this->abortUnlessEmployeeFlag('review_documents');
+
+            $documentName = trim((string) $request->input('document_name'));
+            if ($documentName === '') {
+                return back()->withErrors('Please choose or enter the document name.');
+            }
+
+            $item = SanadDocumentRequest::create([
+                'booking_id' => $booking->id,
+                'service_id' => $booking->service_id,
+                'document_key' => $request->input('document_key') ?: Str::slug($documentName, '_'),
+                'document_name' => $documentName,
+                'requested_from' => 'customer',
+                'requested_from_user_id' => $booking->customer_id,
+                'requested_by' => auth()->id(),
+                'reason' => $request->message,
+                'instructions' => $request->message,
+                'due_at' => $request->input('due_at'),
+                'required' => true,
+            ]);
+
+            $thread = SanadChatThread::where('booking_id', $booking->id)->where('thread_type', 'shared')->latest()->first() ?: SanadChatThread::create([
+                'booking_id' => $booking->id,
+                'thread_type' => 'shared',
+                'participant_roles' => ['admin','demo_admin','employee','provider','user','customer'],
+                'created_by' => optional(auth()->user())->id,
+            ]);
+
+            SanadChatMessage::create([
+                'thread_id' => $thread->id,
+                'sender_id' => optional(auth()->user())->id,
+                'sender_role' => optional(auth()->user())->user_type,
+                'message' => 'Document requested: ' . $item->document_name,
+                'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+                'message_type' => 'document_request',
+                'document_request_id' => $item->id,
+                'recipient_id' => $booking->customer_id,
+            ]);
+            $thread->update(['last_message_at' => now()]);
+
+            $this->audit($request, 'sanad.document_request.created_from_chat', $item);
+            $this->broadcastConversationUpdate($booking->id, 'document_request.created', ['document_request_id' => $item->id]);
+
+            return redirect()->to(route('sanad.chat.workspace', ['booking_id' => $booking->id]))->withSuccess('Customer document request sent.');
+        }
 
         $threadType = $request->thread_type ?: 'shared';
         if ($threadType === 'internal') {
@@ -1127,7 +1890,7 @@ class SanadWebController extends Controller
         $visibleTo = match ($threadType) {
             'internal' => ['admin', 'demo_admin', 'employee'],
             'partner_internal' => ['admin', 'demo_admin', 'employee', 'provider'],
-            default => ['admin', 'demo_admin', 'employee', 'provider', 'user'],
+            default => ['admin', 'demo_admin', 'employee', 'provider', 'user', 'customer'],
         };
         $thread = SanadChatThread::where('booking_id', $booking->id)->where('thread_type', $threadType)->latest()->first() ?: SanadChatThread::create([
             'booking_id' => $booking->id,
@@ -1142,12 +1905,33 @@ class SanadWebController extends Controller
             'sender_role' => optional(auth()->user())->user_type,
             'message' => $request->message,
             'visible_to' => $visibleTo,
-            'message_type' => 'text',
+            'message_type' => $request->message_type ?: 'text',
+            'buzz_alert_id' => $request->buzz_alert_id,
+            'document_request_id' => $request->document_request_id,
+            'ai_interaction_id' => $request->ai_interaction_id,
         ]);
         if ($request->hasFile('attachment')) storeMediaFile($message, $request->file('attachment'), 'attachment');
         $thread->update(['last_message_at' => now()]);
 
         $this->audit($request, 'sanad.chat.message_created', $message);
+        $this->broadcastConversationUpdate($booking->id, 'chat.message_created', ['message_id' => $message->id]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Sanad chat message sent.',
+                'chat_message' => [
+                    'id' => $message->id,
+                    'message' => $message->message,
+                    'sender_role' => $message->sender_role,
+                    'sender_name' => optional(auth()->user())->display_name ?: optional(auth()->user())->email ?: 'User',
+                    'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
+                    'buzz_alert_id' => $message->buzz_alert_id,
+                    'document_request_id' => $message->document_request_id,
+                    'ai_interaction_id' => $message->ai_interaction_id,
+                ],
+            ]);
+        }
 
         return redirect()->back()->withSuccess('Sanad chat message sent.');
     }
@@ -1171,6 +1955,7 @@ class SanadWebController extends Controller
         SanadChatMessage::create(['thread_id' => $thread->id, 'sender_id' => auth()->id(), 'sender_role' => auth()->user()->user_type, 'message' => 'Document requested: '.$item->document_name, 'visible_to' => ['admin','demo_admin','employee','provider','user'], 'message_type' => 'document_request', 'document_request_id' => $item->id]);
         $thread->update(['last_message_at' => now()]);
         $this->audit($request, 'sanad.document_request.created', $item);
+        $this->broadcastConversationUpdate($booking->id, 'document_request.created', ['document_request_id' => $item->id]);
         return back()->withSuccess('Document request created.');
     }
 
@@ -1196,6 +1981,7 @@ class SanadWebController extends Controller
         storeMediaFile($document, $request->file('document'), 'document');
         $item->update(['document_id' => $document->id, 'status' => 'submitted']);
         $this->audit($request, 'sanad.document_request.submitted', $item);
+        $this->broadcastConversationUpdate($booking->id, 'document_request.submitted', ['document_request_id' => $item->id]);
         return back()->withSuccess('Document submitted for review.');
     }
 
@@ -1208,6 +1994,7 @@ class SanadWebController extends Controller
         if (in_array($request->status, ['rejected','replacement_requested'], true) && !$request->review_reason) return back()->withErrors('A reason is required.');
         $item->update(['status' => $request->status, 'reviewed_by' => auth()->id(), 'reviewed_at' => now(), 'review_reason' => $request->review_reason]);
         $this->audit($request, 'sanad.document_request.reviewed', $item);
+        $this->broadcastConversationUpdate($item->booking_id, 'document_request.reviewed', ['document_request_id' => $item->id, 'status' => $request->status]);
         return back()->withSuccess('Document request review saved.');
     }
 
@@ -1505,15 +2292,29 @@ class SanadWebController extends Controller
         $user = auth()->user();
         $query = SanadBuzzAlert::where('booking_id', $booking->id);
 
-        if (!$user->hasRole('admin') && !$user->hasRole('demo_admin')) {
-            $query->where(function ($q) use ($user) {
-                $q->where('sender_id', $user->id)
-                    ->orWhere('recipient_id', $user->id)
-                    ->orWhere('recipient_role', $user->user_type);
-            });
+        if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
+            return $query;
         }
 
-        return $query;
+        if ($user->hasRole('provider') && (int) $booking->provider_id === (int) $user->id) {
+            return $query;
+        }
+
+        if ($user->hasRole('handyman')) {
+            $assignedEmployeeIds = collect($booking->handymanIds())->map(function ($id) {
+                return (int) $id;
+            });
+
+            if ((int) $booking->handyman_id === (int) $user->id || $assignedEmployeeIds->contains((int) $user->id)) {
+                return $query;
+            }
+        }
+
+        return $query->where(function ($q) use ($user) {
+            $q->where('sender_id', $user->id)
+                ->orWhere('recipient_id', $user->id)
+                ->orWhere('recipient_role', $user->user_type);
+        });
     }
 
     private function visibleChatThread(Booking $booking)
@@ -1526,11 +2327,25 @@ class SanadWebController extends Controller
                 $q->where('created_by', $user->id)
                     ->orWhere(function ($visibilityQuery) use ($user) {
                         $this->whereJsonArrayContains($visibilityQuery, 'participant_roles', $user->user_type);
+                        if ($user->user_type === 'user') {
+                            $this->whereJsonArrayContains($visibilityQuery, 'participant_roles', 'customer');
+                        } elseif ($user->user_type === 'customer') {
+                            $this->whereJsonArrayContains($visibilityQuery, 'participant_roles', 'user');
+                        }
                     });
             });
         }
 
-        return $query->latest()->first();
+        $sharedThread = (clone $query)->where('thread_type', 'shared')->latest()->first();
+        return $sharedThread ?: ($query->latest()->first() ?: SanadChatThread::firstOrCreate([
+            'booking_id' => $booking->id,
+            'thread_type' => 'shared',
+        ], [
+            'participant_roles' => ['admin', 'demo_admin', 'employee', 'provider', 'user', 'customer'],
+            'created_by' => optional($user)->id,
+            'status' => 'open',
+            'last_message_at' => now(),
+        ]));
     }
 
     private function whereJsonArrayContains($query, $column, $value)

@@ -8,7 +8,7 @@
         </div>
         <div class="sanad-actions">
             <a class="sanad-btn" href="{{ route('customer-portal.requests.create') }}"><i class="fas fa-plus-circle"></i> Create New Request</a>
-            <a class="sanad-btn secondary" href="{{ route('customer-portal.ai') }}"><i class="fas fa-robot"></i> Ask Sanad AI</a>
+            <a class="sanad-btn secondary" href="{{ route('customer-portal.messages') }}"><i class="fas fa-comments"></i> Messages & Chat</a>
         </div>
     </div>
 
@@ -42,7 +42,7 @@
             <a class="sanad-btn" href="{{ route('customer-portal.requests.create') }}">Create New Request</a>
             <a class="sanad-btn secondary" href="{{ route('customer-portal.requests.index') }}">Track Existing Request</a>
             <a class="sanad-btn secondary" href="{{ route('customer-portal.vault') }}">Upload Documents</a>
-            <a class="sanad-btn secondary" href="{{ route('customer-portal.ai') }}">Ask Sanad AI</a>
+            <a class="sanad-btn secondary" href="{{ route('customer-portal.messages') }}">Messages & Chat</a>
         </div>
     </div>
 

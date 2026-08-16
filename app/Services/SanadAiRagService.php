@@ -50,6 +50,22 @@ class SanadAiRagService
             }
         }
 
+        // Detect uncertainty or missing details in generated answer
+        $uncertaintyKeywords = [
+            'does not specify', 'do not specify', 'apologize', 'recommend checking',
+            'contact the relevant', 'not mentioned', 'not available', 'do not have',
+            'cannot confirm', 'unable to provide', 'do not have access', 'cannot provide',
+            'exact duration', 'how many days', 'processing time', 'flagged for review'
+        ];
+
+        $lowerAnswer = Str::lower($answer);
+        if (Str::contains($lowerAnswer, $uncertaintyKeywords)) {
+            $requiresEscalation = true;
+            if (!Str::contains($answer, 'escalated to the Sanad operations team')) {
+                $answer .= "\n\n*(This inquiry has been automatically escalated to the Sanad operations team for review and approval.)*";
+            }
+        }
+
         $traceId = $this->tracer->trace('sanad-rag-answer', [
             'question' => $question,
             'audience' => $audience,
@@ -90,7 +106,7 @@ class SanadAiRagService
             ->get()
             ->filter(function ($item) use ($audience) {
                 $visibleTo = $item->visible_to ?: [];
-                return empty($visibleTo) || in_array($audience, $visibleTo, true) || in_array('user', $visibleTo, true);
+                return empty($visibleTo) || in_array($audience, $visibleTo, true) || in_array('user', $visibleTo, true) || in_array('customer', $visibleTo, true);
             })
             ->map(function ($item) use ($terms) {
                 $haystack = Str::lower($item->title . ' ' . $item->category . ' ' . $item->content);
@@ -110,56 +126,66 @@ class SanadAiRagService
         $this->vectorStore->indexKnowledgeItem($item);
     }
 
+    private function sanitizeKnowledgeContent(string $text): string
+    {
+        $text = strip_tags($text);
+        $text = preg_replace('/\[×\]\(javascript:.*?\)/i', '', $text);
+        $text = preg_replace('/\[([^\]]+)\]\([^)]+\)/', '$1', $text);
+        $text = preg_replace('/Source:\s*https?:\/\/\S+/i', '', $text);
+        $text = preg_replace('/https?:\/\/\S+/', '', $text);
+        $text = preg_replace('/#+\s*/', '', $text);
+        $text = preg_replace('/[\*\_\~]+/', ' ', $text);
+        $text = preg_replace('/\s+/', ' ', $text);
+        return trim($text);
+    }
+
     private function composeAnswer(string $question, Collection $matches, ?array $liveContext, bool $requiresEscalation): string
     {
         $parts = [];
 
         if ($liveContext) {
-            $parts[] = "Request {$liveContext['reference']} is currently at {$liveContext['stage']}.";
-            $parts[] = "Service: {$liveContext['service']}.";
-            if ($liveContext['pending_customer_actions']) {
+            $parts[] = "Request {$liveContext['reference']} is currently at stage: {$liveContext['stage']}. Service: {$liveContext['service']}.";
+            if (!empty($liveContext['pending_customer_actions'])) {
                 $parts[] = 'Pending customer action: ' . implode('; ', $liveContext['pending_customer_actions']) . '.';
             } else {
-                $parts[] = 'There are no pending customer actions detected right now.';
+                $parts[] = 'There are no pending customer actions required right now.';
             }
-            $parts[] = "Payment status: {$liveContext['payment_status']}.";
-            $parts[] = "Next step: {$liveContext['next_step']}.";
+            $parts[] = "Payment status: {$liveContext['payment_status']}. Next step: {$liveContext['next_step']}.";
         }
 
         if ($matches->isNotEmpty()) {
-            $parts[] = 'Relevant Sanad knowledge:';
-            foreach ($matches->take(3) as $match) {
-                $item = $match['item'];
-                $parts[] = "- {$item->title}: " . Str::limit(trim(strip_tags($item->content)), 420);
-            }
+            $matchedTopics = $matches->take(3)->pluck('item.title')->unique()->implode(', ');
+            $parts[] = "Based on official Sanad guidance regarding {$matchedTopics}, processing steps and estimated completion timelines depend on official government authority review and document verification. Our operations team can assist you with exact progress tracking.";
         } elseif (!$liveContext) {
-            $parts[] = 'I do not have enough Sanad knowledge base content to answer this confidently yet.';
+            $parts[] = 'Processing times and requirements depend on official government department review steps. Our operations team is available to confirm exact details for your request.';
         }
 
         if ($requiresEscalation) {
-            $parts[] = 'I have marked this for Sanad team review because the answer may need human confirmation.';
+            $parts[] = "\n*(This inquiry has been flagged for review by the Sanad operations team to ensure accuracy.)*";
         }
 
-        return implode("\n", $parts);
+        return implode("\n\n", $parts);
     }
 
     private function messages(string $question, Collection $matches, ?array $liveContext, bool $requiresEscalation): array
     {
         $context = $matches->map(function ($match) {
             $item = $match['item'];
-            $content = isset($match['chunk']) ? $match['chunk']->content : $item->content;
+            $rawContent = isset($match['chunk']) ? $match['chunk']->content : $item->content;
+            $cleanContent = $this->sanitizeKnowledgeContent($rawContent);
 
-            return "Title: {$item->title}\nCategory: " . ($item->category ?: 'General') . "\nContent: " . Str::limit(trim(strip_tags($content)), 1400, '');
+            return "Knowledge Item: {$item->title}\nCategory: " . ($item->category ?: 'General') . "\nContent: " . Str::limit($cleanContent, 3500, '');
         })->implode("\n\n---\n\n");
+
+        $prompt = "You are Sanad AI, an expert operations assistant for the Sanad platform. Answer the user question directly, politely, and comprehensively using the provided Knowledge Base and Live Request Context. Do NOT write any draft outlines, mental refinement notes, or system prompt echoes. Output ONLY your final customer-facing response.\n\n" .
+            "User Question:\n{$question}\n\n" .
+            "Live Request Context:\n" . json_encode($liveContext ?: [], JSON_PRETTY_PRINT) . "\n\n" .
+            "Retrieved Sanad Knowledge Base:\n{$context}";
 
         return [
             [
-                'role' => 'system',
-                'content' => 'You are Sanad AI, an operations assistant for a service request platform. Answer only from the supplied Sanad knowledge and live request context. Be concise, practical, and mention when human review is required.',
-            ],
-            [
                 'role' => 'user',
-                'content' => "Question:\n{$question}\n\nLive request context:\n" . json_encode($liveContext ?: [], JSON_PRETTY_PRINT) . "\n\nRetrieved knowledge:\n{$context}\n\nHuman review required: " . ($requiresEscalation ? 'yes' : 'no'),
+                'content' => $prompt,
             ],
         ];
     }
@@ -217,11 +243,17 @@ class SanadAiRagService
 
     private function confidence(Collection $matches, ?Booking $booking): float
     {
-        $score = min(0.55, $matches->sum('score') / 20);
-        $context = $booking ? 0.3 : 0.0;
-        $base = $matches->isNotEmpty() ? 0.2 : 0.1;
+        if ($matches->isEmpty()) {
+            return $booking ? 0.30 : 0.10;
+        }
 
-        return round(min(0.95, $base + $score + $context), 2);
+        $topScore = (float) $matches->max('score');
+        $scoreFactor = min(1.0, max(0.0, $topScore / 0.40));
+        $contextBonus = $booking ? 0.15 : 0.05;
+
+        $calculated = 0.35 + ($scoreFactor * 0.50) + $contextBonus;
+
+        return round(min(0.98, $calculated), 2);
     }
 
     private function terms(string $question): Collection

@@ -9,6 +9,7 @@ use App\Models\complaints_comment;
 use App\Models\Qualitycontrol;
 use App\Models\QualitycontrolComment;
 use App\Models\Region;
+use App\Models\SanadCustomerComplaint;
 use App\Models\Time;
 use App\Models\TimeData;
 use App\Traits\FileHandler;
@@ -33,9 +34,35 @@ class QualityControlController extends Controller
             $query->where('issue_type', request()->issue_type);
         }
         $data = $query->paginate(20);
+        $sanadComplaints = collect();
+        $sanadComplaintStats = ['total' => 0, 'open' => 0, 'urgent' => 0, 'resolved' => 0];
+
+        if (auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            $showSanadComplaints = !request()->issue_type || request()->issue_type === 'customer_complaint';
+            $sanadComplaintQuery = SanadCustomerComplaint::with(['booking.service', 'booking.provider', 'customer'])
+                ->when(request()->provider_id, function ($complaintQuery) {
+                    $complaintQuery->whereHas('booking', fn ($bookingQuery) => $bookingQuery->where('provider_id', request()->provider_id));
+                })
+                ->when(request()->status, fn ($complaintQuery) => $complaintQuery->where('status', request()->status));
+
+            if ($showSanadComplaints) {
+                $sanadComplaints = (clone $sanadComplaintQuery)->latest()->paginate(20, ['*'], 'sanad_page')->withQueryString();
+            }
+
+            $statsQuery = SanadCustomerComplaint::query();
+            $sanadComplaintStats = [
+                'total' => (clone $statsQuery)->count(),
+                'open' => (clone $statsQuery)->where('status', 'open')->count(),
+                'urgent' => (clone $statsQuery)->where('priority', 'urgent')->count(),
+                'resolved' => (clone $statsQuery)->where(function ($resolvedQuery) {
+                    $resolvedQuery->whereNotNull('resolved_at')->orWhere('status', 'resolved');
+                })->count(),
+            ];
+        }
+
         $title = "مراقبه الجوده";
         $route = route('time.create');
-        return view('QualityControl.index',compact('data','title','route'));
+        return view('QualityControl.index',compact('data','title','route', 'sanadComplaints', 'sanadComplaintStats'));
     }
 
     /**

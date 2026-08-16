@@ -139,9 +139,18 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('sanad/knowledge-base', [SanadWebController::class, 'aiConsole'])->name('sanad.knowledge.index');
     Route::get('sanad/ai/escalations', [SanadWebController::class, 'aiEscalations'])->name('sanad.ai.escalations.index');
     Route::post('sanad/ai/escalations/{id}/review', [SanadWebController::class, 'reviewAiEscalation'])->name('sanad.ai.escalations.review');
+    Route::delete('sanad/ai/escalations/{id}', [SanadWebController::class, 'deleteAiEscalation'])->name('sanad.ai.escalations.delete');
     Route::post('sanad/ai/ask', [SanadWebController::class, 'askAi'])->name('sanad.ai.ask');
+    Route::get('sanad/ai/knowledge', fn () => redirect()->route('sanad.knowledge.index'));
     Route::post('sanad/ai/knowledge', [SanadWebController::class, 'storeAiKnowledge'])->name('sanad.ai.knowledge.store');
+    Route::post('sanad/ai/knowledge/scrape-async', [SanadWebController::class, 'scrapeKnowledgeAsync'])->name('sanad.ai.knowledge.scrape-async');
+    Route::post('sanad/ai/knowledge/{id}/run-scrape', [SanadWebController::class, 'runKnowledgeScrape'])->name('sanad.ai.knowledge.run-scrape');
+    Route::get('sanad/ai/knowledge/{id}/status', [SanadWebController::class, 'knowledgeScrapeStatus'])->name('sanad.ai.knowledge.status');
+    Route::get('sanad/ai/knowledge/{id}', fn () => redirect()->route('sanad.knowledge.index'));
     Route::post('sanad/ai/knowledge/{id}', [SanadWebController::class, 'updateAiKnowledge'])->name('sanad.ai.knowledge.update');
+    Route::get('sanad/chat-workspace', [SanadWebController::class, 'chatWorkspace'])->name('sanad.chat.workspace');
+    Route::get('sanad/chat-workspace/snapshot', [SanadWebController::class, 'chatWorkspaceSnapshot'])->name('sanad.chat.workspace.snapshot');
+    Route::post('sanad/ai/review-examples/{id}/promote', [SanadWebController::class, 'promoteAiReviewExample'])->name('sanad.ai.review-examples.promote');
     Route::get('sanad/requests', [SanadWebController::class, 'indexRequests'])->name('sanad.requests.index');
     Route::get('sanad/assignments', [SanadWebController::class, 'assignments'])->name('sanad.assignments.index');
     Route::post('sanad/assignments/{id}/confirm', [SanadWebController::class, 'confirmAssignment'])->name('sanad.assignments.confirm');
@@ -174,6 +183,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('requests/{id}/documents', [SanadCustomerPortalController::class, 'uploadRequestDocument'])->name('requests.documents.store');
         Route::post('requests/{id}/document-requests/{documentRequestId}', [SanadCustomerPortalController::class, 'uploadDocumentRequest'])->name('requests.document-requests.upload');
         Route::post('requests/{id}/messages', [SanadCustomerPortalController::class, 'sendMessage'])->name('requests.messages.store');
+        Route::post('requests/{id}/buzz/{buzzId}/reply', [SanadCustomerPortalController::class, 'replyToBuzz'])->name('requests.buzz.reply');
         Route::get('document-vault', [SanadCustomerPortalController::class, 'vault'])->name('vault');
         Route::post('document-vault', [SanadCustomerPortalController::class, 'storeVaultDocument'])->name('vault.store');
         Route::post('document-vault/{id}/delete', [SanadCustomerPortalController::class, 'deleteVaultDocument'])->name('vault.delete');

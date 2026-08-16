@@ -101,6 +101,9 @@
                                             <button class="btn btn-light btn-sm" type="submit" name="review_action" value="resolve">
                                                 <i class="fas fa-archive mr-1"></i> Resolve
                                             </button>
+                                            <button class="btn btn-outline-danger btn-sm" type="submit" name="review_action" value="delete" onclick="return confirm('Are you sure you want to delete this AI escalation?')">
+                                                <i class="fas fa-trash-alt mr-1"></i> Delete
+                                            </button>
                                         </div>
                                     </form>
                                 </div>

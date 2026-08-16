@@ -20,7 +20,12 @@
                                 <h4 class="font-weight-bold mb-1">{{ $pageTitle }}</h4>
                                 <span class="text-muted">{{ optional($bookingdata->service)->name ?: 'Sanad service request' }}</span>
                             </div>
-                            <a href="{{ route('home') }}" class="btn-link btn-link-hover">Back to dashboard</a>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <a href="{{ route('sanad.chat.workspace', ['booking_id' => $bookingdata->id]) }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-comments mr-1"></i> Open Chat Workspace
+                                </a>
+                                <a href="{{ route('home') }}" class="btn-link btn-link-hover">Back to dashboard</a>
+                            </div>
                         </div>
                     </div>
                 </div>
