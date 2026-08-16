@@ -311,7 +311,9 @@
                                 @endif
 
                                 @if($documentRequest->document)
-                                    @php($documentUrl = $documentRequest->document->publicDocumentUrl())
+                                    @php
+                                        $documentUrl = $documentRequest->document->publicDocumentUrl();
+                                    @endphp
                                     <div class="mt-2 p-2 bg-light rounded border d-flex justify-content-between align-items-center">
                                         <span class="small font-weight-bold text-success"><i class="fas fa-check-circle mr-1"></i> Document Submitted</span>
                                         @if($documentUrl)
