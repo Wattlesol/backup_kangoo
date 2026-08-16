@@ -20,30 +20,16 @@ class SanadCrawlerIngestionService
         $crawlerConfig = [
             'word_count_threshold' => 10,
             'excluded_tags' => ['script', 'style', 'nav', 'footer'],
-            'magic' => true,
-            'simulate_user' => true,
-            'override_navigator' => true,
-            'wait_until' => 'commit',
-            'page_timeout' => 12000,
-        ];
-
-        $browserConfig = [
-            'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Accept-Language' => 'en-US,en;q=0.9,ar;q=0.8',
-            ],
         ];
 
         $proxy = config('sanad.ai.crawler.proxy');
         if ($proxy) {
-            $browserConfig['proxy'] = $proxy;
             $crawlerConfig['proxy'] = $proxy;
         }
 
         $firstPayload = [
             'urls' => [$url],
             'crawler_config' => $crawlerConfig,
-            'browser_config' => $browserConfig,
         ];
 
         $response = $this->sendCrawlRequest($firstPayload);
@@ -84,7 +70,6 @@ class SanadCrawlerIngestionService
                 $secondPayload = [
                     'urls' => $additionalUrls,
                     'crawler_config' => $crawlerConfig,
-                    'browser_config' => $browserConfig,
                 ];
                 try {
                     $secondResponse = $this->sendCrawlRequest($secondPayload);
@@ -237,4 +222,3 @@ class SanadCrawlerIngestionService
         }
     }
 }
-
