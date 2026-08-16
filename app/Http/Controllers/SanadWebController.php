@@ -175,6 +175,7 @@ class SanadWebController extends Controller
     {
         abort_unless($this->canUseChatModule(), 403);
 
+        $user = auth()->user();
         $booking = Booking::myBooking()->with(['customer', 'service', 'provider'])->findOrFail($request->booking_id);
         $thread = $this->visibleChatThread($booking);
         $messages = $thread
@@ -183,7 +184,21 @@ class SanadWebController extends Controller
         $visibleMessages = $messages->reject(fn ($message) => in_array($message->message_type, ['buzz', 'document_request'], true) || $message->buzz_alert_id || $message->document_request_id);
         $buzzAlerts = $this->visibleBuzzQuery($booking)->with('replies.sender')->latest()->get();
         $documentRequests = $booking->sanadDocumentRequests()->with('document')->latest()->get();
-        $isAdmin = auth()->user()->hasAnyRole(['admin', 'demo_admin']);
+        $isAdmin = $user->hasAnyRole(['admin', 'demo_admin']);
+        $isCustomer = in_array(optional($user)->user_type, ['user', 'customer'], true);
+        $storeRoute = $isCustomer ? 'customer-portal.requests.messages.store' : 'sanad.requests.chat.store';
+        $requestShowRoute = $isCustomer ? 'customer-portal.requests.show' : 'sanad.requests.show';
+        $canCreateBuzz = $this->employeeHasFlag('send_buzz') || $isAdmin || $user->hasRole('provider');
+        $canRequestDocuments = $this->employeeHasFlag('review_documents') || $isAdmin || $user->hasRole('provider');
+        $requiredDocuments = $booking->service
+            ? collect($booking->service->required_documents ?: [])->map(function ($doc) {
+                $name = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
+                return [
+                    'key' => is_array($doc) ? ($doc['key'] ?? Str::slug($name, '_')) : Str::slug($name, '_'),
+                    'name' => $name,
+                ];
+            })->values()
+            : collect();
         $aiEscalations = $isAdmin
             ? SanadAiInteraction::query()
                 ->when(request('action_state') !== 'ai_escalations' && $booking, function ($q) use ($booking) {
@@ -252,11 +267,22 @@ class SanadWebController extends Controller
             'request' => [
                 'id' => $booking->id,
                 'reference' => $booking->sanad_reference ?: '#' . $booking->id,
-                'customer' => optional($booking->customer)->display_name ?: optional($booking->customer)->email,
-                'service' => optional($booking->service)->name,
+                'customer' => optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'Customer',
+                'avatar' => Str::upper(Str::substr(optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'C', 0, 1)),
+                'service' => optional($booking->service)->name ?: 'No service',
                 'stage' => Str::headline($booking->sanad_stage ?: $booking->status),
                 'priority' => Str::headline($booking->sanad_priority ?: 'normal'),
+                'sla' => optional($booking->sla_due_at)->format('Y-m-d H:i') ?: '-',
+                'partner' => optional($booking->provider)->display_name ?: '-',
+                'request_url' => route($requestShowRoute, $booking->id),
                 'updated_at' => optional($booking->updated_at)->toIso8601String(),
+            ],
+            'composer' => [
+                'booking_id' => $booking->id,
+                'store_url' => route($storeRoute, $booking->id),
+                'can_create_buzz' => $canCreateBuzz,
+                'can_request_documents' => $canRequestDocuments,
+                'required_documents' => $requiredDocuments,
             ],
             'timeline' => $timelineData,
             'messages' => $visibleMessages->map(fn ($message) => [

@@ -198,7 +198,7 @@
                             ? optional($latestThread->messages->last())->message
                             : null;
                     @endphp
-                    <a class="conversation-item {{ $selectedId === $conversation->id ? 'active' : '' }}" href="{{ route($messagesRoute, array_filter(['booking_id' => $conversation->id, 'action_state' => request('action_state'), 'search' => request('search')])) }}">
+                    <a class="conversation-item {{ $selectedId === $conversation->id ? 'active' : '' }}" data-booking-id="{{ $conversation->id }}" href="{{ route($messagesRoute, array_filter(['booking_id' => $conversation->id, 'action_state' => request('action_state'), 'search' => request('search')])) }}">
                         <div class="avatar">{{ Str::upper(Str::substr(optional($conversation->customer)->display_name ?: 'C', 0, 1)) }}</div>
                         <div class="conversation-copy">
                             <div class="conversation-line"><strong>{{ optional($conversation->customer)->display_name ?: 'Customer' }}</strong><time>{{ optional($conversation->updated_at)->diffForHumans() }}</time></div>
@@ -577,8 +577,8 @@
             .chat-composer.is-buzz .composer-priority { display: block !important; }
             .document-fields { display: none !important; width: 100%; }
             .chat-composer.is-document .document-fields { display: block !important; }
-            .document-request-grid { display: flex; flex-direction: column; gap: 8px; width: 100%; direction: ltr; }
-            .document-field { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: center; min-width: 0; margin: 0; direction: ltr; width: 100%; }
+            .document-request-grid { display: grid; grid-template-columns: minmax(220px, 1.5fr) minmax(220px, 1.2fr) minmax(160px, .8fr); gap: 8px; width: 100%; direction: ltr; align-items: end; }
+            .document-field { display: flex; flex-direction: column; gap: 5px; align-items: stretch; min-width: 0; margin: 0; direction: ltr; width: 100%; }
             .document-field span { font-size: 12px; line-height: 1.2; font-weight: 700; color: #667085; white-space: nowrap; }
             .document-field select, .document-field input { width: 100%; min-width: 0; }
             .document-field select[name="requested_from"] { color: #667085; background: #f8fafc; }
@@ -605,7 +605,7 @@
                 .sanad-inbox-panel, .sanad-context-panel, .sanad-chat-panel { min-height: 420px; }
             }
             @media (max-width: 640px) {
-                .document-field { grid-template-columns: 1fr; gap: 4px; align-items: stretch; }
+                .document-request-grid { grid-template-columns: 1fr; }
                 .composer-main-bar { align-items: stretch !important; }
                 .composer-mode, .composer-priority { width: 100%; }
             }
@@ -648,6 +648,10 @@
                     var documentPreset = composer ? composer.querySelector('select[name="document_preset"]') : null;
                     var documentKey = composer ? composer.querySelector('input[name="document_key"]') : null;
                     var documentName = composer ? composer.querySelector('input[name="document_name"]') : null;
+                    var fileInput = document.getElementById('composer-file-input');
+                    var vaultIdInput = document.getElementById('composer-vault-id');
+                    var chatHeader = document.querySelector('.chat-header');
+                    var contextList = document.querySelector('.context-list');
 
                     function syncComposerMode() {
                         if (!composer || !modeSelect) return;
@@ -705,8 +709,78 @@
                         });
                     }
 
+                    function setActiveConversation(bookingId) {
+                        document.querySelectorAll('.conversation-item').forEach(function (item) {
+                            item.classList.toggle('active', String(item.dataset.bookingId) === String(bookingId));
+                        });
+                    }
+
+                    function updateDocumentOptions(documents) {
+                        if (!documentPreset) return;
+                        var selected = documentPreset.value;
+                        var optionsHtml = '';
+                        (documents || []).forEach(function (doc) {
+                            optionsHtml += '<option value="' + escapeHtml(doc.key) + '" data-key="' + escapeHtml(doc.key) + '" data-name="' + escapeHtml(doc.name) + '">' + escapeHtml(doc.name) + '</option>';
+                        });
+                        optionsHtml += '<option value="custom" data-key="" data-name="">Custom document</option>';
+                        documentPreset.innerHTML = optionsHtml;
+                        var hasSelected = Array.prototype.some.call(documentPreset.options, function (option) {
+                            return option.value === selected;
+                        });
+                        documentPreset.value = hasSelected ? selected : ((documents || []).length ? documents[0].key : 'custom');
+                        syncDocumentPreset();
+                    }
+
+                    function updateRequestChrome(snapshot) {
+                        if (!snapshot || !snapshot.request) return;
+                        var request = snapshot.request;
+                        var bookingChanged = String(shell.dataset.bookingId || '') !== String(request.id || '');
+                        shell.dataset.bookingId = request.id;
+                        setActiveConversation(request.id);
+
+                        if (chatHeader) {
+                            var avatar = chatHeader.querySelector('.avatar.large');
+                            var title = chatHeader.querySelector('h4');
+                            var subtitle = chatHeader.querySelector('div > span');
+                            var status = chatHeader.querySelector('.status-pill');
+                            var requestLink = chatHeader.querySelector('.chat-header-actions a');
+
+                            if (avatar) avatar.textContent = request.avatar || 'C';
+                            if (title) title.textContent = request.customer || 'Customer';
+                            if (subtitle) subtitle.textContent = (request.reference || ('#' + request.id)) + ' · ' + (request.service || 'No service');
+                            if (status) status.textContent = request.stage || '-';
+                            if (requestLink && request.request_url) requestLink.href = request.request_url;
+                        }
+
+                        if (contextList) {
+                            contextList.innerHTML =
+                                '<span>Stage <strong>' + escapeHtml(request.stage || '-') + '</strong></span>' +
+                                '<span>Priority <strong>' + escapeHtml(request.priority || 'Normal') + '</strong></span>' +
+                                '<span>SLA <strong>' + escapeHtml(request.sla || '-') + '</strong></span>' +
+                                '<span>Partner <strong>' + escapeHtml(request.partner || '-') + '</strong></span>';
+                        }
+
+                        if (composer && snapshot.composer) {
+                            if (snapshot.composer.store_url) composer.action = snapshot.composer.store_url;
+                            if (bookingChanged) {
+                                updateDocumentOptions(snapshot.composer.required_documents || []);
+                                if (modeSelect) {
+                                    modeSelect.value = 'message';
+                                    syncComposerMode();
+                                }
+                                if (composerText) composerText.value = '';
+                                if (documentName) documentName.value = '';
+                                if (fileInput) fileInput.value = '';
+                                if (vaultIdInput) vaultIdInput.value = '';
+                                var badge = document.getElementById('composer-attachment-badge');
+                                if (badge) badge.style.setProperty('display', 'none', 'important');
+                            }
+                        }
+                    }
+
                     function render(snapshot) {
                         if (!feed || !snapshot.status) return;
+                        updateRequestChrome(snapshot);
                         var html = '';
                         var items = snapshot.timeline || [];
                         if (items && items.length) {
@@ -725,7 +799,7 @@
                                         html += '<div class="document-deadline mt-2"><i class="far fa-clock mr-1"></i>Submit by ' + escapeHtml(item.due_at) + (item.due_label ? ' · ' + escapeHtml(item.due_label) : '') + '</div>';
                                     }
                                     if (item.has_file && item.file_url) {
-                                        html += '<a target="_blank" href="' + item.file_url + '" class="btn btn-sm btn-outline-info mt-2"><i class="fas fa-file-alt mr-1"></i> Open submission</a>';
+                                        html += '<div class="mt-2 p-2 bg-light rounded border d-flex justify-content-between align-items-center"><span class="small font-weight-bold text-success"><i class="fas fa-check-circle mr-1"></i> Document Submitted</span><a target="_blank" href="' + item.file_url + '" class="btn btn-sm btn-success text-white"><i class="fas fa-download mr-1"></i> View / Download Document</a></div>';
                                     }
                                     html += '</article>';
                                 } else if (item.type === 'message') {
@@ -782,16 +856,37 @@
                     }
 
                     function roundPercent(val) {
-                        return Math.round((parseFloat(val) || 0) * 100);
+                        val = parseFloat(val) || 0;
+                        return Math.round(val > 1 ? val : val * 100);
                     }
 
-                    function refreshConversation() {
-                        if (!shell || !shell.dataset.bookingId) return;
-                        var url = shell.dataset.snapshotUrl + '?booking_id=' + encodeURIComponent(shell.dataset.bookingId);
-                        fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                    function snapshotUrl(bookingId) {
+                        var url = new URL(shell.dataset.snapshotUrl, window.location.origin);
+                        url.searchParams.set('booking_id', bookingId);
+                        var currentUrl = new URL(window.location.href);
+                        ['action_state', 'search'].forEach(function (key) {
+                            if (currentUrl.searchParams.has(key)) url.searchParams.set(key, currentUrl.searchParams.get(key));
+                        });
+                        return url.toString();
+                    }
+
+                    function refreshConversation(bookingId) {
+                        bookingId = bookingId || shell.dataset.bookingId;
+                        if (!shell || !bookingId) return Promise.resolve(null);
+                        var url = snapshotUrl(bookingId);
+                        return fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
                             .then(function (response) { return response.ok ? response.json() : null; })
                             .then(function (snapshot) { if (snapshot) render(snapshot); })
                             .catch(function () {});
+                    }
+
+                    function loadConversation(bookingId, href, pushState) {
+                        if (!bookingId) return;
+                        setActiveConversation(bookingId);
+                        refreshConversation(bookingId);
+                        if (pushState && href) {
+                            window.history.pushState({bookingId: bookingId}, '', href);
+                        }
                     }
 
                     if (composer) {
@@ -879,6 +974,20 @@
                                 refreshConversation();
                             });
                         }
+                    });
+
+                    document.querySelectorAll('.conversation-item[data-booking-id]').forEach(function (item) {
+                        item.addEventListener('click', function (e) {
+                            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                            e.preventDefault();
+                            loadConversation(item.dataset.bookingId, item.href, true);
+                        });
+                    });
+
+                    window.addEventListener('popstate', function () {
+                        var params = new URL(window.location.href).searchParams;
+                        var bookingId = params.get('booking_id') || shell.dataset.bookingId;
+                        loadConversation(bookingId, null, false);
                     });
 
                     if (feed) feed.scrollTop = feed.scrollHeight;
