@@ -936,7 +936,7 @@
                                 }
                                 refreshConversation();
                             });
-                        });
+                        };
 
                         if (composerText) {
                             composerText.addEventListener('keydown', function (e) {
