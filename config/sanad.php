@@ -72,6 +72,7 @@ return [
         'chroma_collection' => env('CHROMA_COLLECTION', 'sanad_knowledge_base'),
         'crawler' => [
             'base_url' => env('CRAWL4AI_BASE_URL', 'http://127.0.0.1:11235'),
+            'fallback_base_url' => env('CRAWL4AI_FALLBACK_BASE_URL', 'http://sanad-crawl4ai-ase2ny:11235'),
             'api_token' => env('CRAWL4AI_API_TOKEN'),
             'timeout' => env('CRAWL4AI_TIMEOUT', 30),
             'max_pages' => env('CRAWL4AI_MAX_PAGES', 50),

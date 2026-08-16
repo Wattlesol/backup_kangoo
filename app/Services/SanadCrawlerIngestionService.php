@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -88,10 +89,31 @@ class SanadCrawlerIngestionService
 
     private function sendCrawlRequest(array $payload): array
     {
-        $response = $this->request()->post($this->endpoint('/crawl'), $payload);
-        if ($response->status() === 404) {
-            $response = $this->request()->post($this->endpoint('/crawl/run'), $payload);
+        $lastConnectionException = null;
+
+        foreach ($this->baseUrls() as $baseUrl) {
+            try {
+                $response = $this->request()->post($this->endpoint('/crawl', $baseUrl), $payload);
+                if ($response->status() === 404) {
+                    $response = $this->request()->post($this->endpoint('/crawl/run', $baseUrl), $payload);
+                }
+
+                return $this->handleCrawlResponse($response, $payload);
+            } catch (ConnectionException $e) {
+                $lastConnectionException = $e;
+                continue;
+            }
         }
+
+        if ($lastConnectionException) {
+            throw new RuntimeException('Crawl4AI scraper error: ' . $lastConnectionException->getMessage(), 0, $lastConnectionException);
+        }
+
+        throw new RuntimeException('Crawl4AI scraper error: No crawler endpoint is configured.');
+    }
+
+    private function handleCrawlResponse($response, array $payload): array
+    {
         if (!$response->successful()) {
             $body = $response->body();
             $json = json_decode($body, true);
@@ -123,9 +145,21 @@ class SanadCrawlerIngestionService
         return $token ? $request->withToken($token) : $request;
     }
 
-    private function endpoint(string $path): string
+    private function endpoint(string $path, ?string $baseUrl = null): string
     {
-        return rtrim((string) config('sanad.ai.crawler.base_url'), '/') . $path;
+        return rtrim((string) ($baseUrl ?: config('sanad.ai.crawler.base_url')), '/') . $path;
+    }
+
+    private function baseUrls(): array
+    {
+        $urls = [config('sanad.ai.crawler.base_url')];
+        $fallback = config('sanad.ai.crawler.fallback_base_url');
+
+        if ($fallback && parse_url((string) config('sanad.ai.crawler.base_url'), PHP_URL_HOST) === 'crawl4ai') {
+            $urls[] = $fallback;
+        }
+
+        return array_values(array_unique(array_filter(array_map('strval', $urls))));
     }
 
     private function extractMarkdownContent($markdown): ?string
