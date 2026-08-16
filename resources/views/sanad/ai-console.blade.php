@@ -180,13 +180,16 @@
                                 <h5 class="font-weight-bold mb-3">Knowledge Base Fine Tuning</h5>
                                 <div class="sanad-ai-list sanad-knowledge-fine-list">
                                     @forelse($knowledgeItems as $item)
-                                        <div class="sanad-ai-list-item">
+                                        <div class="sanad-ai-list-item" id="sanad-knowledge-item-{{ $item->id }}">
                                             <div>
                                                 <strong>{{ $item->title }}</strong>
                                                 <span>{{ Str::limit($item->content, 130) }}</span>
                                                 <small class="d-block text-muted">Chunks: {{ $item->chunks_count ?? 0 }} · Category: {{ $item->category ?: 'General' }}</small>
                                             </div>
-                                            <button type="button" class="btn btn-sm btn-light sanad-icon-btn" data-toggle="modal" data-target="#knowledgeModal{{ $item->id }}" title="View and fine tune"><i class="fas fa-eye"></i></button>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <button type="button" class="btn btn-sm btn-light sanad-icon-btn" data-toggle="modal" data-target="#knowledgeModal{{ $item->id }}" title="View and fine tune"><i class="fas fa-eye"></i></button>
+                                                <button type="button" class="btn btn-sm btn-light text-danger sanad-icon-btn sanad-knowledge-delete-btn" data-delete-url="{{ route('sanad.ai.knowledge.delete', $item->id) }}" data-item-title="{{ $item->title }}" title="Delete knowledge item"><i class="fas fa-trash-alt"></i></button>
+                                            </div>
                                         </div>
                                         <div class="modal fade" id="knowledgeModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
                                             <div class="modal-dialog modal-lg" role="document">
@@ -463,11 +466,13 @@
                     var div = document.createElement('div');
                     div.id = 'sanad-knowledge-item-' + item.id;
                     div.className = 'sanad-ai-list-item';
+                    var itemTitle = item.title || 'Untitled Knowledge';
                     div.innerHTML = '<div>' +
-                        '<strong>' + (item.title || 'Untitled Knowledge') + '</strong>' +
-                        '<span>' + (item.content || '') + '</span>' +
-                        '<small class="d-block text-muted">Chunks: ' + (item.chunks_count || 1) + ' · Category: ' + (item.category || 'General') + '</small>' +
-                        '</div>';
+                        '<strong>' + escapeHtml(itemTitle) + '</strong>' +
+                        '<span>' + escapeHtml(item.content || '') + '</span>' +
+                        '<small class="d-block text-muted">Chunks: ' + escapeHtml(item.chunks_count || 1) + ' · Category: ' + escapeHtml(item.category || 'General') + '</small>' +
+                        '</div>' +
+                        '<button type="button" class="btn btn-sm btn-light text-danger sanad-icon-btn sanad-knowledge-delete-btn" data-delete-url="/sanad/ai/knowledge/' + escapeHtml(item.id) + '" data-item-title="' + escapeHtml(itemTitle) + '" title="Delete knowledge item"><i class="fas fa-trash-alt"></i></button>';
                     listContainer.insertBefore(div, listContainer.firstChild);
                 }
 
@@ -628,6 +633,57 @@
                         });
                     });
                 }
+
+                document.addEventListener('click', function (e) {
+                    var deleteBtn = e.target.closest('.sanad-knowledge-delete-btn');
+                    if (!deleteBtn) return;
+
+                    e.preventDefault();
+                    var title = deleteBtn.dataset.itemTitle || 'this knowledge item';
+                    if (!window.confirm('Delete "' + title + '" and remove its chunks and vector records?')) {
+                        return;
+                    }
+
+                    var card = deleteBtn.closest('.sanad-ai-list-item');
+                    var originalHtml = deleteBtn.innerHTML;
+                    deleteBtn.disabled = true;
+                    deleteBtn.innerHTML = '<span class="sanad-btn-spinner" style="width:12px;height:12px;border-width:2px;"></span>';
+
+                    fetch(deleteBtn.dataset.deleteUrl, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(function (response) {
+                        return response.json().then(function (data) {
+                            return { ok: response.ok, data: data };
+                        });
+                    })
+                    .then(function (res) {
+                        if (!res.ok || !res.data || !res.data.status) {
+                            deleteBtn.disabled = false;
+                            deleteBtn.innerHTML = originalHtml;
+                            showSanadAlert('danger', (res.data && res.data.message) ? res.data.message : 'Delete failed.');
+                            return;
+                        }
+
+                        if (card) card.remove();
+                        showSanadAlert('success', res.data.message || 'Knowledge item deleted.');
+
+                        var listContainer = document.querySelector('.sanad-knowledge-fine-list');
+                        if (listContainer && !listContainer.querySelector('.sanad-ai-list-item')) {
+                            listContainer.innerHTML = '<div class="empty-state">No knowledge items yet.</div>';
+                        }
+                    })
+                    .catch(function (error) {
+                        deleteBtn.disabled = false;
+                        deleteBtn.innerHTML = originalHtml;
+                        showSanadAlert('danger', error.message || 'Delete failed.');
+                    });
+                });
             });
         </script>
     @endonce

@@ -148,6 +148,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('sanad/ai/knowledge/{id}/status', [SanadWebController::class, 'knowledgeScrapeStatus'])->name('sanad.ai.knowledge.status');
     Route::get('sanad/ai/knowledge/{id}', fn () => redirect()->route('sanad.knowledge.index'));
     Route::post('sanad/ai/knowledge/{id}', [SanadWebController::class, 'updateAiKnowledge'])->name('sanad.ai.knowledge.update');
+    Route::delete('sanad/ai/knowledge/{id}', [SanadWebController::class, 'deleteAiKnowledge'])->name('sanad.ai.knowledge.delete');
     Route::get('sanad/chat-workspace', [SanadWebController::class, 'chatWorkspace'])->name('sanad.chat.workspace');
     Route::get('sanad/chat-workspace/snapshot', [SanadWebController::class, 'chatWorkspaceSnapshot'])->name('sanad.chat.workspace.snapshot');
     Route::post('sanad/ai/review-examples/{id}/promote', [SanadWebController::class, 'promoteAiReviewExample'])->name('sanad.ai.review-examples.promote');

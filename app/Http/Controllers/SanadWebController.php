@@ -718,6 +718,31 @@ class SanadWebController extends Controller
         return redirect()->back()->withSuccess('Sanad AI knowledge item updated.');
     }
 
+    public function deleteAiKnowledge(Request $request, $id, SanadVectorStoreService $vectorStore)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+
+        $item = SanadAiKnowledgeItem::with('chunks')->findOrFail($id);
+        $title = $item->title;
+
+        DB::transaction(function () use ($request, $item, $vectorStore) {
+            $vectorStore->deleteKnowledgeItemVectors($item);
+            $this->audit($request, 'sanad.ai.knowledge_deleted', $item);
+            $item->chunks()->delete();
+            $item->forceDelete();
+        });
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => "Knowledge item '{$title}' deleted.",
+                'item_id' => (int) $id,
+            ]);
+        }
+
+        return redirect()->back()->withSuccess("Knowledge item '{$title}' deleted.");
+    }
+
     public function askAi(Request $request, SanadAiRagService $rag)
     {
         abort_unless($this->canUseSanadModule('ai_tools', 'write'), 403);

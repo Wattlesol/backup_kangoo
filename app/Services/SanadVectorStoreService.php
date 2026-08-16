@@ -16,6 +16,7 @@ class SanadVectorStoreService
 
     public function indexKnowledgeItem(SanadAiKnowledgeItem $item): void
     {
+        $this->deleteKnowledgeItemVectors($item);
         $item->chunks()->delete();
 
         foreach ($this->chunk($item->content) as $index => $content) {
@@ -36,6 +37,32 @@ class SanadVectorStoreService
             ]);
 
             $this->upsertChroma($chunk, $item);
+        }
+    }
+
+    public function deleteKnowledgeItemVectors(SanadAiKnowledgeItem $item): void
+    {
+        $vectorIds = $item->chunks()
+            ->pluck('vector_id')
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($vectorIds) || config('sanad.ai.vector_store') !== 'chroma') {
+            return;
+        }
+
+        try {
+            $collectionId = $this->chromaCollectionId();
+            if (!$collectionId) {
+                return;
+            }
+
+            Http::timeout(10)->post($this->chromaUrl('/api/v1/collections/' . $collectionId . '/delete'), [
+                'ids' => $vectorIds,
+            ]);
+        } catch (\Throwable $e) {
+            //
         }
     }
 
