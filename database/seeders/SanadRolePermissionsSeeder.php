@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use App\Models\User;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class SanadRolePermissionsSeeder extends Seeder
 {
@@ -50,6 +52,8 @@ class SanadRolePermissionsSeeder extends Seeder
             'service list',
             'payment list',
         ]);
+
+        $this->syncExistingUserRoles();
     }
 
     private function assignPermissions(array $roleNames, array $permissionNames)
@@ -65,5 +69,26 @@ class SanadRolePermissionsSeeder extends Seeder
                 }
             }
         }
+    }
+
+    private function syncExistingUserRoles(): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $validRoles = ['admin', 'demo_admin', 'provider', 'handyman', 'user'];
+
+        User::withTrashed()->chunkById(100, function ($users) use ($validRoles) {
+            foreach ($users as $user) {
+                $role = in_array($user->user_type, ['customer', 'user'], true)
+                    ? 'user'
+                    : $user->user_type;
+
+                if (in_array($role, $validRoles, true)) {
+                    $user->syncRoles([$role]);
+                }
+            }
+        });
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
