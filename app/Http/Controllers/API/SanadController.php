@@ -84,7 +84,7 @@ class SanadController extends Controller
         $request->validate(['message' => 'required|string|max:2000', 'thread_type' => 'nullable|in:shared,internal']);
         $type = $request->thread_type ?: 'shared';
         if ($type === 'internal' && !auth()->user()->hasAnyRole(['admin','demo_admin','employee'])) abort(403);
-        $thread = SanadChatThread::firstOrCreate(['booking_id' => $booking->id, 'thread_type' => $type], ['participant_roles' => $type === 'internal' ? ['admin','demo_admin','employee'] : ['admin','demo_admin','employee','provider','user'], 'created_by' => auth()->id()]);
+        $thread = SanadChatThread::firstOrCreate(['booking_id' => $booking->id, 'thread_type' => $type], ['participant_roles' => $type === 'internal' ? ['admin','demo_admin','employee','handyman'] : ['admin','demo_admin','employee','handyman','provider','user','customer'], 'created_by' => auth()->id()]);
         $message = SanadChatMessage::create(['thread_id' => $thread->id, 'sender_id' => auth()->id(), 'sender_role' => auth()->user()->user_type, 'message' => $request->message, 'visible_to' => $thread->participant_roles, 'message_type' => 'text']);
         $thread->update(['last_message_at' => now()]);
         return comman_custom_response(['data' => $message]);

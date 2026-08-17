@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\SanadAiInteraction;
 use App\Models\SanadAiKnowledgeItem;
 use App\Models\SanadAiReviewExample;
+use App\Services\SanadAiFirstResponderService;
 use App\Services\SanadAiRagService;
 use App\Services\SanadCrawlerIngestionService;
 use App\Services\SanadVectorStoreService;
@@ -84,7 +85,9 @@ class SanadWebController extends Controller
             $query->whereHas('sanadChatThreads', fn ($chatQuery) => $chatQuery->where('status', 'open'));
         }
         if ($request->action_state === 'unread_buzz') {
-            $query->whereHas('sanadBuzzAlerts', fn ($buzzQuery) => $buzzQuery->where('status', 'unread'));
+            $query->whereHas('sanadBuzzAlerts', function ($buzzQuery) {
+                $this->whereVisibleBuzzForCurrentUser($buzzQuery->where('status', 'unread'));
+            });
         }
         if ($request->action_state === 'pending_documents') {
             $query->whereHas('sanadDocumentRequests', fn ($docQuery) => $docQuery->whereIn('status', ['pending', 'submitted', 'replacement_requested']));
@@ -122,7 +125,16 @@ class SanadWebController extends Controller
         $messages = $thread
             ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document', 'aiInteraction'])->get()
             : collect();
-        $visibleMessages = $messages->reject(fn ($message) => in_array($message->message_type, ['buzz', 'document_request'], true) || $message->buzz_alert_id || $message->document_request_id);
+        $roleAliases = $this->chatParticipantRoleAliases(auth()->user());
+        $visibleMessages = $messages->reject(function ($message) use ($roleAliases) {
+            $visibleTo = $message->visible_to ?: [];
+            return in_array($message->message_type, ['buzz', 'document_request'], true)
+                || $message->buzz_alert_id
+                || $message->document_request_id
+                || ($visibleTo
+                    && !in_array($message->sender_role, ['user', 'customer'], true)
+                    && empty(array_intersect($visibleTo, $roleAliases)));
+        });
         $buzzAlerts = $selectedBooking ? $this->visibleBuzzQuery($selectedBooking)->with('replies.sender')->latest()->get() : collect();
         $documentRequests = $selectedBooking ? $selectedBooking->sanadDocumentRequests()->with('document')->latest()->get() : collect();
         $aiEscalations = $isAdmin
@@ -181,7 +193,16 @@ class SanadWebController extends Controller
         $messages = $thread
             ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document', 'aiInteraction'])->get()
             : collect();
-        $visibleMessages = $messages->reject(fn ($message) => in_array($message->message_type, ['buzz', 'document_request'], true) || $message->buzz_alert_id || $message->document_request_id);
+        $roleAliases = $this->chatParticipantRoleAliases($user);
+        $visibleMessages = $messages->reject(function ($message) use ($roleAliases) {
+            $visibleTo = $message->visible_to ?: [];
+            return in_array($message->message_type, ['buzz', 'document_request'], true)
+                || $message->buzz_alert_id
+                || $message->document_request_id
+                || ($visibleTo
+                    && !in_array($message->sender_role, ['user', 'customer'], true)
+                    && empty(array_intersect($visibleTo, $roleAliases)));
+        });
         $buzzAlerts = $this->visibleBuzzQuery($booking)->with('replies.sender')->latest()->get();
         $documentRequests = $booking->sanadDocumentRequests()->with('document')->latest()->get();
         $isAdmin = $user->hasAnyRole(['admin', 'demo_admin']);
@@ -190,6 +211,7 @@ class SanadWebController extends Controller
         $requestShowRoute = $isCustomer ? 'customer-portal.requests.show' : 'sanad.requests.show';
         $canCreateBuzz = $this->employeeHasFlag('send_buzz') || $isAdmin || $user->hasRole('provider');
         $canRequestDocuments = $this->employeeHasFlag('review_documents') || $isAdmin || $user->hasRole('provider');
+        $directMessageLock = $this->directMessageLock($booking, $user);
         $requiredDocuments = $booking->service
             ? collect($booking->service->required_documents ?: [])->map(function ($doc) {
                 $name = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
@@ -222,8 +244,16 @@ class SanadWebController extends Controller
                 'created_at' => optional($buzz->created_at)->format('Y-m-d H:i'),
                 'priority' => Str::headline($buzz->priority),
                 'status' => Str::headline($buzz->status),
+                'raw_status' => $buzz->status,
                 'message' => $buzz->message,
                 'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
+                'recipient_id' => $buzz->recipient_id,
+                'action_type' => $buzz->action_type,
+                'action_status' => $buzz->action_status,
+                'accept_url' => route('sanad.requests.buzz.acknowledge', [$booking->id, $buzz->id]),
+                'can_accept' => $buzz->action_type === 'chat_assignment_accept'
+                    && $buzz->status === 'unread'
+                    && (int) $buzz->recipient_id === (int) auth()->id(),
                 'replies' => $buzz->replies->map(fn ($r) => [
                     'sender' => optional($r->sender)->display_name ?: Str::headline($r->sender_role ?: 'user'),
                     'message' => $r->message,
@@ -256,6 +286,9 @@ class SanadWebController extends Controller
                 'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
                 'sender_role' => $message->sender_role,
                 'message' => $message->message,
+                'message_type' => $message->message_type ?: 'text',
+                'ai_interaction_id' => $message->ai_interaction_id,
+                'handover_status' => optional($message->aiInteraction)->status,
                 'attachment_url' => $message->getFirstMediaUrl('sanad_chat_attachment') ?: $message->getFirstMediaUrl('attachment'),
                 'attachment_name' => optional($message->getFirstMedia('sanad_chat_attachment'))->file_name,
             ]);
@@ -276,6 +309,11 @@ class SanadWebController extends Controller
                 'partner' => optional($booking->provider)->display_name ?: '-',
                 'request_url' => route($requestShowRoute, $booking->id),
                 'updated_at' => optional($booking->updated_at)->toIso8601String(),
+                'ai_first_responder_enabled' => $booking->ai_first_responder_enabled !== false,
+                'chat_owner_type' => $booking->chat_owner_type ?: 'ai',
+                'chat_owner_user_id' => $booking->chat_owner_user_id,
+                'chat_owner_team' => $this->chatOwnerTeam($booking),
+                'chat_assignment_label' => $this->chatAssignmentLabel($booking),
             ],
             'composer' => [
                 'booking_id' => $booking->id,
@@ -283,6 +321,11 @@ class SanadWebController extends Controller
                 'can_create_buzz' => $canCreateBuzz,
                 'can_request_documents' => $canRequestDocuments,
                 'required_documents' => $requiredDocuments,
+                'ai_toggle_url' => !$isCustomer ? route('sanad.requests.ai-first-responder', $booking->id) : null,
+                'chat_assignment_url' => !$isCustomer ? route('sanad.requests.chat-assignment', $booking->id) : null,
+                'assignable_chat_targets' => !$isCustomer ? $this->assignableChatTargets($booking) : [],
+                'direct_message_locked' => $directMessageLock['locked'],
+                'direct_message_lock_message' => $directMessageLock['message'],
             ],
             'timeline' => $timelineData,
             'messages' => $visibleMessages->map(fn ($message) => [
@@ -301,8 +344,16 @@ class SanadWebController extends Controller
                 'id' => $buzz->id,
                 'priority' => Str::headline($buzz->priority),
                 'status' => Str::headline($buzz->status),
+                'raw_status' => $buzz->status,
                 'message' => $buzz->message,
                 'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
+                'recipient_id' => $buzz->recipient_id,
+                'action_type' => $buzz->action_type,
+                'action_status' => $buzz->action_status,
+                'accept_url' => route('sanad.requests.buzz.acknowledge', [$booking->id, $buzz->id]),
+                'can_accept' => $buzz->action_type === 'chat_assignment_accept'
+                    && $buzz->status === 'unread'
+                    && (int) $buzz->recipient_id === (int) auth()->id(),
                 'reply_count' => $buzz->reply_count,
                 'created_at' => optional($buzz->created_at)->format('Y-m-d H:i'),
                 'replies' => $buzz->replies->map(fn ($reply) => [
@@ -1047,7 +1098,7 @@ class SanadWebController extends Controller
 
         $thread = SanadChatThread::firstOrCreate(
             ['booking_id' => $bookingId, 'thread_type' => 'shared'],
-            ['participant_roles' => ['admin','demo_admin','employee','provider','user','customer'], 'created_by' => auth()->id()]
+            ['participant_roles' => ['admin','demo_admin','employee','handyman','provider','user','customer'], 'created_by' => auth()->id()]
         );
 
         SanadChatMessage::updateOrCreate(
@@ -1057,7 +1108,7 @@ class SanadWebController extends Controller
                 'sender_id' => auth()->id(),
                 'sender_role' => 'system',
                 'message' => $interaction->answer,
-                'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+                'visible_to' => ['admin','demo_admin','employee','handyman','provider','user','customer'],
             ]
         );
         $thread->update(['last_message_at' => now()]);
@@ -1138,7 +1189,7 @@ class SanadWebController extends Controller
                             $documentQuery->where('verification_status', 'pending');
                         })
                         ->orWhereHas('sanadBuzzAlerts', function ($buzzQuery) {
-                            $buzzQuery->where('status', 'unread');
+                            $this->whereVisibleBuzzForCurrentUser($buzzQuery->where('status', 'unread'));
                         });
                 });
             }
@@ -1149,7 +1200,7 @@ class SanadWebController extends Controller
             }
             if ($request->action_state === 'unread_buzz') {
                 $query->whereHas('sanadBuzzAlerts', function ($buzzQuery) {
-                    $buzzQuery->where('status', 'unread');
+                    $this->whereVisibleBuzzForCurrentUser($buzzQuery->where('status', 'unread'));
                 });
             }
             if ($request->action_state === 'open_chat') {
@@ -1429,6 +1480,82 @@ class SanadWebController extends Controller
         ]);
 
         return redirect()->back()->withSuccess('Sanad employees assigned.');
+    }
+
+    public function toggleAiFirstResponder(Request $request, $id, SanadAiFirstResponderService $firstResponder)
+    {
+        abort_unless($this->canUseChatModule(true), 403);
+        $booking = Booking::myBooking()->findOrFail($id);
+        abort_unless($this->canManageChatControls($booking), 403);
+
+        $data = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        $firstResponder->setAiEnabled($booking, (bool) $data['enabled'], auth()->user());
+        $this->audit($request, 'sanad.chat.ai_first_responder_' . ((bool) $data['enabled'] ? 'enabled' : 'disabled'), $booking);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'enabled' => (bool) $data['enabled'],
+                'message' => (bool) $data['enabled'] ? 'AI first responder re-enabled.' : 'Manual takeover enabled.',
+            ]);
+        }
+
+        return redirect()->back()->withSuccess((bool) $data['enabled'] ? 'AI first responder re-enabled.' : 'Manual takeover enabled.');
+    }
+
+    public function assignChat(Request $request, $id, SanadAiFirstResponderService $firstResponder)
+    {
+        abort_unless($this->canUseChatModule(true), 403);
+        $booking = Booking::myBooking()->findOrFail($id);
+        abort_unless($this->canManageChatControls($booking), 403);
+
+        $data = $request->validate([
+            'target_type' => 'required|in:sanad_team,partner_team,user',
+            'target_user_id' => 'nullable|integer',
+            'note' => 'nullable|string|max:1000',
+        ]);
+
+        $targetType = $data['target_type'];
+        $targetUser = null;
+        if (!empty($data['target_user_id'])) {
+            $targetPayload = $this->assignableChatTargets($booking)->firstWhere('id', (int) $data['target_user_id']);
+            if (!$targetPayload || !$this->chatTargetMatchesTeam($targetPayload, $targetType, $booking)) {
+                $message = 'Selected team member cannot be assigned to this chat.';
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json(['status' => false, 'message' => $message], 422);
+                }
+                return redirect()->back()->withErrors($message);
+            }
+            $targetUser = User::findOrFail($targetPayload['id']);
+            $targetType = 'user';
+        }
+
+        if ($data['target_type'] === 'partner_team' && !$this->canAssignChatToPartnerTeam($booking)) {
+            abort(403);
+        }
+
+        $firstResponder->assignChat($booking, $targetType, $targetUser, auth()->user(), $data['note'] ?? null);
+        $this->audit($request, 'sanad.chat.assigned', $booking, [
+            'target_type' => $targetType,
+            'target_user_id' => optional($targetUser)->id,
+        ]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Chat assignment updated.',
+                'assignment' => [
+                    'owner_type' => $booking->fresh()->chat_owner_type,
+                    'owner_user_id' => $booking->fresh()->chat_owner_user_id,
+                    'label' => $this->chatAssignmentLabel($booking->fresh()),
+                ],
+            ]);
+        }
+
+        return redirect()->back()->withSuccess('Chat assignment updated.');
     }
 
     public function updateRequestLifecycle(Request $request, $id)
@@ -1786,14 +1913,14 @@ class SanadWebController extends Controller
 
         $thread = SanadChatThread::firstOrCreate(
             ['booking_id' => $booking->id, 'thread_type' => 'shared'],
-            ['participant_roles' => ['admin','demo_admin','employee','provider','user'], 'created_by' => auth()->id()]
+            ['participant_roles' => ['admin','demo_admin','employee','handyman','provider','user','customer'], 'created_by' => auth()->id()]
         );
         SanadChatMessage::create([
             'thread_id' => $thread->id,
             'sender_id' => auth()->id(),
             'sender_role' => optional(auth()->user())->user_type,
             'message' => $request->message,
-            'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+            'visible_to' => ['admin','demo_admin','employee','handyman','provider','user','customer'],
             'message_type' => 'buzz',
             'buzz_alert_id' => $alert->id,
             'recipient_id' => $alert->recipient_id,
@@ -1813,10 +1940,22 @@ class SanadWebController extends Controller
 
         $alert->status = 'acknowledged';
         $alert->acknowledged_at = now();
+        if ($alert->action_type === 'chat_assignment_accept') {
+            $alert->action_status = 'accepted';
+            $booking->forceFill([
+                'chat_owner_type' => 'user',
+                'chat_owner_user_id' => $alert->recipient_id,
+                'chat_assigned_at' => now(),
+            ])->save();
+        }
         $alert->save();
 
         $this->audit($request, 'sanad.buzz.acknowledged', $alert);
         $this->broadcastConversationUpdate($booking->id, 'buzz.acknowledged', ['buzz_alert_id' => $alert->id]);
+
+        if ($request->ajax() || $request->expectsJson()) {
+            return response()->json(['status' => true, 'buzz_id' => $alert->id, 'action_status' => $alert->action_status]);
+        }
 
         return redirect()->back()->withSuccess('Sanad Buzz alert acknowledged.');
     }
@@ -1859,7 +1998,7 @@ class SanadWebController extends Controller
             $thread = SanadChatThread::where('booking_id', $booking->id)->where('thread_type', 'shared')->latest()->first() ?: SanadChatThread::create([
                 'booking_id' => $booking->id,
                 'thread_type' => 'shared',
-                'participant_roles' => ['admin','demo_admin','employee','provider','user','customer'],
+                'participant_roles' => ['admin','demo_admin','employee','handyman','provider','user','customer'],
                 'created_by' => optional(auth()->user())->id,
             ]);
 
@@ -1868,7 +2007,7 @@ class SanadWebController extends Controller
                 'sender_id' => optional(auth()->user())->id,
                 'sender_role' => optional(auth()->user())->user_type,
                 'message' => $request->message,
-                'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+                'visible_to' => ['admin','demo_admin','employee','handyman','provider','user','customer'],
                 'message_type' => 'buzz',
                 'buzz_alert_id' => $alert->id,
                 'recipient_id' => $booking->customer_id,
@@ -1907,7 +2046,7 @@ class SanadWebController extends Controller
             $thread = SanadChatThread::where('booking_id', $booking->id)->where('thread_type', 'shared')->latest()->first() ?: SanadChatThread::create([
                 'booking_id' => $booking->id,
                 'thread_type' => 'shared',
-                'participant_roles' => ['admin','demo_admin','employee','provider','user','customer'],
+                'participant_roles' => ['admin','demo_admin','employee','handyman','provider','user','customer'],
                 'created_by' => optional(auth()->user())->id,
             ]);
 
@@ -1916,7 +2055,7 @@ class SanadWebController extends Controller
                 'sender_id' => optional(auth()->user())->id,
                 'sender_role' => optional(auth()->user())->user_type,
                 'message' => 'Document requested: ' . $item->document_name,
-                'visible_to' => ['admin','demo_admin','employee','provider','user','customer'],
+                'visible_to' => ['admin','demo_admin','employee','handyman','provider','user','customer'],
                 'message_type' => 'document_request',
                 'document_request_id' => $item->id,
                 'recipient_id' => $booking->customer_id,
@@ -1929,6 +2068,24 @@ class SanadWebController extends Controller
             return redirect()->to(route('sanad.chat.workspace', ['booking_id' => $booking->id]))->withSuccess('Customer document request sent.');
         }
 
+        if ($booking->ai_first_responder_enabled !== false && ($request->input('delivery_mode') ?: 'message') === 'message') {
+            $message = 'Disable AI first responder to send a direct message.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => false, 'message' => $message], 422);
+            }
+
+            return redirect()->back()->withErrors($message);
+        }
+
+        $directMessageLock = $this->directMessageLock($booking, auth()->user());
+        if (($request->input('delivery_mode') ?: 'message') === 'message' && $directMessageLock['locked']) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => false, 'message' => $directMessageLock['message']], 422);
+            }
+
+            return redirect()->back()->withErrors($directMessageLock['message']);
+        }
+
         $threadType = $request->thread_type ?: 'shared';
         if ($threadType === 'internal') {
             abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee']) || auth()->user()->user_type === 'handyman', 403);
@@ -1939,9 +2096,9 @@ class SanadWebController extends Controller
             $this->abortUnlessEmployeeFlag('internal_notes');
         }
         $visibleTo = match ($threadType) {
-            'internal' => ['admin', 'demo_admin', 'employee'],
-            'partner_internal' => ['admin', 'demo_admin', 'employee', 'provider'],
-            default => ['admin', 'demo_admin', 'employee', 'provider', 'user', 'customer'],
+            'internal' => ['admin', 'demo_admin', 'employee', 'handyman'],
+            'partner_internal' => ['admin', 'demo_admin', 'employee', 'handyman', 'provider'],
+            default => ['admin', 'demo_admin', 'employee', 'handyman', 'provider', 'user', 'customer'],
         };
         $thread = SanadChatThread::where('booking_id', $booking->id)->where('thread_type', $threadType)->latest()->first() ?: SanadChatThread::create([
             'booking_id' => $booking->id,
@@ -2002,8 +2159,8 @@ class SanadWebController extends Controller
             'requested_by' => auth()->id(), 'reason' => $request->reason, 'instructions' => $request->instructions,
             'required' => $request->boolean('required', true), 'due_at' => $request->due_at,
         ]);
-        $thread = SanadChatThread::firstOrCreate(['booking_id' => $booking->id, 'thread_type' => 'shared'], ['participant_roles' => ['admin','demo_admin','employee','provider','user'], 'created_by' => auth()->id()]);
-        SanadChatMessage::create(['thread_id' => $thread->id, 'sender_id' => auth()->id(), 'sender_role' => auth()->user()->user_type, 'message' => 'Document requested: '.$item->document_name, 'visible_to' => ['admin','demo_admin','employee','provider','user'], 'message_type' => 'document_request', 'document_request_id' => $item->id]);
+        $thread = SanadChatThread::firstOrCreate(['booking_id' => $booking->id, 'thread_type' => 'shared'], ['participant_roles' => ['admin','demo_admin','employee','handyman','provider','user','customer'], 'created_by' => auth()->id()]);
+        SanadChatMessage::create(['thread_id' => $thread->id, 'sender_id' => auth()->id(), 'sender_role' => auth()->user()->user_type, 'message' => 'Document requested: '.$item->document_name, 'visible_to' => ['admin','demo_admin','employee','handyman','provider','user','customer'], 'message_type' => 'document_request', 'document_request_id' => $item->id]);
         $thread->update(['last_message_at' => now()]);
         $this->audit($request, 'sanad.document_request.created', $item);
         $this->broadcastConversationUpdate($booking->id, 'document_request.created', ['document_request_id' => $item->id]);
@@ -2068,7 +2225,7 @@ class SanadWebController extends Controller
                 $q->where('owner_id', $user->id)
                     ->orWhere('uploaded_by', $user->id)
                     ->orWhere(function ($visibilityQuery) use ($user) {
-                        $this->whereJsonArrayContains($visibilityQuery, 'visible_to', $user->user_type);
+                        $this->whereJsonArrayContainsAny($visibilityQuery, 'visible_to', $this->chatParticipantRoleAliases($user));
                     });
             });
         }
@@ -2283,7 +2440,13 @@ class SanadWebController extends Controller
     {
         $pendingDocuments = $booking->sanadDocuments()->where('verification_status', 'pending')->count();
         $rejectedDocuments = $booking->sanadDocuments()->where('verification_status', 'rejected')->count();
-        $openBuzz = $booking->sanadBuzzAlerts()->whereIn('status', ['unread', 'sent'])->count();
+        $openBuzz = $booking->sanadBuzzAlerts()
+            ->whereIn('status', ['unread', 'sent'])
+            ->where(function ($buzzQuery) {
+                $buzzQuery->whereNull('action_type')
+                    ->orWhere('action_type', '!=', 'chat_assignment_accept');
+            })
+            ->count();
         $openChat = $booking->sanadChatThreads()->where('status', 'open')->count();
         $paymentStatus = optional($booking->payment)->payment_status ?: 'no_payment';
         $latestDecision = $booking->sanadRequestActions()
@@ -2311,7 +2474,7 @@ class SanadWebController extends Controller
     private function assignableEmployees(Booking $booking)
     {
         $user = auth()->user();
-        $query = User::where('user_type', 'handyman')->where('status', 1)->orderBy('display_name');
+        $query = User::with('providers')->where('user_type', 'handyman')->where('status', 1)->orderBy('display_name');
         $assignedEmployeeIds = $booking->handymanAdded()->pluck('handyman_id')->filter()->all();
 
         if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
@@ -2338,33 +2501,290 @@ class SanadWebController extends Controller
         return collect();
     }
 
-    private function visibleBuzzQuery(Booking $booking)
+    public function assignableChatTargets(Booking $booking)
     {
         $user = auth()->user();
-        $query = SanadBuzzAlert::where('booking_id', $booking->id);
+        $query = User::with('providers')
+            ->whereIn('user_type', ['provider', 'handyman'])
+            ->where('status', 1)
+            ->orderBy('display_name');
 
-        if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
-            return $query;
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return $query->where(function ($q) use ($booking) {
+                $q->where(function ($sanad) {
+                    $sanad->where('user_type', 'handyman')
+                        ->where(function ($staff) {
+                            $staff->whereNull('provider_id')->orWhere('provider_id', 0);
+                        });
+                });
+                if ($booking->provider_id) {
+                    $q->orWhere('id', $booking->provider_id)
+                        ->orWhere('provider_id', $booking->provider_id);
+                }
+            })->get()->map(fn ($target) => $this->chatTargetPayload($target))->values();
         }
 
-        if ($user->hasRole('provider') && (int) $booking->provider_id === (int) $user->id) {
-            return $query;
+        if ($user->hasRole('provider')) {
+            return $query->where(function ($q) use ($user) {
+                $q->where('id', $user->id)
+                    ->orWhere('provider_id', $user->id);
+            })->get()->map(fn ($target) => $this->chatTargetPayload($target))->values();
         }
 
         if ($user->hasRole('handyman')) {
-            $assignedEmployeeIds = collect($booking->handymanIds())->map(function ($id) {
-                return (int) $id;
-            });
+            if (!empty($user->provider_id)) {
+                return $query->where(function ($q) use ($user) {
+                    $q->where('id', $user->provider_id)
+                        ->orWhere('provider_id', $user->provider_id);
+                })->get()->map(fn ($target) => $this->chatTargetPayload($target))->values();
+            }
 
-            if ((int) $booking->handyman_id === (int) $user->id || $assignedEmployeeIds->contains((int) $user->id)) {
-                return $query;
+            return $query->where(function ($q) {
+                $q->where('user_type', 'handyman')
+                    ->where(function ($staff) {
+                        $staff->whereNull('provider_id')->orWhere('provider_id', 0);
+                    });
+            })->get()->map(fn ($target) => $this->chatTargetPayload($target))->values();
+        }
+
+        return collect();
+    }
+
+    private function chatTargetPayload(User $target): array
+    {
+        $name = trim(implode(' ', array_filter([$target->first_name, $target->last_name])));
+        if ($name === '') {
+            $name = $target->display_name ?: $target->email;
+        }
+
+        $association = $target->user_type === 'provider'
+            ? 'Partner'
+            : ($target->provider_id
+            ? (optional($target->providers)->display_name ?: optional($target->providers)->first_name ?: 'Partner')
+            : 'Sanad');
+
+        return [
+            'id' => $target->id,
+            'name' => $name,
+            'role' => $association,
+            'team' => ($target->provider_id || $target->user_type === 'provider') ? 'partner_team' : 'sanad_team',
+            'provider_id' => $target->user_type === 'provider' ? $target->id : $target->provider_id,
+        ];
+    }
+
+    private function chatTargetMatchesTeam(array $targetPayload, string $targetType, Booking $booking): bool
+    {
+        if ($targetType === 'user') {
+            return true;
+        }
+
+        if (($targetPayload['team'] ?? null) !== $targetType) {
+            return false;
+        }
+
+        if ($targetType === 'partner_team') {
+            return !empty($booking->provider_id) && (int) ($targetPayload['provider_id'] ?? 0) === (int) $booking->provider_id;
+        }
+
+        return true;
+    }
+
+    private function chatOwnerTeam(Booking $booking): string
+    {
+        if ($booking->chat_owner_type === 'partner_team') {
+            return 'partner_team';
+        }
+
+        if ($booking->chat_owner_type === 'user' && $booking->chat_owner_user_id) {
+            $owner = User::find($booking->chat_owner_user_id);
+            if ($owner && ($owner->provider_id || $owner->user_type === 'provider')) {
+                return 'partner_team';
             }
         }
 
-        return $query->where(function ($q) use ($user) {
-            $q->where('sender_id', $user->id)
-                ->orWhere('recipient_id', $user->id)
-                ->orWhere('recipient_role', $user->user_type);
+        return 'sanad_team';
+    }
+
+    private function canManageChatControls(Booking $booking): bool
+    {
+        $user = auth()->user();
+
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return true;
+        }
+
+        if ($user->hasRole('provider')) {
+            return (int) $booking->provider_id === (int) $user->id
+                || (int) $booking->chat_owner_user_id === (int) $user->id;
+        }
+
+        if ($user->hasRole('handyman')) {
+            if (!empty($user->provider_id)) {
+                return (int) $booking->chat_owner_user_id === (int) $user->id
+                    || ((int) $booking->provider_id === (int) $user->provider_id && $booking->chat_owner_type === 'partner_team');
+            }
+
+            return (int) $booking->chat_owner_user_id === (int) $user->id
+                || $booking->handymanAdded()->where('handyman_id', $user->id)->exists()
+                || $user->can('booking list');
+        }
+
+        return false;
+    }
+
+    private function canAssignChatToPartnerTeam(Booking $booking): bool
+    {
+        $user = auth()->user();
+
+        if (!$booking->provider_id) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return true;
+        }
+
+        if ($user->hasRole('provider')) {
+            return (int) $booking->provider_id === (int) $user->id
+                || (int) $booking->chat_owner_user_id === (int) $user->id;
+        }
+
+        if ($user->hasRole('handyman') && !empty($user->provider_id)) {
+            return (int) $booking->provider_id === (int) $user->provider_id
+                || (int) $booking->chat_owner_user_id === (int) $user->id;
+        }
+
+        return false;
+    }
+
+    public function directMessageLock(Booking $booking, ?User $user = null): array
+    {
+        $user = $user ?: auth()->user();
+
+        if (!$user || in_array(optional($user)->user_type, ['user', 'customer'], true)) {
+            return ['locked' => false, 'message' => null];
+        }
+
+        if ($booking->ai_first_responder_enabled !== false) {
+            return [
+                'locked' => true,
+                'message' => 'Disable AI first responder to send a direct message.',
+            ];
+        }
+
+        $assignmentBuzzQuery = SanadBuzzAlert::where('booking_id', $booking->id)
+            ->where('action_type', 'chat_assignment_accept')
+            ->latest();
+
+        if ($booking->chat_owner_type === 'user' && $booking->chat_owner_user_id) {
+            if ((int) $booking->chat_owner_user_id !== (int) $user->id) {
+                return [
+                    'locked' => true,
+                    'message' => 'This chat is assigned to another team member.',
+                ];
+            }
+
+            $latestAssignment = (clone $assignmentBuzzQuery)
+                ->where('recipient_id', $user->id)
+                ->first();
+
+            if ($latestAssignment && $latestAssignment->action_status !== 'accepted') {
+                return [
+                    'locked' => true,
+                    'message' => 'Accept the chat assignment before sending a direct message.',
+                ];
+            }
+
+            return ['locked' => false, 'message' => null];
+        }
+
+        $pendingAssignment = (clone $assignmentBuzzQuery)
+            ->where('recipient_id', $user->id)
+            ->where(function ($assignmentQuery) {
+                $assignmentQuery->whereNull('action_status')
+                    ->orWhere('action_status', 'pending');
+            })
+            ->exists();
+
+        if ($pendingAssignment) {
+            return [
+                'locked' => true,
+                'message' => 'Accept the chat assignment before sending a direct message.',
+            ];
+        }
+
+        return ['locked' => false, 'message' => null];
+    }
+
+    private function chatAssignmentLabel(Booking $booking): string
+    {
+        if (($booking->chat_owner_type ?: 'ai') === 'ai') {
+            return 'AI First Responder';
+        }
+
+        if ($booking->chat_owner_type === 'sanad_team') {
+            return 'Sanad Team';
+        }
+
+        if ($booking->chat_owner_type === 'partner_team') {
+            return 'Partner Team';
+        }
+
+        if ($booking->chat_owner_type === 'user' && $booking->chat_owner_user_id) {
+            $target = User::find($booking->chat_owner_user_id);
+            return $target ? ($target->display_name ?: $target->first_name ?: $target->email) : 'Assigned Team Member';
+        }
+
+        return 'Unassigned';
+    }
+
+    private function visibleBuzzQuery(Booking $booking)
+    {
+        return $this->whereVisibleBuzzForCurrentUser(SanadBuzzAlert::where('booking_id', $booking->id), $booking);
+    }
+
+    private function whereVisibleBuzzForCurrentUser($query, ?Booking $booking = null)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function ($visibilityQuery) use ($user, $booking) {
+            $visibilityQuery->where(function ($assignmentQuery) use ($user) {
+                $assignmentQuery->where('action_type', 'chat_assignment_accept')
+                    ->where('recipient_id', $user->id);
+            })->orWhere(function ($regularQuery) use ($user, $booking) {
+                $regularQuery->where(function ($notAssignmentQuery) {
+                    $notAssignmentQuery->whereNull('action_type')
+                        ->orWhere('action_type', '!=', 'chat_assignment_accept');
+                });
+
+                if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
+                    return;
+                }
+
+                if ($booking && $user->hasRole('provider') && (int) $booking->provider_id === (int) $user->id) {
+                    return;
+                }
+
+                if ($booking && $user->hasRole('handyman')) {
+                    $assignedEmployeeIds = $booking->handymanAdded()->pluck('handyman_id')->map(function ($id) {
+                        return (int) $id;
+                    });
+
+                    if ((int) $booking->handyman_id === (int) $user->id || $assignedEmployeeIds->contains((int) $user->id)) {
+                        return;
+                    }
+                }
+
+                $regularQuery->where(function ($roleQuery) use ($user) {
+                    $roleQuery->where('sender_id', $user->id)
+                        ->orWhere('recipient_id', $user->id)
+                        ->orWhere('recipient_role', $user->user_type);
+                });
+            });
         });
     }
 
@@ -2377,12 +2797,7 @@ class SanadWebController extends Controller
             $query->where(function ($q) use ($user) {
                 $q->where('created_by', $user->id)
                     ->orWhere(function ($visibilityQuery) use ($user) {
-                        $this->whereJsonArrayContains($visibilityQuery, 'participant_roles', $user->user_type);
-                        if ($user->user_type === 'user') {
-                            $this->whereJsonArrayContains($visibilityQuery, 'participant_roles', 'customer');
-                        } elseif ($user->user_type === 'customer') {
-                            $this->whereJsonArrayContains($visibilityQuery, 'participant_roles', 'user');
-                        }
+                        $this->whereJsonArrayContainsAny($visibilityQuery, 'participant_roles', $this->chatParticipantRoleAliases($user));
                     });
             });
         }
@@ -2392,11 +2807,50 @@ class SanadWebController extends Controller
             'booking_id' => $booking->id,
             'thread_type' => 'shared',
         ], [
-            'participant_roles' => ['admin', 'demo_admin', 'employee', 'provider', 'user', 'customer'],
+            'participant_roles' => ['admin', 'demo_admin', 'employee', 'handyman', 'provider', 'user', 'customer'],
             'created_by' => optional($user)->id,
             'status' => 'open',
             'last_message_at' => now(),
         ]));
+    }
+
+    private function chatParticipantRoleAliases(User $user): array
+    {
+        $roles = array_filter([(string) $user->user_type]);
+
+        if ($user->hasRole('handyman') || $user->user_type === 'handyman') {
+            $roles[] = 'employee';
+            $roles[] = 'handyman';
+        }
+
+        if ($user->hasRole('employee') || $user->user_type === 'employee') {
+            $roles[] = 'employee';
+            $roles[] = 'handyman';
+        }
+
+        if (in_array($user->user_type, ['user', 'customer'], true)) {
+            $roles[] = 'user';
+            $roles[] = 'customer';
+        }
+
+        if ($user->hasRole('provider') || $user->user_type === 'provider') {
+            $roles[] = 'provider';
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    private function whereJsonArrayContainsAny($query, $column, array $values)
+    {
+        return $query->where(function ($roleQuery) use ($column, $values) {
+            foreach ($values as $value) {
+                if (DB::connection()->getDriverName() === 'sqlite') {
+                    $roleQuery->orWhere($column, 'like', '%"' . $value . '"%');
+                } else {
+                    $roleQuery->orWhereJsonContains($column, $value);
+                }
+            }
+        });
     }
 
     private function whereJsonArrayContains($query, $column, $value)

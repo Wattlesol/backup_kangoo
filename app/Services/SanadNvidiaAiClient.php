@@ -11,13 +11,19 @@ class SanadNvidiaAiClient
     public function chat(array $messages, array $options = []): array
     {
         $primaryModel = $options['model'] ?? config('sanad.ai.model', 'nvidia/nemotron-3.5-lightning-30b-a3b');
-        $modelsToTry = array_unique([$primaryModel, 'nvidia/nemotron-3.5-lightning-30b-a3b', 'meta/llama-3.1-70b-instruct']);
+        $fallbackModels = $options['fallback_models'] ?? ['nvidia/nemotron-3.5-lightning-30b-a3b', 'meta/llama-3.1-70b-instruct'];
+        $modelsToTry = array_unique(array_filter(array_merge([$primaryModel], $fallbackModels ?: [])));
 
         $payload = [
             'messages' => $messages,
             'temperature' => (float) ($options['temperature'] ?? config('sanad.ai.temperature', 0.2)),
             'max_tokens' => (int) ($options['max_tokens'] ?? config('sanad.ai.max_tokens', 2048)),
         ];
+        foreach (['top_p', 'reasoning_effort', 'chat_template_kwargs'] as $optionKey) {
+            if (array_key_exists($optionKey, $options)) {
+                $payload[$optionKey] = $options[$optionKey];
+            }
+        }
 
         $lastException = null;
         $response = null;

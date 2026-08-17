@@ -32,6 +32,14 @@ class SanadDocumentVaultItem extends Model implements HasMedia
         'required',
         'source',
         'retention_until',
+        'expiry_date',
+        'expiry_reminder_at',
+        'expiry_reminder_enabled',
+        'expiry_reminder_sent_at',
+        'ocr_status',
+        'ocr_confidence',
+        'ocr_metadata',
+        'ocr_processed_at',
     ];
 
     protected $casts = [
@@ -47,6 +55,13 @@ class SanadDocumentVaultItem extends Model implements HasMedia
         'required' => 'boolean',
         'reviewed_at' => 'datetime',
         'retention_until' => 'datetime',
+        'expiry_date' => 'date',
+        'expiry_reminder_at' => 'date',
+        'expiry_reminder_enabled' => 'boolean',
+        'expiry_reminder_sent_at' => 'datetime',
+        'ocr_confidence' => 'float',
+        'ocr_metadata' => 'array',
+        'ocr_processed_at' => 'datetime',
     ];
 
     public function booking() { return $this->belongsTo(Booking::class); }

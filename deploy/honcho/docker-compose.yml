@@ -26,6 +26,11 @@ services:
       LLM_OPENAI_API_KEY: disabled-self-hosted-sanad
     ports:
       - "127.0.0.1:18000:8000"
+    networks:
+      default:
+      dokploy-network:
+        aliases:
+          - honcho
     volumes:
       - lancedb-data:/app/lancedb_data
     healthcheck:
@@ -94,6 +99,10 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true
 
 volumes:
   pgdata:

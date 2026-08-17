@@ -7,6 +7,7 @@ use Throwable;
 use Exception;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Session\TokenMismatchException;
 class Handler extends ExceptionHandler
 {
@@ -42,6 +43,22 @@ class Handler extends ExceptionHandler
         });
 
         $this->renderable(function(Exception $exception, $request) {
+            if ($exception instanceof PostTooLargeException) {
+                $message = 'The uploaded file is too large. Please upload JPG, JPEG, PNG, PDF, DOC, DOX, DOCX, or DOCS files up to 20 MB.';
+
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => $message,
+                    ], 413);
+                }
+
+                return redirect()
+                    ->back()
+                    ->withInput($request->except(['file']))
+                    ->withErrors(['file' => $message]);
+            }
+
             if ($exception instanceof TokenMismatchException) {
                 if ($request->expectsJson() || $request->is('api/*')) {
                     return response()->json([

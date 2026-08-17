@@ -61,6 +61,7 @@ return [
         'base_url' => env('NVIDIA_AI_BASE_URL', 'https://integrate.api.nvidia.com/v1'),
         'api_key' => env('NVIDIA_API_KEY'),
         'model' => env('NVIDIA_AI_MODEL', 'nvidia/nemotron-3.5-lightning-30b-a3b'),
+        'ocr_model' => env('NVIDIA_AI_OCR_MODEL', env('NVIDIA_AI_MODEL', 'nvidia/nemotron-3.5-lightning-30b-a3b')),
         'embedding_model' => env('NVIDIA_AI_EMBEDDING_MODEL', 'nvidia/nv-embedqa-e5-v5'),
         'temperature' => env('SANAD_AI_TEMPERATURE', 0.2),
         'max_tokens' => env('SANAD_AI_MAX_TOKENS', 2048),
@@ -82,7 +83,8 @@ return [
             'enabled' => env('LANGSMITH_TRACING', true),
             'api_key' => env('LANGSMITH_API_KEY'),
             'endpoint' => env('LANGSMITH_ENDPOINT', 'https://api.smith.langchain.com'),
-            'project' => env('LANGSMITH_PROJECT', 'sanad-rag'),
+            'project' => env('LANGSMITH_PROJECT', 'sanad-ai'),
+            'ocr_project' => env('LANGSMITH_OCR_PROJECT', 'sanad-ocr'),
         ],
         'honcho' => [
             'enabled' => env('HONCHO_ENABLED', false),

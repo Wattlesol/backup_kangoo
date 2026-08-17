@@ -1,6 +1,7 @@
 @php
     $isCustomer = !empty($isCustomerPortal) || in_array(optional(auth()->user())->user_type, ['user', 'customer'], true);
     $messagesRoute = $isCustomer ? 'customer-portal.messages' : 'sanad.chat.workspace';
+    $snapshotRoute = $isCustomer ? 'customer-portal.messages.snapshot' : 'sanad.chat.workspace.snapshot';
     $storeChatRoute = $isCustomer ? 'customer-portal.requests.messages.store' : 'sanad.requests.chat.store';
     $requestShowRoute = $isCustomer ? 'customer-portal.requests.show' : 'sanad.requests.show';
     $roleLabel = fn ($role) => Str::headline(str_replace(['demo_admin', 'handyman'], ['admin', 'employee'], (string) $role));
@@ -161,8 +162,37 @@
 
             fileName.textContent = input.files && input.files[0] ? input.files[0].name : 'No file selected';
         };
+
+        window.syncChatAssignmentTarget = function (selectElem) {
+            var form = selectElem ? selectElem.closest('.chat-assignment-form') : document.querySelector('.chat-assignment-form');
+            if (!form) return;
+            var typeSelect = form.querySelector('select[name="target_type"]');
+            var targetSelect = form.querySelector('.chat-target-select');
+            var selectedType = typeSelect ? typeSelect.value : '';
+            if (targetSelect) {
+                var hasVisibleOption = false;
+                Array.prototype.forEach.call(targetSelect.options, function (option) {
+                    if (!option.value) {
+                        option.hidden = false;
+                        return;
+                    }
+                    var visible = option.dataset.team === selectedType;
+                    option.hidden = !visible;
+                    if (visible) hasVisibleOption = true;
+                });
+                targetSelect.style.display = 'block';
+                targetSelect.required = false;
+                if (targetSelect.value) {
+                    var selectedOption = targetSelect.options[targetSelect.selectedIndex];
+                    if (selectedOption && selectedOption.hidden) targetSelect.value = '';
+                }
+                targetSelect.options[0].textContent = selectedType === 'partner_team'
+                    ? (hasVisibleOption ? 'Assign whole partner team or choose member' : 'No partner team members available')
+                    : (hasVisibleOption ? 'Assign whole Sanad team or choose member' : 'No Sanad team members available');
+            }
+        };
     </script>
-    <div class="sanad-inbox-shell" data-booking-id="{{ $selectedId }}" data-snapshot-url="{{ route('sanad.chat.workspace.snapshot') }}">
+    <div class="sanad-inbox-shell {{ $isCustomer ? 'is-customer-chat' : '' }}" data-booking-id="{{ $selectedId }}" data-snapshot-url="{{ route($snapshotRoute) }}">
         <aside class="sanad-inbox-panel">
             <div class="inbox-top">
                 <div>
@@ -190,7 +220,16 @@
             <div class="conversation-list">
                 @forelse($conversations as $conversation)
                     @php
-                        $openBuzz = $conversation->sanadBuzzAlerts->where('status', 'unread')->count();
+                        $openBuzz = $conversation->sanadBuzzAlerts
+                            ->filter(function ($buzz) use ($isCustomer) {
+                                if ($buzz->action_type !== 'chat_assignment_accept') {
+                                    return true;
+                                }
+
+                                return !$isCustomer && (int) $buzz->recipient_id === (int) auth()->id();
+                            })
+                            ->where('status', 'unread')
+                            ->count();
                         $pendingDocs = $conversation->sanadDocumentRequests->whereIn('status', ['pending', 'submitted', 'replacement_requested'])->count();
                         $aiReviews = $isAdmin ? $conversation->sanadAiInteractions->where('requires_escalation', true)->count() : 0;
                         $latestThread = $conversation->sanadChatThreads->sortByDesc('last_message_at')->first();
@@ -264,6 +303,24 @@
                     @endforelse
                 </section>
             @elseif($selectedBooking)
+                @php
+                    $aiEnabled = $selectedBooking->ai_first_responder_enabled !== false;
+                    $chatOwnerType = $selectedBooking->chat_owner_type ?: 'ai';
+                    $chatOwnerLabel = match ($chatOwnerType) {
+                        'sanad_team' => 'Sanad Team',
+                        'partner_team' => 'Partner Team',
+                        'user' => optional(\App\Models\User::find($selectedBooking->chat_owner_user_id))->display_name ?: optional(\App\Models\User::find($selectedBooking->chat_owner_user_id))->email ?: 'Assigned Team Member',
+                        default => 'AI First Responder',
+                    };
+                    $chatTargets = !$isCustomer ? app(\App\Http\Controllers\SanadWebController::class)->assignableChatTargets($selectedBooking) : collect();
+                    $selectedChatTarget = $chatTargets->firstWhere('id', (int) $selectedBooking->chat_owner_user_id);
+                    $assignmentFormType = $chatOwnerType === 'user'
+                        ? ($selectedChatTarget['team'] ?? ($selectedBooking->provider_id ? 'partner_team' : 'sanad_team'))
+                        : ($chatOwnerType === 'partner_team' ? 'partner_team' : 'sanad_team');
+                    $directMessageLock = !$isCustomer
+                        ? app(\App\Http\Controllers\SanadWebController::class)->directMessageLock($selectedBooking, auth()->user())
+                        : ['locked' => false, 'message' => null];
+                @endphp
                 <header class="chat-header">
                     <div class="avatar large">{{ Str::upper(Str::substr(optional($selectedBooking->customer)->display_name ?: 'C', 0, 1)) }}</div>
                     <div>
@@ -290,6 +347,12 @@
                                         <small>No reply yet.</small>
                                     @endforelse
                                 </div>
+                                @if(!$isCustomer && $buzz->action_type === 'chat_assignment_accept' && $buzz->status === 'unread' && (int) $buzz->recipient_id === (int) auth()->id())
+                                    <form method="POST" action="{{ route('sanad.requests.buzz.acknowledge', [$selectedBooking->id, $buzz->id]) }}" class="buzz-accept-form mt-2">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check mr-1"></i> Accept</button>
+                                    </form>
+                                @endif
                                 @if($isCustomer && $buzz->status === 'unread')
                                     <form method="POST" action="{{ route('customer-portal.requests.buzz.reply', [$selectedBooking->id, $buzz->id]) }}" class="mt-2 d-flex gap-2 align-items-center">
                                         @csrf
@@ -350,7 +413,29 @@
                             </article>
                         @elseif($item->type === 'message')
                             @php $message = $item->data; @endphp
-                            <article class="message-row {{ in_array($message->sender_role, ['user', 'customer'], true) ? 'customer' : 'team' }}" data-message-id="{{ $message->id }}">
+                            @if($message->message_type === 'ai_handover_prompt')
+                                <article class="event-card ai-handover" data-event-type="ai-handover" data-message-id="{{ $message->id }}">
+                                    <div class="event-head"><strong><i class="fas fa-robot text-primary mr-1"></i> Sanad AI</strong><span>{{ Str::headline(optional($message->aiInteraction)->status ?: 'Handover Required') }}</span></div>
+                                    <p>{{ $message->message }}</p>
+                                    @if($isCustomer && optional($message->aiInteraction)->status === 'handover_required')
+                                        <div class="action-row d-flex gap-2">
+                                            <form method="POST" action="{{ route('customer-portal.ai.handover', $message->ai_interaction_id) }}">
+                                                @csrf
+                                                <input type="hidden" name="decision" value="yes">
+                                                <button type="submit" class="btn btn-sm btn-primary">Yes</button>
+                                            </form>
+                                            <form method="POST" action="{{ route('customer-portal.ai.handover', $message->ai_interaction_id) }}">
+                                                @csrf
+                                                <input type="hidden" name="decision" value="no">
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary">No</button>
+                                            </form>
+                                        </div>
+                                    @elseif(in_array(optional($message->aiInteraction)->status, ['handover_accepted', 'handover_declined'], true))
+                                        <small class="text-muted">{{ optional($message->aiInteraction)->status === 'handover_accepted' ? 'Sanad team has been notified.' : 'No handover requested.' }}</small>
+                                    @endif
+                                </article>
+                            @else
+                            <article class="message-row {{ in_array($message->sender_role, ['user', 'customer'], true) ? 'customer' : 'team' }} {{ $message->message_type === 'system_note' ? 'system' : '' }}" data-message-id="{{ $message->id }}">
                                 <div class="message-bubble">
                                     <div class="message-meta"><strong>{{ $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: $roleLabel($message->sender_role)) }}</strong><span>{{ optional($message->created_at)->format('Y-m-d H:i') }}</span></div>
                                     @if($message->message)<p>{{ $message->message }}</p>@endif
@@ -368,6 +453,7 @@
                                     </div>
                                 </div>
                             </article>
+                            @endif
                         @endif
                     @empty
                         <div class="empty-chat py-5 text-center text-muted">
@@ -404,9 +490,12 @@
                     @endif
                 </section>
 
-                <form method="POST" enctype="multipart/form-data" action="{{ route($storeChatRoute, $selectedBooking->id) }}" class="chat-composer">
+                <form method="POST" enctype="multipart/form-data" action="{{ route($storeChatRoute, $selectedBooking->id) }}" class="chat-composer {{ (!$isCustomer && $directMessageLock['locked']) ? 'ai-blocks-message' : '' }}" data-ai-enabled="{{ $aiEnabled ? '1' : '0' }}" data-is-customer="{{ $isCustomer ? '1' : '0' }}" data-direct-message-locked="{{ $directMessageLock['locked'] ? '1' : '0' }}" data-direct-message-lock-message="{{ $directMessageLock['message'] }}">
                     @csrf
                     <input type="hidden" name="thread_type" value="shared">
+                    @if(!$isCustomer)
+                        <div class="composer-ai-warning">{{ $directMessageLock['message'] ?: 'Disable AI first responder to send a direct message.' }} Buzz and document requests remain available.</div>
+                    @endif
                     <div class="document-fields mb-2" dir="rtl">
                         <div class="document-request-grid">
                             <label class="document-field">
@@ -497,24 +586,55 @@
             @endif
         </main>
 
-        <aside class="sanad-context-panel">
-            @if($selectedBooking)
-                <section class="context-tab active" id="tab-request">
-                    <h5>Request Context</h5>
-                    <div class="context-list">
-                        <span>Stage <strong>{{ $selectedStage }}</strong></span>
-                        <span>Priority <strong>{{ Str::headline($selectedBooking->sanad_priority ?: 'normal') }}</strong></span>
-                        <span>SLA <strong>{{ optional($selectedBooking->sla_due_at)->format('Y-m-d H:i') ?: '-' }}</strong></span>
-                        <span>Partner <strong>{{ optional($selectedBooking->provider)->display_name ?: '-' }}</strong></span>
-                    </div>
-                </section>
-            @endif
-        </aside>
+        @if(!$isCustomer)
+            <aside class="sanad-context-panel">
+                @if($selectedBooking)
+                    <section class="context-tab active" id="tab-request">
+                        <h5>Request Context</h5>
+                        <div class="context-list">
+                            <span>Stage <strong>{{ $selectedStage }}</strong></span>
+                            <span>Priority <strong>{{ Str::headline($selectedBooking->sanad_priority ?: 'normal') }}</strong></span>
+                            <span>SLA <strong>{{ optional($selectedBooking->sla_due_at)->format('Y-m-d H:i') ?: '-' }}</strong></span>
+                            <span>Partner <strong>{{ optional($selectedBooking->provider)->display_name ?: '-' }}</strong></span>
+                            <span>AI <strong data-ai-state-label>{{ $aiEnabled ? 'AI First Responder On' : 'Manual Takeover' }}</strong></span>
+                            <span>Assignment <strong data-chat-assignment-label>{{ $chatOwnerLabel }}</strong></span>
+                        </div>
+                        <div class="chat-control-panel mt-3" data-ai-toggle-url="{{ route('sanad.requests.ai-first-responder', $selectedBooking->id) }}" data-chat-assignment-url="{{ route('sanad.requests.chat-assignment', $selectedBooking->id) }}">
+                            <form class="ai-toggle-form mb-3">
+                                @csrf
+                                <input type="hidden" name="enabled" value="{{ $aiEnabled ? 0 : 1 }}">
+                                <button type="submit" class="btn btn-sm {{ $aiEnabled ? 'btn-outline-danger' : 'btn-outline-success' }} w-100">
+                                    <i class="fas {{ $aiEnabled ? 'fa-user-shield' : 'fa-robot' }} mr-1"></i>
+                                    {{ $aiEnabled ? 'Disable AI / Manual Takeover' : 'Re-enable AI First Responder' }}
+                                </button>
+                            </form>
+                            <form class="chat-assignment-form">
+                                @csrf
+                                <label class="small text-muted font-weight-bold mb-1">Assignment</label>
+                                <select name="target_type" class="form-control form-control-sm mb-2" onchange="window.syncChatAssignmentTarget(this)">
+                                    <option value="sanad_team" {{ $assignmentFormType === 'sanad_team' ? 'selected' : '' }}>Assign to Sanad Team</option>
+                                    <option value="partner_team" {{ $assignmentFormType === 'partner_team' ? 'selected' : '' }}>Assign to Partner Team</option>
+                                </select>
+                                <select name="target_user_id" class="form-control form-control-sm mb-2 chat-target-select">
+                                    <option value="">Select team member</option>
+                                    @foreach($chatTargets as $target)
+                                        <option value="{{ $target['id'] }}" data-team="{{ $target['team'] ?? '' }}" {{ (int) $selectedBooking->chat_owner_user_id === (int) $target['id'] ? 'selected' : '' }}>{{ $target['name'] }} · {{ $target['role'] }}</option>
+                                    @endforeach
+                                </select>
+                                <input name="note" class="form-control form-control-sm mb-2" placeholder="Assignment note (optional)">
+                                <button type="submit" class="btn btn-sm btn-primary w-100">Save Assignment</button>
+                            </form>
+                        </div>
+                    </section>
+                @endif
+            </aside>
+        @endif
     </div>
 
         <style>
             .content-page { min-height: 100vh; }
             .sanad-inbox-shell { height: calc(100vh - 90px); display: grid; grid-template-columns: 340px minmax(0, 1fr) 340px; overflow: hidden !important; background: #f5f7fb; border-top: 1px solid #e5e9f2; }
+            .sanad-inbox-shell.is-customer-chat { grid-template-columns: 340px minmax(0, 1fr); }
             .sanad-inbox-panel, .sanad-context-panel { background: #fff; overflow-y: auto; height: 100%; border-right: 1px solid #e4e9f2; }
             .sanad-context-panel { border-right: 0; border-left: 1px solid #e4e9f2; padding: 14px; }
             .inbox-top { display: flex; justify-content: space-between; gap: 12px; padding: 18px 16px 12px; }
@@ -557,6 +677,7 @@
             .event-card { align-self: center; width: min(620px, 88%); background: #fff; border: 1px solid #e5e9f2; border-left: 3px solid #64748b; border-radius: 10px; padding: 9px 11px; font-size: 13px; }
             .event-card.buzz { border-left-color: #ef4444; }
             .event-card.document { border-left-color: #0ea5e9; }
+            .event-card.ai-handover { border-left-color: #6366f1; background: #f8faff; }
             .document-deadline { display: inline-flex; align-items: center; gap: 3px; color: #b42318; background: #fff1f3; border: 1px solid #ffd5da; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 700; }
             .customer-upload-row.is-disabled { opacity: .48; pointer-events: none; }
             .customer-upload-icon { width: 42px; height: 38px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -590,10 +711,15 @@
             .composer-text-wrapper { flex: 1; min-width: 0; display: flex; flex-direction: column; }
             .chat-composer textarea { width: 100% !important; min-width: 0; resize: none; min-height: 38px; max-height: 120px; border: 1px solid #dce3ee; border-radius: 14px; padding: 8px 12px; font-size: 14px; outline: none; box-sizing: border-box; }
             .chat-composer textarea:focus { border-color: #4f46e5; }
+            .chat-composer textarea:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; border-color: #d8dee8; }
             .send-btn { width: 44px; height: 38px; border-radius: 12px; background: #4f46e5; color: #fff; flex-shrink: 0; border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
             .context-tab h5 { font-weight: 800; margin-bottom: 12px; }
             .context-list { display: grid; gap: 8px; }
             .context-list span, .learning-card { display: flex; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid #e5e9f2; border-radius: 10px; background: #fff; }
+            .chat-control-panel { border-top: 1px solid #edf1f7; padding-top: 12px; }
+            .chat-target-select { display: none; }
+            .composer-ai-warning { display: none; color: #b45309; font-size: 12px; padding: 6px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; }
+            .chat-composer.ai-blocks-message:not(.is-buzz):not(.is-document) .composer-ai-warning { display: block; }
             .compact-form { display: grid; gap: 8px; }
             .compact-form input, .compact-form select, .compact-form textarea { border: 1px solid #dce3ee; border-radius: 8px; padding: 9px 10px; width: 100%; }
             .learning-card { display: grid; margin-bottom: 8px; }
@@ -652,6 +778,11 @@
                     var vaultIdInput = document.getElementById('composer-vault-id');
                     var chatHeader = document.querySelector('.chat-header');
                     var contextList = document.querySelector('.context-list');
+                    var controlPanel = document.querySelector('.chat-control-panel');
+
+                    function isControlPanelActive() {
+                        return !!(controlPanel && document.activeElement && controlPanel.contains(document.activeElement));
+                    }
 
                     function syncComposerMode() {
                         if (!composer || !modeSelect) return;
@@ -668,6 +799,20 @@
                             var isCustom = !documentPreset || documentPreset.value === 'custom';
                             documentName.required = isDocument && isCustom;
                         }
+                        syncAiComposerLock();
+                    }
+
+                    function syncAiComposerLock() {
+                        if (!composer || !composerText) return;
+                        var deliveryMode = modeSelect ? modeSelect.value : 'message';
+                        var lockMessage = composer.dataset.directMessageLockMessage || 'Disable AI first responder to send a direct message.';
+                        var shouldLock = composer.dataset.isCustomer !== '1' && composer.dataset.directMessageLocked === '1' && deliveryMode === 'message';
+                        var normalPlaceholder = deliveryMode === 'buzz'
+                            ? 'Send an urgent Buzz to this request customer...'
+                            : (deliveryMode === 'document' ? 'Reason and instructions for the customer...' : 'Type a message...');
+                        composerText.disabled = shouldLock;
+                        composerText.readOnly = shouldLock;
+                        composerText.placeholder = shouldLock ? lockMessage : normalPlaceholder;
                     }
 
                     function syncDocumentPreset() {
@@ -695,6 +840,9 @@
                         documentPreset.addEventListener('change', syncDocumentPreset);
                         syncDocumentPreset();
                     }
+                    document.querySelectorAll('.chat-assignment-form select[name="target_type"]').forEach(function (select) {
+                        window.syncChatAssignmentTarget(select);
+                    });
                     if (modeSelect) {
                         modeSelect.addEventListener('change', function () {
                             syncComposerMode();
@@ -713,6 +861,17 @@
                         document.querySelectorAll('.conversation-item').forEach(function (item) {
                             item.classList.toggle('active', String(item.dataset.bookingId) === String(bookingId));
                         });
+                    }
+
+                    function showSnapshotError(message) {
+                        if (!feed) return;
+                        var existing = feed.querySelector('.chat-refresh-error');
+                        if (existing) existing.remove();
+                        var error = document.createElement('div');
+                        error.className = 'chat-refresh-error alert alert-warning py-2 px-3 mb-2';
+                        error.style.fontSize = '13px';
+                        error.textContent = message || 'Unable to load this conversation. Please try again.';
+                        feed.prepend(error);
                     }
 
                     function updateDocumentOptions(documents) {
@@ -757,11 +916,22 @@
                                 '<span>Stage <strong>' + escapeHtml(request.stage || '-') + '</strong></span>' +
                                 '<span>Priority <strong>' + escapeHtml(request.priority || 'Normal') + '</strong></span>' +
                                 '<span>SLA <strong>' + escapeHtml(request.sla || '-') + '</strong></span>' +
-                                '<span>Partner <strong>' + escapeHtml(request.partner || '-') + '</strong></span>';
+                                '<span>Partner <strong>' + escapeHtml(request.partner || '-') + '</strong></span>' +
+                                '<span>AI <strong data-ai-state-label>' + escapeHtml(request.ai_first_responder_enabled === false ? 'Manual Takeover' : 'AI First Responder On') + '</strong></span>' +
+                                '<span>Assignment <strong data-chat-assignment-label>' + escapeHtml(request.chat_assignment_label || 'AI First Responder') + '</strong></span>';
                         }
 
                         if (composer && snapshot.composer) {
                             if (snapshot.composer.store_url) composer.action = snapshot.composer.store_url;
+                            composer.dataset.aiEnabled = request.ai_first_responder_enabled === false ? '0' : '1';
+                            composer.dataset.directMessageLocked = snapshot.composer.direct_message_locked ? '1' : '0';
+                            composer.dataset.directMessageLockMessage = snapshot.composer.direct_message_lock_message || '';
+                            composer.classList.toggle('ai-blocks-message', composer.dataset.isCustomer !== '1' && composer.dataset.directMessageLocked === '1');
+                            var composerWarning = composer.querySelector('.composer-ai-warning');
+                            if (composerWarning) {
+                                composerWarning.textContent = (snapshot.composer.direct_message_lock_message || 'Disable AI first responder to send a direct message.') + ' Buzz and document requests remain available.';
+                            }
+                            syncAiComposerLock();
                             if (bookingChanged) {
                                 updateDocumentOptions(snapshot.composer.required_documents || []);
                                 if (modeSelect) {
@@ -776,6 +946,68 @@
                                 if (badge) badge.style.setProperty('display', 'none', 'important');
                             }
                         }
+
+                        if (controlPanel && snapshot.composer) {
+                            controlPanel.dataset.aiToggleUrl = snapshot.composer.ai_toggle_url || '';
+                            controlPanel.dataset.chatAssignmentUrl = snapshot.composer.chat_assignment_url || '';
+                            if (!isControlPanelActive()) {
+                                var toggleForm = controlPanel.querySelector('.ai-toggle-form');
+                                if (toggleForm) {
+                                    var enabledInput = toggleForm.querySelector('[name="enabled"]');
+                                    var toggleBtn = toggleForm.querySelector('button');
+                                    var aiOn = request.ai_first_responder_enabled !== false;
+                                    if (enabledInput) enabledInput.value = aiOn ? '0' : '1';
+                                    if (toggleBtn) {
+                                        toggleBtn.className = 'btn btn-sm ' + (aiOn ? 'btn-outline-danger' : 'btn-outline-success') + ' w-100';
+                                        toggleBtn.innerHTML = '<i class="fas ' + (aiOn ? 'fa-user-shield' : 'fa-robot') + ' mr-1"></i>' + (aiOn ? 'Disable AI / Manual Takeover' : 'Re-enable AI First Responder');
+                                    }
+                                }
+                                var typeSelect = controlPanel.querySelector('.chat-assignment-form select[name="target_type"]');
+                                if (typeSelect) {
+                                    var targetType = request.chat_owner_type || 'sanad_team';
+                                    if (targetType === 'ai' || targetType === 'user') targetType = request.chat_owner_team || 'sanad_team';
+                                    if (!Array.prototype.some.call(typeSelect.options, function (option) { return option.value === targetType; })) {
+                                        targetType = 'sanad_team';
+                                    }
+                                    typeSelect.value = targetType;
+                                }
+                                var targetSelect = controlPanel.querySelector('.chat-target-select');
+                                if (targetSelect) {
+                                    var selectedUserId = String(request.chat_owner_user_id || '');
+                                    targetSelect.innerHTML = '<option value="">Select team member</option>';
+                                    (snapshot.composer.assignable_chat_targets || []).forEach(function (target) {
+                                    var option = document.createElement('option');
+                                    option.value = String(target.id || '');
+                                    option.textContent = (target.name || 'Team member') + ' · ' + (target.role || 'Staff');
+                                    option.dataset.team = target.team || '';
+                                    option.selected = selectedUserId && selectedUserId === option.value;
+                                    targetSelect.appendChild(option);
+                                });
+                                }
+                                if (typeSelect) {
+                                    window.syncChatAssignmentTarget(typeSelect);
+                                }
+                            }
+                        }
+                    }
+
+                    function handoverPromptHtml(item) {
+                        var status = item.handover_status || 'handover_required';
+                        var html = '<article class="event-card ai-handover" data-event-type="ai-handover" data-message-id="' + escapeHtml(item.id || '') + '">' +
+                            '<div class="event-head"><strong><i class="fas fa-robot text-primary mr-1"></i> Sanad AI</strong><span>' + escapeHtml(status.replace(/_/g, ' ')) + '</span></div>' +
+                            '<p>' + escapeHtml(item.message || "I don't have enough information on this. I can connect you with a Sanad agent if you want.") + '</p>';
+                        if (composer && composer.dataset.isCustomer === '1' && status === 'handover_required' && item.ai_interaction_id) {
+                            html += '<div class="action-row d-flex gap-2">' +
+                                '<form class="ai-handover-form" data-interaction-id="' + item.ai_interaction_id + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="decision" value="yes"><button type="submit" class="btn btn-sm btn-primary">Yes</button></form>' +
+                                '<form class="ai-handover-form" data-interaction-id="' + item.ai_interaction_id + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="decision" value="no"><button type="submit" class="btn btn-sm btn-outline-secondary">No</button></form>' +
+                                '</div>';
+                        } else if (status === 'handover_accepted') {
+                            html += '<small class="text-muted">Sanad team has been notified.</small>';
+                        } else if (status === 'handover_declined') {
+                            html += '<small class="text-muted">No handover requested.</small>';
+                        }
+                        html += '</article>';
+                        return html;
                     }
 
                     function render(snapshot) {
@@ -792,7 +1024,11 @@
                                     } else {
                                         html += '<small>No reply yet.</small>';
                                     }
-                                    html += '</div></article>';
+                                    html += '</div>';
+                                    if (item.can_accept && item.accept_url) {
+                                        html += '<form class="buzz-accept-form mt-2" action="' + escapeHtml(item.accept_url) + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check mr-1"></i> Accept</button></form>';
+                                    }
+                                    html += '</article>';
                                 } else if (item.type === 'document') {
                                     html += '<article class="event-card document" data-event-type="document"><div class="event-head"><strong>Document Request (From ' + escapeHtml(item.requested_from) + ')</strong><span>' + escapeHtml(item.status) + '</span></div><p><b>' + escapeHtml(item.document_name) + '</b><br>' + escapeHtml(item.instructions) + '</p>';
                                     if (item.due_at) {
@@ -803,18 +1039,26 @@
                                     }
                                     html += '</article>';
                                 } else if (item.type === 'message') {
-                                    var side = ['user', 'customer'].indexOf(item.sender_role) >= 0 ? 'customer' : 'team';
-                                    html += '<article class="message-row ' + side + '" data-message-id="' + item.id + '"><div class="message-bubble"><div class="message-meta"><strong>' + escapeHtml(item.sender) + '</strong><span>' + escapeHtml(item.created_at) + '</span></div><p>' + escapeHtml(item.message) + '</p>';
-                                    if (item.attachment_url) {
-                                        html += '<div class="mt-2"><a href="' + item.attachment_url + '" target="_blank" class="btn btn-sm btn-light border text-primary"><i class="fas fa-paperclip mr-1"></i> ' + escapeHtml(item.attachment_name || 'Download Attachment') + '</a></div>';
+                                    if (item.message_type === 'ai_handover_prompt') {
+                                        html += handoverPromptHtml(item);
+                                    } else {
+                                        var side = ['user', 'customer'].indexOf(item.sender_role) >= 0 ? 'customer' : 'team';
+                                        html += '<article class="message-row ' + side + (item.message_type === 'system_note' ? ' system' : '') + '" data-message-id="' + item.id + '"><div class="message-bubble"><div class="message-meta"><strong>' + escapeHtml(item.sender) + '</strong><span>' + escapeHtml(item.created_at) + '</span></div><p>' + escapeHtml(item.message) + '</p>';
+                                        if (item.attachment_url) {
+                                            html += '<div class="mt-2"><a href="' + item.attachment_url + '" target="_blank" class="btn btn-sm btn-light border text-primary"><i class="fas fa-paperclip mr-1"></i> ' + escapeHtml(item.attachment_name || 'Download Attachment') + '</a></div>';
+                                        }
+                                        html += '</div></article>';
                                     }
-                                    html += '</div></article>';
                                 }
                             });
                         } else {
                             if (snapshot.buzz_alerts && snapshot.buzz_alerts.length) {
                                 snapshot.buzz_alerts.forEach(function (buzz) {
-                                    html += '<article class="event-card buzz" data-event-type="buzz"><div class="event-head"><strong>' + escapeHtml(buzz.priority) + ' Buzz</strong><span>' + escapeHtml(buzz.recipient_role) + ' · ' + escapeHtml(buzz.status) + '</span></div><p>' + escapeHtml(buzz.message) + '</p></article>';
+                                    html += '<article class="event-card buzz" data-event-type="buzz"><div class="event-head"><strong>' + escapeHtml(buzz.priority) + ' Buzz</strong><span>' + escapeHtml(buzz.recipient_role) + ' · ' + escapeHtml(buzz.status) + '</span></div><p>' + escapeHtml(buzz.message) + '</p>';
+                                    if (buzz.can_accept && buzz.accept_url) {
+                                        html += '<form class="buzz-accept-form mt-2" action="' + escapeHtml(buzz.accept_url) + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check mr-1"></i> Accept</button></form>';
+                                    }
+                                    html += '</article>';
                                 });
                             }
                             if (snapshot.documents && snapshot.documents.length) {
@@ -828,8 +1072,12 @@
                             }
                             if (snapshot.messages && snapshot.messages.length) {
                                 snapshot.messages.forEach(function (message) {
-                                    var side = ['user', 'customer'].indexOf(message.sender_role) >= 0 ? 'customer' : 'team';
-                                    html += '<article class="message-row ' + side + '" data-message-id="' + message.id + '"><div class="message-bubble"><div class="message-meta"><strong>' + escapeHtml(message.sender) + '</strong><span>' + escapeHtml(message.created_at) + '</span></div><p>' + escapeHtml(message.message) + '</p></div></article>';
+                                    if (message.message_type === 'ai_handover_prompt') {
+                                        html += handoverPromptHtml(message);
+                                    } else {
+                                        var side = ['user', 'customer'].indexOf(message.sender_role) >= 0 ? 'customer' : 'team';
+                                        html += '<article class="message-row ' + side + '" data-message-id="' + message.id + '"><div class="message-bubble"><div class="message-meta"><strong>' + escapeHtml(message.sender) + '</strong><span>' + escapeHtml(message.created_at) + '</span></div><p>' + escapeHtml(message.message) + '</p></div></article>';
+                                    }
                                 });
                             }
                         }
@@ -870,23 +1118,90 @@
                         return url.toString();
                     }
 
-                    function refreshConversation(bookingId) {
+                    function refreshConversation(bookingId, showError) {
                         bookingId = bookingId || shell.dataset.bookingId;
                         if (!shell || !bookingId) return Promise.resolve(null);
                         var url = snapshotUrl(bookingId);
                         return fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-                            .then(function (response) { return response.ok ? response.json() : null; })
-                            .then(function (snapshot) { if (snapshot) render(snapshot); })
-                            .catch(function () {});
+                            .then(function (response) {
+                                if (!response.ok) throw new Error('Snapshot request failed with status ' + response.status);
+                                return response.json();
+                            })
+                            .then(function (snapshot) {
+                                if (!snapshot || !snapshot.status) throw new Error('Snapshot response was not usable');
+                                render(snapshot);
+                                return snapshot;
+                            })
+                            .catch(function (error) {
+                                if (showError) showSnapshotError(error.message);
+                                throw error;
+                            });
+                    }
+
+                    function resetComposerAttachments() {
+                        if (fileInput) fileInput.value = '';
+                        if (vaultIdInput) vaultIdInput.value = '';
+                        var badge = document.getElementById('composer-attachment-badge');
+                        if (badge) badge.style.setProperty('display', 'none', 'important');
+                    }
+
+                    function appendSentMessage(message) {
+                        if (!feed || !message || !message.id) return;
+                        if (feed.querySelector('[data-message-id="msg-' + message.id + '"], [data-message-id="' + message.id + '"]')) return;
+
+                        var emptyChat = feed.querySelector('.empty-chat');
+                        if (emptyChat) emptyChat.remove();
+
+                        var side = ['user', 'customer'].indexOf(message.sender_role) >= 0 ? 'customer' : 'team';
+                        var article = document.createElement('article');
+                        article.className = 'message-row ' + side;
+                        article.dataset.messageId = 'msg-' + message.id;
+
+                        var html = '<div class="message-bubble">' +
+                            '<div class="message-meta"><strong>' + escapeHtml(message.sender_name || message.sender || 'Customer') + '</strong><span>' + escapeHtml(message.created_at || '') + '</span></div>';
+
+                        if (message.message) {
+                            html += '<p>' + escapeHtml(message.message) + '</p>';
+                        }
+                        if (message.attachment_url) {
+                            html += '<div class="mt-2"><a href="' + escapeHtml(message.attachment_url) + '" target="_blank" class="btn btn-sm btn-light border text-primary"><i class="fas fa-paperclip mr-1"></i> ' + escapeHtml(message.attachment_name || 'Download Attachment') + '</a></div>';
+                        }
+                        if (message.ai_response_pending) {
+                            html += '<div class="message-links"><span>Waiting for Sanad AI...</span></div>';
+                        }
+                        html += '</div>';
+
+                        article.innerHTML = html;
+                        feed.appendChild(article);
+                        feed.scrollTop = feed.scrollHeight;
+                    }
+
+                    function pollForAiReply(attemptsLeft) {
+                        attemptsLeft = attemptsLeft || 8;
+                        if (attemptsLeft <= 0) return;
+
+                        window.setTimeout(function () {
+                            refreshConversation(shell.dataset.bookingId, false)
+                                .catch(function () {})
+                                .finally(function () {
+                                    pollForAiReply(attemptsLeft - 1);
+                                });
+                        }, 900);
                     }
 
                     function loadConversation(bookingId, href, pushState) {
                         if (!bookingId) return;
-                        setActiveConversation(bookingId);
-                        refreshConversation(bookingId);
-                        if (pushState && href) {
-                            window.history.pushState({bookingId: bookingId}, '', href);
-                        }
+                        var previousBookingId = shell.dataset.bookingId;
+                        return refreshConversation(bookingId, true)
+                            .then(function () {
+                                setActiveConversation(bookingId);
+                                if (pushState && href) {
+                                    window.history.pushState({bookingId: bookingId}, '', href);
+                                }
+                            })
+                            .catch(function () {
+                                setActiveConversation(previousBookingId);
+                            });
                     }
 
                     if (composer) {
@@ -899,8 +1214,13 @@
                             var docNameVal = documentName ? documentName.value.trim() : '';
                             var vaultIdVal = vaultIdInput ? vaultIdInput.value.trim() : '';
                             var hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+                            var deliveryMode = modeSelect ? modeSelect.value : 'message';
 
                             if (!msgText && !docNameVal && !vaultIdVal && !hasFile) return;
+                            if (composer.dataset.isCustomer !== '1' && composer.dataset.directMessageLocked === '1' && deliveryMode === 'message') {
+                                showSnapshotError(composer.dataset.directMessageLockMessage || 'Disable AI first responder to send a direct message.');
+                                return;
+                            }
 
                             var sendBtn = composer.querySelector('.send-btn');
                             var origBtnHtml = sendBtn ? sendBtn.innerHTML : '';
@@ -908,8 +1228,6 @@
                                 sendBtn.disabled = true;
                                 sendBtn.innerHTML = '<span class="sanad-btn-spinner" style="width:12px;height:12px;border-width:2px;border-top-color:#fff;display:inline-block;border-radius:50%;animation:sanadBtnSpin 0.7s linear infinite;"></span>';
                             }
-
-                            if (composerText) composerText.value = '';
 
                             var formData = new FormData(composer);
 
@@ -921,20 +1239,37 @@
                                     'Accept': 'application/json'
                                 }
                             })
-                            .then(function (res) { return res.json(); })
-                            .then(function (data) {
-                                if (sendBtn) {
-                                    sendBtn.disabled = false;
-                                    sendBtn.innerHTML = origBtnHtml;
-                                }
-                                refreshConversation();
+                            .then(function (res) {
+                                return res.json().catch(function () { return {}; }).then(function (data) {
+                                    if (!res.ok || data.status === false) {
+                                        var firstError = data.errors ? Object.values(data.errors)[0] : null;
+                                        throw new Error((Array.isArray(firstError) ? firstError[0] : firstError) || data.message || 'Message send failed.');
+                                    }
+                                    return data;
+                                });
                             })
+	                            .then(function (data) {
+	                                if (sendBtn) {
+	                                    sendBtn.disabled = false;
+	                                    sendBtn.innerHTML = origBtnHtml;
+	                                }
+	                                if (composerText) composerText.value = '';
+	                                resetComposerAttachments();
+                                    if (data.chat_message) {
+                                        appendSentMessage(data.chat_message);
+                                    }
+	                                refreshConversation(shell.dataset.bookingId, true).catch(function () {});
+                                    if (data.chat_message && data.chat_message.ai_response_pending) {
+                                        pollForAiReply(10);
+                                    }
+	                            })
                             .catch(function (err) {
                                 if (sendBtn) {
                                     sendBtn.disabled = false;
                                     sendBtn.innerHTML = origBtnHtml;
                                 }
-                                refreshConversation();
+                                showSnapshotError(err.message || 'Message send failed.');
+                                refreshConversation(shell.dataset.bookingId, true).catch(function () {});
                             });
                         };
 
@@ -948,9 +1283,71 @@
                         }
                     }
 
-                    document.addEventListener('submit', function (e) {
-                        var form = e.target;
-                        if (form && form.action && (form.action.indexOf('/sanad/ai/interactions/') !== -1 || form.action.indexOf('/review') !== -1)) {
+	                    document.addEventListener('submit', function (e) {
+	                        var form = e.target;
+	                        if (form && form.classList && form.classList.contains('ai-handover-form')) {
+	                            e.preventDefault();
+	                            var interactionId = form.dataset.interactionId;
+	                            var formData = new FormData(form);
+	                            form.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+	                            fetch('/customer-dashboard/ai/interactions/' + interactionId + '/handover', {
+	                                method: 'POST',
+	                                body: formData,
+	                                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+	                            }).then(function (res) { return res.json(); })
+	                                .then(function () { refreshConversation(shell.dataset.bookingId, true).catch(function () {}); })
+	                                .catch(function () { refreshConversation(shell.dataset.bookingId, true).catch(function () {}); });
+	                            return;
+	                        }
+	                        if (form && form.classList && form.classList.contains('ai-toggle-form')) {
+	                            e.preventDefault();
+	                            if (!controlPanel || !controlPanel.dataset.aiToggleUrl) return;
+	                            fetch(controlPanel.dataset.aiToggleUrl, {
+	                                method: 'POST',
+	                                body: new FormData(form),
+	                                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+	                            }).then(function (res) { return res.json(); })
+	                                .then(function () { refreshConversation(shell.dataset.bookingId, true).catch(function () {}); })
+	                                .catch(function () { refreshConversation(shell.dataset.bookingId, true).catch(function () {}); });
+	                            return;
+	                        }
+	                        if (form && form.classList && form.classList.contains('buzz-accept-form')) {
+	                            e.preventDefault();
+	                            form.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+	                            fetch(form.action, {
+	                                method: 'POST',
+	                                body: new FormData(form),
+	                                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+	                            }).then(function (res) {
+	                                if (!res.ok) throw new Error('Accept failed with status ' + res.status);
+	                                return res.json().catch(function () { return {}; });
+	                            }).then(function () {
+	                                refreshConversation(shell.dataset.bookingId, true).catch(function () {});
+	                            }).catch(function (error) {
+	                                showSnapshotError(error.message || 'Accept failed.');
+	                                refreshConversation(shell.dataset.bookingId, false).catch(function () {});
+	                            });
+	                            return;
+	                        }
+	                        if (form && form.classList && form.classList.contains('chat-assignment-form')) {
+	                            e.preventDefault();
+	                            if (!controlPanel || !controlPanel.dataset.chatAssignmentUrl) return;
+                            fetch(controlPanel.dataset.chatAssignmentUrl, {
+                                method: 'POST',
+                                body: new FormData(form),
+                                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+                            }).then(function (res) {
+                                if (!res.ok) throw new Error('Assignment update failed with status ' + res.status);
+                                return res.json();
+                            })
+                                .then(function () { refreshConversation(shell.dataset.bookingId, true).catch(function () {}); })
+                                .catch(function (error) {
+                                    showSnapshotError(error.message || 'Assignment update failed.');
+                                    refreshConversation(shell.dataset.bookingId, false).catch(function () {});
+                                });
+                            return;
+                        }
+	                        if (form && form.action && (form.action.indexOf('/sanad/ai/interactions/') !== -1 || form.action.indexOf('/review') !== -1)) {
                             e.preventDefault();
                             var submitter = e.submitter;
                             var formData = new FormData(form);
@@ -968,10 +1365,10 @@
                             })
                             .then(function (res) { return res.json(); })
                             .then(function () {
-                                refreshConversation();
+                                refreshConversation(shell.dataset.bookingId).catch(function () {});
                             })
                             .catch(function () {
-                                refreshConversation();
+                                refreshConversation(shell.dataset.bookingId).catch(function () {});
                             });
                         }
                     });
@@ -991,11 +1388,16 @@
                     });
 
                     if (feed) feed.scrollTop = feed.scrollHeight;
-                    setInterval(refreshConversation, 2000);
+                    setInterval(function () {
+                        if (isControlPanelActive()) return;
+                        refreshConversation(shell.dataset.bookingId).catch(function () {});
+                    }, 2000);
 
                     if (window.Echo && shell.dataset.bookingId) {
                         window.Echo.private('sanad.request.' + shell.dataset.bookingId)
-                            .listen('.sanad.conversation.updated', refreshConversation);
+                            .listen('.sanad.conversation.updated', function () {
+                                refreshConversation(shell.dataset.bookingId).catch(function () {});
+                            });
                     }
                 }
 

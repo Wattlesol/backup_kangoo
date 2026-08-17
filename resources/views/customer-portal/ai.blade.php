@@ -70,6 +70,26 @@
                             <span class="sanad-badge {{ $item->requires_escalation ? 'warn' : 'ok' }}">{{ $item->requires_escalation ? 'Human Review' : 'Answered' }}</span>
                             <small class="sanad-muted">{{ round(($item->confidence ?? 0) * 100) }}% confidence · {{ optional($item->created_at)->format('Y-m-d H:i') }}</small>
                         </div>
+                        @if($item->status === 'handover_required')
+                            <div class="mt-2 d-flex gap-2">
+                                <form method="POST" action="{{ route('customer-portal.ai.handover', $item->id) }}">
+                                    @csrf
+                                    <input type="hidden" name="decision" value="yes">
+                                    <button class="btn btn-sm btn-primary" type="submit">Yes</button>
+                                </form>
+                                <form method="POST" action="{{ route('customer-portal.ai.handover', $item->id) }}">
+                                    @csrf
+                                    <input type="hidden" name="decision" value="no">
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit">No</button>
+                                </form>
+                            </div>
+                        @elseif($item->status === 'handover_accepted')
+                            <div class="sanad-muted mt-2">Sanad team has been notified.</div>
+                        @elseif($item->status === 'handover_declined')
+                            <div class="sanad-muted mt-2">No handover requested.</div>
+                        @elseif($item->status === 'manual_takeover')
+                            <div class="sanad-muted mt-2">A Sanad agent is handling this request now.</div>
+                        @endif
                     </div>
                 @empty
                     <div class="sanad-ai-message agent">Ask me about a service, required documents, payment status, or what is currently happening on one of your requests.</div>

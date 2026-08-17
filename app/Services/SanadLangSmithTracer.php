@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 class SanadLangSmithTracer
 {
-    public function trace(string $name, array $inputs, array $outputs = [], array $metadata = []): ?string
+    public function trace(string $name, array $inputs, array $outputs = [], array $metadata = [], ?string $projectName = null): ?string
     {
         if (!config('sanad.ai.langsmith.enabled') || !config('sanad.ai.langsmith.api_key')) {
             return null;
@@ -25,7 +25,7 @@ class SanadLangSmithTracer
                     'id' => $runId,
                     'name' => $name,
                     'run_type' => 'chain',
-                    'project_name' => config('sanad.ai.langsmith.project', 'sanad-rag'),
+                    'project_name' => $projectName ?: config('sanad.ai.langsmith.project', 'sanad-ai'),
                     'inputs' => $inputs,
                     'outputs' => $outputs,
                     'extra' => ['metadata' => $metadata],

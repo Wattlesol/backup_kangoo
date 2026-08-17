@@ -168,6 +168,8 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('sanad/requests/{id}/buzz', [SanadWebController::class, 'storeBuzz'])->name('sanad.requests.buzz.store');
     Route::post('sanad/requests/{id}/buzz/{alertId}/acknowledge', [SanadWebController::class, 'acknowledgeBuzz'])->name('sanad.requests.buzz.acknowledge');
     Route::post('sanad/requests/{id}/chat-messages', [SanadWebController::class, 'storeChatMessage'])->name('sanad.requests.chat.store');
+    Route::post('sanad/requests/{id}/ai-first-responder', [SanadWebController::class, 'toggleAiFirstResponder'])->name('sanad.requests.ai-first-responder');
+    Route::post('sanad/requests/{id}/chat-assignment', [SanadWebController::class, 'assignChat'])->name('sanad.requests.chat-assignment');
     Route::post('sanad/requests/{id}/chat-threads/{threadId}/read', [SanadWebController::class, 'markChatRead'])->name('sanad.requests.chat.read');
     Route::post('sanad/requests/{id}/document-requests', [SanadWebController::class, 'createDocumentRequest'])->name('sanad.requests.document-requests.store');
     Route::post('sanad/requests/{id}/document-requests/{documentRequestId}/upload', [SanadWebController::class, 'uploadDocumentRequest'])->name('sanad.requests.document-requests.upload');
@@ -187,14 +189,21 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('requests/{id}/buzz/{buzzId}/reply', [SanadCustomerPortalController::class, 'replyToBuzz'])->name('requests.buzz.reply');
         Route::get('document-vault', [SanadCustomerPortalController::class, 'vault'])->name('vault');
         Route::post('document-vault', [SanadCustomerPortalController::class, 'storeVaultDocument'])->name('vault.store');
+        Route::post('document-vault/analyze', [SanadCustomerPortalController::class, 'analyzeVaultDocument'])->name('vault.analyze');
+        Route::post('document-vault/confirm', [SanadCustomerPortalController::class, 'confirmVaultDocument'])->name('vault.confirm');
+        Route::post('document-vault/cancel-upload', [SanadCustomerPortalController::class, 'cancelVaultDocumentUpload'])->name('vault.cancel-upload');
+        Route::post('document-vault/{id}', [SanadCustomerPortalController::class, 'updateVaultDocument'])->name('vault.update');
+        Route::post('document-vault/{id}/reminder', [SanadCustomerPortalController::class, 'updateVaultReminder'])->name('vault.reminder.update');
         Route::post('document-vault/{id}/delete', [SanadCustomerPortalController::class, 'deleteVaultDocument'])->name('vault.delete');
         Route::get('messages', [SanadCustomerPortalController::class, 'messages'])->name('messages');
+        Route::get('messages/snapshot', [SanadCustomerPortalController::class, 'messagesSnapshot'])->name('messages.snapshot');
         Route::get('notifications', [SanadCustomerPortalController::class, 'notifications'])->name('notifications');
         Route::get('billing', [SanadCustomerPortalController::class, 'billing'])->name('billing');
         Route::get('support', [SanadCustomerPortalController::class, 'support'])->name('support');
         Route::post('support', [SanadCustomerPortalController::class, 'storeComplaint'])->name('support.store');
         Route::get('ai', [SanadCustomerPortalController::class, 'ai'])->name('ai');
         Route::post('ai', [SanadCustomerPortalController::class, 'askAi'])->name('ai.ask');
+        Route::post('ai/interactions/{id}/handover', [SanadCustomerPortalController::class, 'handleAiHandover'])->name('ai.handover');
         Route::get('profile', [SanadCustomerPortalController::class, 'profile'])->name('profile');
     });
 

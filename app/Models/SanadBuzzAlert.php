@@ -17,6 +17,8 @@ class SanadBuzzAlert extends Model
         'priority',
         'status',
         'message',
+        'action_type',
+        'action_status',
         'reply_count',
         'last_reply_at',
         'acknowledged_at',

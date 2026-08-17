@@ -19,11 +19,15 @@ use App\Models\SanadDocumentRequest;
 use App\Models\SanadDocumentVaultItem;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\SanadDocumentOcrAgent;
+use App\Services\SanadAiFirstResponderService;
 use App\Services\SanadAiRagService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SanadCustomerPortalController extends Controller
@@ -149,7 +153,7 @@ class SanadCustomerPortalController extends Controller
                 'required' => true,
                 'source' => 'request',
                 'verification_status' => 'pending',
-                'visible_to' => ['user', 'customer', 'admin', 'employee'],
+                'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
                 'file_name' => $file->getClientOriginalName(),
             ]);
             $document->addMedia($file)->toMediaCollection('sanad_document');
@@ -170,7 +174,7 @@ class SanadCustomerPortalController extends Controller
                 'required' => false,
                 'source' => 'request',
                 'verification_status' => 'pending',
-                'visible_to' => ['user', 'customer', 'admin', 'employee'],
+                'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
                 'file_name' => $vault->file_name,
             ]);
         }
@@ -227,7 +231,7 @@ class SanadCustomerPortalController extends Controller
             'required' => false,
             'source' => 'request',
             'verification_status' => 'pending',
-            'visible_to' => ['user', 'customer', 'admin', 'employee'],
+            'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
             'file_name' => $request->file('file')->getClientOriginalName(),
         ]);
         $document->addMedia($request->file('file'))->toMediaCollection('sanad_document');
@@ -260,7 +264,7 @@ class SanadCustomerPortalController extends Controller
                 'required' => $documentRequest->required,
                 'source' => 'request',
                 'verification_status' => 'pending',
-                'visible_to' => ['user', 'customer', 'admin', 'employee'],
+                'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
                 'file_name' => $vault->file_name,
             ]);
             $media = $vault->getFirstMedia('sanad_document');
@@ -278,7 +282,7 @@ class SanadCustomerPortalController extends Controller
                 'required' => $documentRequest->required,
                 'source' => 'request',
                 'verification_status' => 'pending',
-                'visible_to' => ['user', 'customer', 'admin', 'employee'],
+                'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
                 'file_name' => $request->file('file')->getClientOriginalName(),
             ]);
             $document->addMedia($request->file('file'))->toMediaCollection('sanad_document');
@@ -303,25 +307,266 @@ class SanadCustomerPortalController extends Controller
 
     public function storeVaultDocument(Request $request)
     {
-        $data = $request->validate([
-            'document_type' => ['required', 'string', 'max:190'],
-            'file' => ['required', 'file', 'max:10240'],
+        return $this->confirmVaultDocument($request);
+    }
+
+    public function analyzeVaultDocument(Request $request, SanadDocumentOcrAgent $ocrAgent)
+    {
+        $data = $request->validate($this->vaultDocumentRules(true), $this->vaultDocumentMessages());
+
+        $file = $request->file('file');
+        $token = (string) Str::uuid();
+        $tempPath = $file->storeAs(
+            'sanad-vault-temp/' . Auth::id(),
+            $token . '.' . strtolower($file->getClientOriginalExtension())
+        );
+
+        $analysis = $ocrAgent->analyzeFile(
+            $data['document_type'],
+            $file->getClientOriginalName(),
+            Storage::path($tempPath),
+            $file->getMimeType()
+        );
+
+        $expiryDate = $analysis['expiry_date'] ?? null;
+        $reminderDate = $analysis['expiry_reminder_at'] ?? null;
+        $mode = $expiryDate ? 'expiry_detected' : 'manual_reminder';
+
+        Cache::put($this->vaultUploadCacheKey($token), [
+            'owner_id' => Auth::id(),
+            'document_type' => $data['document_type'],
+            'file_name' => $file->getClientOriginalName(),
+            'path' => $tempPath,
+            'mime_type' => $file->getMimeType(),
+            'size' => $file->getSize(),
+            'analysis' => $analysis,
+        ], now()->addMinutes(30));
+
+        return response()->json([
+            'status' => true,
+            'mode' => $mode,
+            'token' => $token,
+            'document_type' => $data['document_type'],
+            'file_name' => $file->getClientOriginalName(),
+            'expiry_date' => $expiryDate,
+            'expiry_reminder_at' => $reminderDate,
+            'ocr_status' => $analysis['ocr_status'],
+            'ocr_confidence' => $analysis['ocr_confidence'],
+            'message' => $expiryDate
+                ? 'Sanad AI found an expiry date. Please confirm before saving.'
+                : ($analysis['message'] ?: 'Sanad AI could not find an expiry date. Please set a follow-up reminder before saving.'),
         ]);
+    }
+
+    public function confirmVaultDocument(Request $request)
+    {
+        $data = $request->validate([
+            'upload_token' => ['required', 'string'],
+            'expiry_date' => ['nullable', 'date'],
+            'expiry_reminder_at' => ['required', 'date'],
+            'expiry_reminder_enabled' => ['nullable', 'boolean'],
+        ]);
+
+        $cacheKey = $this->vaultUploadCacheKey($data['upload_token']);
+        $pendingUpload = Cache::pull($cacheKey);
+
+        if (!$pendingUpload || (int) ($pendingUpload['owner_id'] ?? 0) !== Auth::id()) {
+            return $this->vaultConfirmError($request, 'This upload session expired. Please attach the document again.');
+        }
+
+        if (empty($pendingUpload['path']) || !Storage::exists($pendingUpload['path'])) {
+            return $this->vaultConfirmError($request, 'The temporary upload could not be found. Please attach the document again.');
+        }
 
         $document = SanadDocumentVaultItem::create([
             'owner_id' => Auth::id(),
             'uploaded_by' => Auth::id(),
-            'document_type' => $data['document_type'],
-            'document_key' => Str::slug($data['document_type'], '_'),
+            'document_type' => $pendingUpload['document_type'],
+            'document_key' => Str::slug($pendingUpload['document_type'], '_'),
             'source' => 'vault',
             'verification_status' => 'stored',
             'visible_to' => ['user', 'customer'],
-            'file_name' => $request->file('file')->getClientOriginalName(),
+            'file_name' => $pendingUpload['file_name'],
+            'ocr_status' => data_get($pendingUpload, 'analysis.ocr_status', 'needs_review'),
+            'ocr_confidence' => data_get($pendingUpload, 'analysis.ocr_confidence'),
+            'ocr_metadata' => data_get($pendingUpload, 'analysis.metadata'),
+            'ocr_processed_at' => now(),
         ]);
-        $document->addMedia($request->file('file'))->toMediaCollection('sanad_document');
+        $document->addMediaFromDisk($pendingUpload['path'])->toMediaCollection('sanad_document');
+        Storage::delete($pendingUpload['path']);
+        $this->applyVaultExpiry($document, $data['expiry_date'] ?? null, $data['expiry_reminder_at'], $request->boolean('expiry_reminder_enabled', true));
+
         $this->audit('customer_vault_document_uploaded', $document);
 
-        return back()->withSuccess('Vault document saved.');
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Vault document saved.',
+                'redirect_url' => route('customer-portal.vault'),
+            ]);
+        }
+
+        return redirect()->route('customer-portal.vault')->withSuccess('Vault document saved.');
+    }
+
+    public function cancelVaultDocumentUpload(Request $request)
+    {
+        $data = $request->validate([
+            'upload_token' => ['required', 'string'],
+        ]);
+
+        $pendingUpload = Cache::pull($this->vaultUploadCacheKey($data['upload_token']));
+        if ($pendingUpload && (int) ($pendingUpload['owner_id'] ?? 0) === Auth::id() && !empty($pendingUpload['path'])) {
+            Storage::delete($pendingUpload['path']);
+        }
+
+        return response()->json(['status' => true]);
+    }
+
+    public function updateVaultReminder(Request $request, $id)
+    {
+        $document = SanadDocumentVaultItem::where('owner_id', Auth::id())
+            ->where('source', 'vault')
+            ->findOrFail($id);
+
+        $data = $request->validate([
+            'expiry_date' => ['nullable', 'date'],
+            'expiry_reminder_at' => ['nullable', 'date'],
+            'expiry_reminder_enabled' => ['nullable', 'boolean'],
+        ]);
+
+        $expiryDate = $data['expiry_date'] ?? null;
+        $reminderDate = $data['expiry_reminder_at'] ?? null;
+
+        $this->applyVaultExpiry($document, $expiryDate, $reminderDate, $request->boolean('expiry_reminder_enabled'));
+
+        $this->audit('customer_vault_document_reminder_updated', $document);
+
+        return back()->withSuccess('Document reminder saved.');
+    }
+
+    public function updateVaultDocument(Request $request, $id, SanadDocumentOcrAgent $ocrAgent)
+    {
+        $document = SanadDocumentVaultItem::where('owner_id', Auth::id())
+            ->where('source', 'vault')
+            ->findOrFail($id);
+
+        $data = $request->validate($this->vaultDocumentRules(false), $this->vaultDocumentMessages());
+
+        $expiryDate = $data['expiry_date'] ?? null;
+        $reminderDate = $data['expiry_reminder_at'] ?? null;
+
+        if ($expiryDate && !$reminderDate) {
+            $reminderDate = \Carbon\Carbon::parse($expiryDate)->subMonthNoOverflow()->toDateString();
+        }
+
+        $fileReplaced = $request->hasFile('file');
+        $document->forceFill([
+            'document_type' => $data['document_type'],
+            'document_key' => Str::slug($data['document_type'], '_'),
+            'expiry_date' => $expiryDate,
+            'expiry_reminder_at' => $reminderDate,
+            'expiry_reminder_enabled' => $request->boolean('expiry_reminder_enabled'),
+            'expiry_reminder_sent_at' => null,
+        ]);
+
+        if ($fileReplaced) {
+            $document->forceFill([
+                'file_name' => $request->file('file')->getClientOriginalName(),
+                'ocr_status' => 'pending',
+                'ocr_confidence' => null,
+                'ocr_metadata' => null,
+                'ocr_processed_at' => null,
+            ]);
+        }
+
+        $document->save();
+
+        if ($fileReplaced) {
+            $document->clearMediaCollection('sanad_document');
+            $document->addMedia($request->file('file'))->toMediaCollection('sanad_document');
+
+            try {
+                $ocrAgent->analyze($document->fresh());
+            } catch (\Throwable $exception) {
+                \Log::warning('Sanad document OCR agent failed during vault document update', [
+                    'document_id' => $document->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if (!$document->fresh()->expiry_date && $expiryDate) {
+            $this->applyVaultExpiry($document, $expiryDate, $reminderDate, $request->boolean('expiry_reminder_enabled'));
+        }
+
+        if (!$document->fresh()->expiry_date) {
+            return back()
+                ->withInput($request->except(['file']))
+                ->withErrors([
+                    'file' => 'Sanad AI could not detect an expiry date. Please upload a clearer replacement where the expiry date is visible, or enter the expiry date manually.',
+                ]);
+        }
+
+        $this->audit('customer_vault_document_updated', $document);
+
+        return back()->withSuccess('Document updated.');
+    }
+
+    private function vaultDocumentRules(bool $fileRequired): array
+    {
+        return [
+            'document_type' => ['required', 'string', 'max:190'],
+            'file' => [
+                $fileRequired ? 'required' : 'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,pdf,doc,dox,docx,docs',
+                'max:20480',
+            ],
+            'expiry_date' => ['nullable', 'date'],
+            'expiry_reminder_at' => ['nullable', 'date'],
+            'expiry_reminder_enabled' => ['nullable', 'boolean'],
+        ];
+    }
+
+    private function applyVaultExpiry(SanadDocumentVaultItem $document, ?string $expiryDate, ?string $reminderDate, bool $reminderEnabled): void
+    {
+        if ($expiryDate && !$reminderDate) {
+            $reminderDate = \Carbon\Carbon::parse($expiryDate)->subMonthNoOverflow()->toDateString();
+        }
+
+        $document->forceFill([
+            'expiry_date' => $expiryDate,
+            'expiry_reminder_at' => $reminderDate,
+            'expiry_reminder_enabled' => $reminderEnabled,
+            'expiry_reminder_sent_at' => null,
+        ])->save();
+    }
+
+    private function vaultDocumentMessages(): array
+    {
+        return [
+            'file.mimes' => 'Please upload a supported document: JPG, JPEG, PNG, PDF, DOC, DOX, DOCX, or DOCS.',
+            'file.max' => 'Please upload a document up to 20 MB.',
+            'file.uploaded' => 'The file could not be uploaded. Please use JPG, JPEG, PNG, PDF, DOC, DOX, DOCX, or DOCS up to 20 MB.',
+        ];
+    }
+
+    private function vaultUploadCacheKey(string $token): string
+    {
+        return 'sanad:vault-upload:' . Auth::id() . ':' . $token;
+    }
+
+    private function vaultConfirmError(Request $request, string $message)
+    {
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => false,
+                'message' => $message,
+            ], 422);
+        }
+
+        return back()->withErrors(['file' => $message]);
     }
 
     public function deleteVaultDocument($id)
@@ -345,13 +590,14 @@ class SanadCustomerPortalController extends Controller
             'sanadChatThreads.messages.sender',
             'sanadBuzzAlerts.replies.sender',
             'sanadDocumentRequests.document',
+            'sanadAiInteractions',
         ]);
 
         if ($request->action_state === 'open_chat') {
             $query->whereHas('sanadChatThreads', fn ($chatQuery) => $chatQuery->where('status', 'open'));
         }
         if ($request->action_state === 'unread_buzz') {
-            $query->whereHas('sanadBuzzAlerts', fn ($buzzQuery) => $buzzQuery->where('status', 'unread'));
+            $query->whereHas('sanadBuzzAlerts', fn ($buzzQuery) => $this->whereVisibleCustomerBuzz($buzzQuery->where('status', 'unread')));
         }
         if ($request->action_state === 'pending_documents') {
             $query->whereHas('sanadDocumentRequests', fn ($docQuery) => $docQuery->whereIn('status', ['pending', 'submitted', 'replacement_requested']));
@@ -374,16 +620,23 @@ class SanadCustomerPortalController extends Controller
                 'provider',
                 'sanadDocumentRequests.document',
                 'sanadBuzzAlerts.replies.sender',
+                'sanadAiInteractions.user',
             ])->find($request->booking_id);
         }
         $selectedBooking = $selectedBooking ?: $conversations->first();
 
         $thread = $selectedBooking ? $this->customerThread($selectedBooking) : null;
         $messages = $thread
-            ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document'])->get()
+            ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document', 'aiInteraction'])->get()
             : collect();
-        $visibleMessages = $messages->reject(fn ($message) => in_array($message->message_type, ['buzz', 'document_request'], true) || $message->buzz_alert_id || $message->document_request_id);
-        $buzzAlerts = $selectedBooking ? $selectedBooking->sanadBuzzAlerts()->with('replies.sender')->latest()->get() : collect();
+        $visibleMessages = $messages->reject(function ($message) {
+            $visibleTo = $message->visible_to ?: [];
+            return in_array($message->message_type, ['buzz', 'document_request'], true)
+                || $message->buzz_alert_id
+                || $message->document_request_id
+                || ($visibleTo && empty(array_intersect($visibleTo, ['customer', 'user'])));
+        });
+        $buzzAlerts = $selectedBooking ? $this->visibleCustomerBuzzQuery($selectedBooking)->with('replies.sender')->latest()->get() : collect();
         $documentRequests = $selectedBooking ? $selectedBooking->sanadDocumentRequests()->with('document')->latest()->get() : collect();
         $vaultDocuments = SanadDocumentVaultItem::where('owner_id', Auth::id())->where('source', 'vault')->latest()->get();
 
@@ -420,7 +673,163 @@ class SanadCustomerPortalController extends Controller
         ]);
     }
 
-    public function sendMessage(Request $request, $id)
+    public function messagesSnapshot(Request $request)
+    {
+        $booking = $this->customerRequests($this->customer())
+            ->with(['customer', 'service', 'provider', 'sanadDocumentRequests.document', 'sanadBuzzAlerts.replies.sender', 'sanadAiInteractions'])
+            ->findOrFail($request->booking_id);
+
+        $thread = $this->customerThread($booking);
+        $messages = $thread
+            ? $thread->messages()->with(['sender', 'buzzAlert.replies.sender', 'documentRequest.document', 'aiInteraction'])->get()
+            : collect();
+        $visibleMessages = $messages->reject(function ($message) {
+            $visibleTo = $message->visible_to ?: [];
+            return in_array($message->message_type, ['buzz', 'document_request'], true)
+                || $message->buzz_alert_id
+                || $message->document_request_id
+                || ($visibleTo && empty(array_intersect($visibleTo, ['customer', 'user'])));
+        });
+        $buzzAlerts = $this->visibleCustomerBuzzQuery($booking)->with('replies.sender')->latest()->get();
+        $documentRequests = $booking->sanadDocumentRequests()->with('document')->latest()->get();
+        $requiredDocuments = $booking->service
+            ? collect($booking->service->required_documents ?: [])->map(function ($doc) {
+                $name = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
+                return [
+                    'key' => is_array($doc) ? ($doc['key'] ?? Str::slug($name, '_')) : Str::slug($name, '_'),
+                    'name' => $name,
+                ];
+            })->values()
+            : collect();
+
+        $timelineData = collect();
+        foreach ($buzzAlerts as $buzz) {
+            $timelineData->push([
+                'type' => 'buzz',
+                'id' => 'buzz-' . $buzz->id,
+                'timestamp' => optional($buzz->created_at)->timestamp ?: 0,
+                'created_at' => optional($buzz->created_at)->format('Y-m-d H:i'),
+                'priority' => Str::headline($buzz->priority),
+                'status' => Str::headline($buzz->status),
+                'message' => $buzz->message,
+                'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
+                'replies' => $buzz->replies->map(fn ($reply) => [
+                    'sender' => optional($reply->sender)->display_name ?: Str::headline($reply->sender_role ?: 'user'),
+                    'message' => $reply->message,
+                    'created_at' => optional($reply->created_at)->format('Y-m-d H:i'),
+                ])->values(),
+            ]);
+        }
+        foreach ($documentRequests as $documentRequest) {
+            $timelineData->push([
+                'type' => 'document',
+                'id' => 'doc-' . $documentRequest->id,
+                'timestamp' => optional($documentRequest->created_at)->timestamp ?: 0,
+                'created_at' => optional($documentRequest->created_at)->format('Y-m-d H:i'),
+                'status' => Str::headline($documentRequest->status),
+                'document_name' => $documentRequest->document_name,
+                'requested_from' => Str::headline($documentRequest->requested_from ?: 'customer'),
+                'instructions' => $documentRequest->instructions ?: $documentRequest->reason,
+                'due_at' => optional($documentRequest->due_at)->format('Y-m-d'),
+                'due_label' => $documentRequest->due_at ? $documentRequest->due_at->diffForHumans() : null,
+                'has_file' => (bool) $documentRequest->document,
+                'file_url' => $documentRequest->document ? $documentRequest->document->publicDocumentUrl() : null,
+            ]);
+        }
+        foreach ($visibleMessages as $message) {
+            $timelineData->push([
+                'type' => 'message',
+                'id' => 'msg-' . $message->id,
+                'timestamp' => optional($message->created_at)->timestamp ?: 0,
+                'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
+                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender_role' => $message->sender_role,
+                'message' => $message->message,
+                'message_type' => $message->message_type ?: 'text',
+                'ai_interaction_id' => $message->ai_interaction_id,
+                'handover_status' => optional($message->aiInteraction)->status,
+                'attachment_url' => $message->getFirstMediaUrl('sanad_chat_attachment') ?: $message->getFirstMediaUrl('attachment'),
+                'attachment_name' => optional($message->getFirstMedia('sanad_chat_attachment'))->file_name,
+            ]);
+        }
+        $timelineData = $timelineData->sortBy('timestamp')->values();
+
+        return response()->json([
+            'status' => true,
+            'request' => [
+                'id' => $booking->id,
+                'reference' => $booking->sanad_reference ?: '#' . $booking->id,
+                'customer' => optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'Customer',
+                'avatar' => Str::upper(Str::substr(optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'C', 0, 1)),
+                'service' => optional($booking->service)->name ?: 'No service',
+                'stage' => Str::headline($booking->sanad_stage ?: $booking->status),
+                'priority' => Str::headline($booking->sanad_priority ?: 'normal'),
+                'sla' => optional($booking->sla_due_at)->format('Y-m-d H:i') ?: '-',
+                'partner' => optional($booking->provider)->display_name ?: '-',
+                'request_url' => route('customer-portal.requests.show', $booking->id),
+                'updated_at' => optional($booking->updated_at)->toIso8601String(),
+                'ai_first_responder_enabled' => $booking->ai_first_responder_enabled !== false,
+                'chat_owner_type' => $booking->chat_owner_type ?: 'ai',
+                'chat_owner_user_id' => $booking->chat_owner_user_id,
+                'chat_owner_team' => null,
+                'chat_assignment_label' => $this->chatAssignmentLabel($booking),
+            ],
+            'composer' => [
+                'booking_id' => $booking->id,
+                'store_url' => route('customer-portal.requests.messages.store', $booking->id),
+                'can_create_buzz' => false,
+                'can_request_documents' => false,
+                'required_documents' => $requiredDocuments,
+                'ai_toggle_url' => null,
+                'chat_assignment_url' => null,
+                'assignable_chat_targets' => [],
+                'direct_message_locked' => false,
+                'direct_message_lock_message' => null,
+            ],
+            'timeline' => $timelineData,
+            'messages' => $visibleMessages->map(fn ($message) => [
+                'id' => $message->id,
+                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender_role' => $message->sender_role,
+                'message' => $message->message,
+                'message_type' => $message->message_type ?: 'text',
+                'buzz_alert_id' => $message->buzz_alert_id,
+                'document_request_id' => $message->document_request_id,
+                'ai_interaction_id' => $message->ai_interaction_id,
+                'handover_status' => optional($message->aiInteraction)->status,
+                'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
+                'attachment_url' => $message->getFirstMediaUrl('sanad_chat_attachment') ?: $message->getFirstMediaUrl('attachment'),
+                'attachment_name' => optional($message->getFirstMedia('sanad_chat_attachment'))->file_name,
+            ])->values(),
+            'buzz_alerts' => $buzzAlerts->map(fn ($buzz) => [
+                'id' => $buzz->id,
+                'priority' => Str::headline($buzz->priority),
+                'status' => Str::headline($buzz->status),
+                'message' => $buzz->message,
+                'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
+                'reply_count' => $buzz->reply_count,
+                'created_at' => optional($buzz->created_at)->format('Y-m-d H:i'),
+                'replies' => $buzz->replies->map(fn ($reply) => [
+                    'sender' => optional($reply->sender)->display_name ?: Str::headline($reply->sender_role ?: 'user'),
+                    'message' => $reply->message,
+                    'created_at' => optional($reply->created_at)->format('Y-m-d H:i'),
+                ])->values(),
+            ])->values(),
+            'documents' => $documentRequests->map(fn ($documentRequest) => [
+                'id' => $documentRequest->id,
+                'document_name' => $documentRequest->document_name,
+                'status' => Str::headline($documentRequest->status),
+                'instructions' => $documentRequest->instructions ?: $documentRequest->reason,
+                'requested_from' => Str::headline($documentRequest->requested_from),
+                'due_at' => optional($documentRequest->due_at)->format('Y-m-d'),
+                'due_label' => $documentRequest->due_at ? $documentRequest->due_at->diffForHumans() : null,
+                'file_url' => $documentRequest->document ? $documentRequest->document->publicDocumentUrl() : null,
+            ])->values(),
+            'ai_escalations' => [],
+        ]);
+    }
+
+    public function sendMessage(Request $request, $id, SanadAiFirstResponderService $firstResponder)
     {
         $booking = $this->customerRequests($this->customer())->findOrFail($id);
         $data = $request->validate([
@@ -452,7 +861,7 @@ class SanadCustomerPortalController extends Controller
             'message' => $this->filterContactInformation($data['message'] ?? ''),
             'message_type' => $buzz ? 'buzz_reply' : ($isAttachment ? 'attachment' : 'text'),
             'buzz_alert_id' => optional($buzz)->id,
-            'visible_to' => ['user', 'customer', 'admin', 'employee'],
+            'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
         ]);
         if ($request->hasFile('attachment')) {
             $message->addMedia($request->file('attachment'))->toMediaCollection('sanad_chat_attachment');
@@ -475,6 +884,43 @@ class SanadCustomerPortalController extends Controller
             'message_id' => $message->id,
             'buzz_alert_id' => optional($buzz)->id,
         ]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            if (!$buzz && $message->message_type === 'text') {
+                app()->terminating(function () use ($firstResponder, $message, $booking) {
+                    try {
+                        $firstResponder->respondToCustomerMessage($message, $booking);
+                    } catch (\Throwable $exception) {
+                        \Log::warning('Sanad AI first responder failed after customer message send', [
+                            'booking_id' => $booking->id,
+                            'message_id' => $message->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+                });
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Message sent.',
+                'chat_message' => [
+                    'id' => $message->id,
+                    'message' => $message->message,
+                    'sender_role' => $message->sender_role,
+                    'sender_name' => optional(Auth::user())->display_name ?: optional(Auth::user())->email ?: 'Customer',
+                    'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
+                    'buzz_alert_id' => optional($buzz)->id,
+                    'message_type' => $message->message_type ?: 'text',
+                    'attachment_url' => $message->getFirstMediaUrl('sanad_chat_attachment') ?: $message->getFirstMediaUrl('attachment'),
+                    'attachment_name' => optional($message->getFirstMedia('sanad_chat_attachment'))->file_name,
+                    'ai_response_pending' => !$buzz && $message->message_type === 'text',
+                ],
+            ]);
+        }
+
+        if (!$buzz && $message->message_type === 'text') {
+            $firstResponder->respondToCustomerMessage($message, $booking);
+        }
 
         return back()->withSuccess('Message sent.');
     }
@@ -591,7 +1037,7 @@ class SanadCustomerPortalController extends Controller
         return view('customer-portal.ai', compact('requests', 'interactions'));
     }
 
-    public function askAi(Request $request, SanadAiRagService $rag)
+    public function askAi(Request $request, SanadAiFirstResponderService $firstResponder)
     {
         $data = $request->validate([
             'question' => ['required', 'string', 'max:2000'],
@@ -602,25 +1048,51 @@ class SanadCustomerPortalController extends Controller
             $booking = $this->customerRequests($this->customer())->with('service')->findOrFail($data['booking_id']);
         }
 
-        $answer = $rag->answer($data['question'], $booking, 'customer');
-        $interaction = SanadAiInteraction::create([
-            'user_id' => Auth::id(),
-            'booking_id' => optional($booking)->id,
-            'question' => $data['question'],
-            'answer' => $answer['answer'],
-            'confidence' => $answer['confidence'],
-            'requires_escalation' => $answer['requires_escalation'],
-            'status' => $answer['requires_escalation'] ? 'handover_required' : 'answered',
-            'metadata' => [
-                'sources' => $answer['sources'],
-                'live_context' => $answer['live_context'],
-                'provider' => $answer['provider_metadata'] ?? [],
-                'langsmith_run_id' => $answer['langsmith_run_id'] ?? null,
-            ],
-        ]);
+        if ($booking && !$firstResponder->isEnabled($booking)) {
+            $interaction = SanadAiInteraction::create([
+                'user_id' => Auth::id(),
+                'booking_id' => $booking->id,
+                'question' => $data['question'],
+                'answer' => 'A Sanad agent is handling this request now. Your message is visible to the assigned team.',
+                'confidence' => 0,
+                'requires_escalation' => true,
+                'status' => 'manual_takeover',
+                'metadata' => ['first_responder_disabled' => true],
+            ]);
+        } else {
+            $interaction = $firstResponder->createInteraction($data['question'], $booking, Auth::user(), 'customer');
+        }
         $this->audit('customer_ai_question_asked', $interaction, ['booking_id' => optional($booking)->id]);
 
         return back()->withSuccess('Sanad AI response generated.');
+    }
+
+    public function handleAiHandover(Request $request, $id, SanadAiFirstResponderService $firstResponder)
+    {
+        $data = $request->validate([
+            'decision' => ['required', 'in:yes,no'],
+        ]);
+
+        $interaction = SanadAiInteraction::where('user_id', Auth::id())->findOrFail($id);
+        if ($interaction->booking_id) {
+            $this->customerRequests($this->customer())->findOrFail($interaction->booking_id);
+        }
+
+        $result = $firstResponder->handleHandoverDecision($interaction, $data['decision'], Auth::user());
+        $this->audit('customer_ai_handover_' . $data['decision'], $interaction, $result);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => true,
+                'decision' => $data['decision'],
+                'message' => $data['decision'] === 'yes'
+                    ? 'Sanad team has been notified.'
+                    : 'Okay, no handover requested.',
+                'result' => $result,
+            ]);
+        }
+
+        return back()->withSuccess($data['decision'] === 'yes' ? 'Sanad team has been notified.' : 'Okay, no handover requested.');
     }
 
     public function profile()
@@ -648,9 +1120,22 @@ class SanadCustomerPortalController extends Controller
             ->where(function ($query) {
                 $query->where('sanad_stage', 'awaiting_customer_action')
                     ->orWhereHas('sanadDocumentRequests', fn ($q) => $q->where('requested_from', 'customer')->whereIn('status', ['pending', 'replacement_requested', 'rejected']))
-                    ->orWhereHas('sanadBuzzAlerts', fn ($q) => $q->where('status', 'unread'));
+                    ->orWhereHas('sanadBuzzAlerts', fn ($q) => $this->whereVisibleCustomerBuzz($q->where('status', 'unread')));
             })
             ->latest('updated_at');
+    }
+
+    private function visibleCustomerBuzzQuery(Booking $booking)
+    {
+        return $this->whereVisibleCustomerBuzz($booking->sanadBuzzAlerts());
+    }
+
+    private function whereVisibleCustomerBuzz($query)
+    {
+        return $query->where(function ($buzzQuery) {
+            $buzzQuery->whereNull('action_type')
+                ->orWhere('action_type', '!=', 'chat_assignment_accept');
+        });
     }
 
     private function recentActivity(User $user)
@@ -665,7 +1150,7 @@ class SanadCustomerPortalController extends Controller
             'booking_id' => $booking->id,
             'thread_type' => 'shared',
         ], [
-            'participant_roles' => ['user', 'customer', 'admin', 'employee', 'provider'],
+            'participant_roles' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
             'created_by' => Auth::id(),
             'status' => 'open',
             'last_message_at' => now(),
@@ -695,6 +1180,28 @@ class SanadCustomerPortalController extends Controller
         ];
 
         return trim(preg_replace($patterns, '[removed contact information]', $message));
+    }
+
+    private function chatAssignmentLabel(Booking $booking): string
+    {
+        if (($booking->chat_owner_type ?: 'ai') === 'ai') {
+            return 'AI First Responder';
+        }
+
+        if ($booking->chat_owner_type === 'sanad_team') {
+            return 'Sanad Team';
+        }
+
+        if ($booking->chat_owner_type === 'partner_team') {
+            return 'Partner Team';
+        }
+
+        if ($booking->chat_owner_type === 'user' && $booking->chat_owner_user_id) {
+            $target = User::find($booking->chat_owner_user_id);
+            return $target ? ($target->display_name ?: $target->first_name ?: $target->email) : 'Assigned Team Member';
+        }
+
+        return 'Unassigned';
     }
 
     private function aiAnswer(string $question, ?Booking $booking, string $knowledge): array

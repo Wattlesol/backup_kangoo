@@ -47,7 +47,15 @@ class Booking extends Model
         'assignment_reason',
         'expected_completion_at',
         'escalated_at',
-        'closed_at'
+        'closed_at',
+        'ai_first_responder_enabled',
+        'ai_first_responder_disabled_by',
+        'ai_first_responder_disabled_at',
+        'chat_owner_type',
+        'chat_owner_user_id',
+        'chat_assigned_by',
+        'chat_assigned_at',
+        'chat_assignment_note',
     ];
 
     protected $casts = [
@@ -74,6 +82,12 @@ class Booking extends Model
         'expected_completion_at' => 'datetime',
         'escalated_at' => 'datetime',
         'closed_at' => 'datetime',
+        'ai_first_responder_enabled' => 'boolean',
+        'ai_first_responder_disabled_by' => 'integer',
+        'ai_first_responder_disabled_at' => 'datetime',
+        'chat_owner_user_id' => 'integer',
+        'chat_assigned_by' => 'integer',
+        'chat_assigned_at' => 'datetime',
     ];
     public function customer(){
         return $this->belongsTo(User::class,'customer_id', 'id')->withTrashed();
@@ -150,7 +164,14 @@ class Booking extends Model
         }
 
         if($user->hasRole('provider')) {
-            return $query->where('provider_id', $user->id);
+            return $query->where(function ($assignmentQuery) use ($user) {
+                $assignmentQuery->where('provider_id', $user->id)
+                    ->orWhere('chat_owner_user_id', $user->id)
+                    ->orWhere(function ($teamQuery) use ($user) {
+                        $teamQuery->where('chat_owner_type', 'partner_team')
+                            ->where('provider_id', $user->id);
+                    });
+            });
         }
 
         if($user->hasRole('user')) {
@@ -159,10 +180,17 @@ class Booking extends Model
 
         if($user->hasRole('handyman')) {
             if (!empty($user->provider_id)) {
-                $query->where('provider_id', $user->provider_id);
-
-                return $query->whereHas('handymanAdded',function ($q) use($user){
-                    $q->where('handyman_id',$user->id);
+                return $query->where(function ($assignmentQuery) use ($user) {
+                    $assignmentQuery->where('chat_owner_user_id', $user->id)
+                        ->orWhere(function ($partnerQuery) use ($user) {
+                            $partnerQuery->where('provider_id', $user->provider_id)
+                                ->where(function ($visibleQuery) use ($user) {
+                                    $visibleQuery->where('chat_owner_type', 'partner_team')
+                                        ->orWhereHas('handymanAdded',function ($q) use($user){
+                                            $q->where('handyman_id',$user->id);
+                                        });
+                                });
+                        });
                 });
             }
 
@@ -170,8 +198,11 @@ class Booking extends Model
                 return $query;
             }
 
-            return $query->whereHas('handymanAdded',function ($q) use($user){
-                $q->where('handyman_id',$user->id);
+            return $query->where(function ($assignmentQuery) use ($user) {
+                $assignmentQuery->where('chat_owner_user_id', $user->id)
+                    ->orWhereHas('handymanAdded',function ($q) use($user){
+                        $q->where('handyman_id',$user->id);
+                    });
             });
         }
 
