@@ -26,12 +26,18 @@ class OrderController extends Controller
 {
     private array $kanbanStages = [
         'submitted',
+        'pending_review',
+        'assigned_to_partner',
+        'assigned_to_employee',
+        'in_progress',
         'waiting_for_documents',
         'government_processing',
         'legal_review',
         'accounting',
         'quality_review',
         'ready_for_delivery',
+        'awaiting_customer_action',
+        'awaiting_quality_review',
         'completed',
     ];
 

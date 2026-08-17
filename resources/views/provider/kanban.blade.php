@@ -13,7 +13,7 @@
                     <div class="sanad-kanban-drop">
                         @forelse($orders as $order)
                             <div class="sanad-kanban-card" draggable="true" data-id="{{ $order->id }}">
-                                <strong>{{ $order->sanad_reference ?: 'SANAD-'.$order->id }}</strong>
+                                <strong><a href="{{ route('provider.order.show', $order->id) }}">{{ $order->sanad_reference ?: 'SANAD-'.$order->id }}</a></strong>
                                 <div>{{ optional($order->customer)->display_name ?: '-' }}</div>
                                 <div class="text-muted small">{{ optional($order->service)->name_en ?: optional($order->service)->name ?: '-' }}</div>
                                 <div class="mt-2">
@@ -55,4 +55,3 @@ document.querySelectorAll('.sanad-kanban-drop').forEach(function(drop) {
 </script>
 @endsection
 </x-master-layout>
-

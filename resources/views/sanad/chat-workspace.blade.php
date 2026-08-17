@@ -669,6 +669,8 @@
             .chat-feed::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
             .message-row { display: flex; }
             .message-row.team { justify-content: flex-end; }
+            .message-row.pending .message-bubble { opacity: .82; }
+            .message-row.failed .message-bubble { border-color: #fecaca; background: #fff7f7; color: #991b1b; }
             .message-bubble { max-width: min(680px, 78%); border-radius: 16px; padding: 10px 12px; background: #fff; border: 1px solid #e5e9f2; box-shadow: 0 4px 16px rgba(15,23,42,.04); }
             .message-row.team .message-bubble { background: #4f46e5; color: #fff; border-color: #4f46e5; }
             .message-meta { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; margin-bottom: 4px; opacity: .82; }
@@ -1145,35 +1147,65 @@
                         if (badge) badge.style.setProperty('display', 'none', 'important');
                     }
 
-                    function appendSentMessage(message) {
-                        if (!feed || !message || !message.id) return;
-                        if (feed.querySelector('[data-message-id="msg-' + message.id + '"], [data-message-id="' + message.id + '"]')) return;
-
-                        var emptyChat = feed.querySelector('.empty-chat');
-                        if (emptyChat) emptyChat.remove();
-
-                        var side = ['user', 'customer'].indexOf(message.sender_role) >= 0 ? 'customer' : 'team';
-                        var article = document.createElement('article');
-                        article.className = 'message-row ' + side;
-                        article.dataset.messageId = 'msg-' + message.id;
-
+                    function messageBubbleHtml(message, statusLabel) {
                         var html = '<div class="message-bubble">' +
-                            '<div class="message-meta"><strong>' + escapeHtml(message.sender_name || message.sender || 'Customer') + '</strong><span>' + escapeHtml(message.created_at || '') + '</span></div>';
+                            '<div class="message-meta"><strong>' + escapeHtml(message.sender_name || message.sender || 'Customer') + '</strong><span>' + escapeHtml(statusLabel || message.created_at || '') + '</span></div>';
 
                         if (message.message) {
                             html += '<p>' + escapeHtml(message.message) + '</p>';
                         }
                         if (message.attachment_url) {
                             html += '<div class="mt-2"><a href="' + escapeHtml(message.attachment_url) + '" target="_blank" class="btn btn-sm btn-light border text-primary"><i class="fas fa-paperclip mr-1"></i> ' + escapeHtml(message.attachment_name || 'Download Attachment') + '</a></div>';
+                        } else if (message.attachment_name) {
+                            html += '<div class="message-links"><span><i class="fas fa-paperclip mr-1"></i>' + escapeHtml(message.attachment_name) + '</span></div>';
                         }
                         if (message.ai_response_pending) {
                             html += '<div class="message-links"><span>Waiting for Sanad AI...</span></div>';
                         }
                         html += '</div>';
 
-                        article.innerHTML = html;
-                        feed.appendChild(article);
+                        return html;
+                    }
+
+                    function upsertMessageBubble(message, options) {
+                        options = options || {};
+                        if (!feed || !message || !message.id) return null;
+                        var messageId = String(message.id);
+                        var selector = '[data-message-id="' + escapeHtml(messageId) + '"], [data-message-id="msg-' + escapeHtml(messageId) + '"]';
+                        var article = options.replaceId ? feed.querySelector('[data-message-id="' + options.replaceId + '"]') : feed.querySelector(selector);
+
+                        var emptyChat = feed.querySelector('.empty-chat');
+                        if (emptyChat) emptyChat.remove();
+
+                        var side = ['user', 'customer'].indexOf(message.sender_role) >= 0 ? 'customer' : 'team';
+                        if (!article) {
+                            article = document.createElement('article');
+                            feed.appendChild(article);
+                        }
+
+                        article.className = 'message-row ' + side + (options.pending ? ' pending' : '') + (options.failed ? ' failed' : '');
+                        article.dataset.messageId = options.domId || ('msg-' + messageId);
+                        article.innerHTML = messageBubbleHtml(message, options.statusLabel);
                         feed.scrollTop = feed.scrollHeight;
+                        return article;
+                    }
+
+                    function appendSentMessage(message) {
+                        upsertMessageBubble(message);
+                    }
+
+                    function createOptimisticMessage(formData, deliveryMode) {
+                        var file = fileInput && fileInput.files && fileInput.files.length ? fileInput.files[0] : null;
+                        return {
+                            id: 'pending-' + Date.now() + '-' + Math.random().toString(16).slice(2),
+                            message: formData.get('message') || (file ? 'Attachment' : 'Message'),
+                            sender_role: 'user',
+                            sender_name: 'You',
+                            created_at: 'Sending...',
+                            message_type: deliveryMode === 'message' ? (file ? 'attachment' : 'text') : deliveryMode,
+                            attachment_name: file ? file.name : '',
+                            ai_response_pending: false
+                        };
                     }
 
                     function pollForAiReply(attemptsLeft) {
@@ -1230,6 +1262,17 @@
                             }
 
                             var formData = new FormData(composer);
+                            var optimisticMessage = null;
+                            if (deliveryMode === 'message') {
+                                optimisticMessage = createOptimisticMessage(formData, deliveryMode);
+                                upsertMessageBubble(optimisticMessage, {
+                                    domId: optimisticMessage.id,
+                                    pending: true,
+                                    statusLabel: 'Sending...'
+                                });
+                                if (composerText) composerText.value = '';
+                                resetComposerAttachments();
+                            }
 
                             fetch(composer.action, {
                                 method: 'POST',
@@ -1253,10 +1296,14 @@
 	                                    sendBtn.disabled = false;
 	                                    sendBtn.innerHTML = origBtnHtml;
 	                                }
-	                                if (composerText) composerText.value = '';
-	                                resetComposerAttachments();
+                                    if (deliveryMode !== 'message') {
+	                                    if (composerText) composerText.value = '';
+	                                    resetComposerAttachments();
+                                    }
                                     if (data.chat_message) {
-                                        appendSentMessage(data.chat_message);
+                                        upsertMessageBubble(data.chat_message, {
+                                            replaceId: optimisticMessage ? optimisticMessage.id : null
+                                        });
                                     }
 	                                refreshConversation(shell.dataset.bookingId, true).catch(function () {});
                                     if (data.chat_message && data.chat_message.ai_response_pending) {
@@ -1267,6 +1314,14 @@
                                 if (sendBtn) {
                                     sendBtn.disabled = false;
                                     sendBtn.innerHTML = origBtnHtml;
+                                }
+                                if (optimisticMessage) {
+                                    optimisticMessage.created_at = 'Not sent';
+                                    upsertMessageBubble(optimisticMessage, {
+                                        domId: optimisticMessage.id,
+                                        failed: true,
+                                        statusLabel: 'Not sent'
+                                    });
                                 }
                                 showSnapshotError(err.message || 'Message send failed.');
                                 refreshConversation(shell.dataset.bookingId, true).catch(function () {});
