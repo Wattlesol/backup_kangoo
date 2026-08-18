@@ -107,9 +107,11 @@
                         title: "{{ __('messages.name') }}"
                     },
                     {
-                        data:'service_id',
-                        name:'service_id',
-                        title:"{{ __('messages.service') }}"
+                        data:'targets',
+                        name:'targets',
+                        title:"Applies To",
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data:'price',

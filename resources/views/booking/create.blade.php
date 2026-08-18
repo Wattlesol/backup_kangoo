@@ -28,12 +28,23 @@
                         <div class="sanad-order-section">
                             <h6>Customer Information</h6>
                             @if(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'employee', 'handyman']))
+                                <div class="form-group">
+                                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                        <label class="btn btn-outline-primary active" id="existing-customer-toggle">
+                                            <input type="radio" name="customer_mode" value="existing" autocomplete="off" checked> Existing Customer
+                                        </label>
+                                        <label class="btn btn-outline-primary" id="new-customer-toggle">
+                                            <input type="radio" name="customer_mode" value="new" autocomplete="off"> New Customer
+                                        </label>
+                                    </div>
+                                </div>
                                 <div class="row">
-                                    <div class="form-group col-md-4">
+                                    <div class="form-group col-md-4 existing-customer-field">
                                         {{ Form::label('customer_id', 'Existing Customer', ['class' => 'form-control-label']) }}
                                         <br>
                                         {{ Form::select('customer_id', [optional($bookingdata->customer)->id => optional($bookingdata->customer)->display_name], optional($bookingdata->customer)->id, [
                                             'class' => 'select2js form-group customer',
+                                            'id' => 'customer_id',
                                             'data-placeholder' => 'Search by customer name or phone',
                                             'data-ajax--url' => route('ajax-list', ['type' => 'user']),
                                         ]) }}
@@ -48,12 +59,21 @@
                                         {{ Form::text('customer_phone', old('customer_phone', optional($bookingdata->customer)->contact_number), ['class' => 'form-control', 'placeholder' => '+966...']) }}
                                     </div>
                                     <div class="form-group col-md-4">
-                                        {{ Form::label('customer_email', 'Email', ['class' => 'form-control-label']) }}
+                                        {{ Form::label('customer_email', 'Email <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
                                         {{ Form::email('customer_email', old('customer_email', optional($bookingdata->customer)->email), ['class' => 'form-control', 'placeholder' => 'customer@example.com']) }}
                                     </div>
                                     <div class="form-group col-md-8">
                                         {{ Form::label('customer_address', 'Customer Address', ['class' => 'form-control-label']) }}
                                         {{ Form::text('customer_address', old('customer_address', optional($bookingdata->customer)->address), ['class' => 'form-control', 'placeholder' => 'Customer address or preferred contact location']) }}
+                                    </div>
+                                    <div class="form-group col-md-4 new-customer-credential-field d-none">
+                                        {{ Form::label('customer_password', 'Login Password', ['class' => 'form-control-label']) }}
+                                        {{ Form::password('customer_password', ['class' => 'form-control', 'placeholder' => 'Leave blank to generate']) }}
+                                        <small class="text-muted">Customer will use the email and this password to upload documents.</small>
+                                    </div>
+                                    <div class="form-group col-md-4 new-customer-credential-field d-none">
+                                        {{ Form::label('customer_password_confirmation', 'Confirm Password', ['class' => 'form-control-label']) }}
+                                        {{ Form::password('customer_password_confirmation', ['class' => 'form-control', 'placeholder' => 'Repeat password']) }}
                                     </div>
                                 </div>
                             @else
@@ -104,7 +124,7 @@
         </div>
     </div>
 
-    @push('after-styles')
+    @section('bottom_script')
         <style>
             .sanad-order-section {
                 border: 1px solid #edf1f7;
@@ -134,5 +154,51 @@
                 justify-content: flex-end;
             }
         </style>
-    @endpush
+
+        <script>
+            (function () {
+                const customerDetailsBaseUrl = '{{ url("booking/customer") }}';
+
+                function setCustomerMode(mode) {
+                    const isNew = mode === 'new';
+                    $('.existing-customer-field').toggleClass('d-none', isNew);
+                    $('.new-customer-credential-field').toggleClass('d-none', !isNew);
+
+                    if (isNew) {
+                        $('#customer_id').val(null).trigger('change');
+                        $('#existing-customer-toggle').removeClass('active');
+                        $('#new-customer-toggle').addClass('active');
+                        $('input[name="customer_mode"][value="new"]').prop('checked', true);
+                    } else {
+                        $('#new-customer-toggle').removeClass('active');
+                        $('#existing-customer-toggle').addClass('active');
+                        $('input[name="customer_mode"][value="existing"]').prop('checked', true);
+                    }
+                }
+
+                $('input[name="customer_mode"]').on('change', function () {
+                    setCustomerMode(this.value);
+                });
+
+                $('#customer_id').on('select2:select change', function () {
+                    const customerId = $(this).val();
+                    if (!customerId) {
+                        return;
+                    }
+
+                    $.get(customerDetailsBaseUrl + '/' + customerId)
+                        .done(function (customer) {
+                            $('input[name="customer_name"]').val(customer.display_name || '');
+                            $('input[name="customer_phone"]').val(customer.contact_number || '');
+                            $('input[name="customer_email"]').val(customer.email || '');
+                            $('input[name="customer_address"]').val(customer.address || '');
+                        });
+                });
+
+                @if(!$bookingdata->id && old('customer_mode') === 'new')
+                    setCustomerMode('new');
+                @endif
+            })();
+        </script>
+    @endsection
 </x-master-layout>

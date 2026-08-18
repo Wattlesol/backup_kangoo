@@ -99,7 +99,33 @@
                                     <tbody>
                                     <tr>
                                         <td class="ps-0 py-2">
-                                            <label class="text-capitalize"><h6>{{ __('messages.price') }}</h6></label>
+                                            <label class="text-capitalize"><h6>Original Price</h6></label>
+                                        </td>
+                                        <td class="pe-0 py-2 text-end">
+                                            <h6 class="text-muted text-decoration-line-through">{{ getPriceFormat($serviceData->original_price) }}</h6>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="ps-0 py-2">
+                                            <label class="text-capitalize"><h6>Bundle Price</h6></label>
+                                        </td>
+                                        <td class="pe-0 py-2 text-end">
+                                            <h6 class="text-primary">{{ getPriceFormat($serviceData->price) }}</h6>
+                                        </td>
+                                    </tr>
+                                    @if($serviceData->discount_amount > 0)
+                                    <tr>
+                                        <td class="ps-0 py-2">
+                                            <label class="text-capitalize"><h6>Discount</h6></label>
+                                        </td>
+                                        <td class="pe-0 py-2 text-end">
+                                            <h6 class="text-success">{{ getPriceFormat($serviceData->discount_amount) }} off @if($serviceData->discount_percentage > 0) ({{ $serviceData->discount_percentage }}%) @endif</h6>
+                                        </td>
+                                    </tr>
+                                    @endif
+                                    <tr>
+                                        <td class="ps-0 py-2">
+                                            <label class="text-capitalize"><h6>Area Price Check</h6></label>
                                         </td>
                                         <td class="pe-0 py-2 text-end">
                                             <h6 class="text-primary" id="check_price_data" style="color: red"></h6>

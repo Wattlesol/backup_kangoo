@@ -435,7 +435,7 @@ class FrontendController extends Controller
         $serviceaddon = null;
         if($request->addons){
             $addon_id = explode(',', $request->addons);
-            $serviceaddons = ServiceAddon::whereIn('id', $addon_id)->get();
+            $serviceaddons = ServiceAddon::forService(Service::findOrFail($service_id))->whereIn('id', $addon_id)->get();
             $serviceaddon = $serviceaddons->map(function ($addon) {
                 return [
                     'id' => $addon->id,

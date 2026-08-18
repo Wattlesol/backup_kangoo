@@ -295,6 +295,8 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     });
 
     Route::group(['middleware' => ['permission:booking list']], function () {
+        Route::get('booking/export/{format}',[BookingController::class,'export'])->name('booking.export');
+        Route::get('booking/customer/{id}', [BookingController::class, 'customerDetails'])->name('booking.customer-details');
         Route::resource('booking', BookingController::class);
         Route::get('booking-index-data',[BookingController::class,'index_data'])->name('booking.index_data');
         Route::post('booking-bulk-action', [BookingController::class, 'bulk_action'])->name('booking.bulk-action');
@@ -753,6 +755,10 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 
     Route::post('order-cancel', [OrderController::class, 'cancel'])
         ->name('order.cancel')
+        ->middleware('permission:order edit');
+
+    Route::post('order/{id}/reassign-partner', [OrderController::class, 'reassignPartner'])
+        ->name('order.reassign-partner')
         ->middleware('permission:order edit');
 
     Route::post('order-bulk-action', [OrderController::class, 'bulkAction'])

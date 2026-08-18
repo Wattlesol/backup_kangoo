@@ -37,6 +37,12 @@
                         <div class="card-body">
                             <h5 class="card-title">{{ $vaule->name }}</h5>
                             <p class="card-text">{{ $vaule->description }}</p>
+                            <div class="mb-3">
+                                @if($vaule->original_price > $vaule->price)
+                                    <span class="text-muted text-decoration-line-through me-2">{{ getPriceFormat($vaule->original_price) }}</span>
+                                @endif
+                                <strong class="text-primary">{{ getPriceFormat($vaule->price) }}</strong>
+                            </div>
                             <a href="{{ route('service-package.detail',$vaule->id) }}" class="btn btn-primary">Buy Now</a>
                         </div>
                     </div>

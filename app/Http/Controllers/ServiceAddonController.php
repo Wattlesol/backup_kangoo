@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServiceAddon;
+use App\Models\Category;
+use App\Models\Service;
 use Illuminate\Http\Request;
 use Yajra\DataTables\DataTables;
 use App\Http\Requests\ServiceAddonRequest;
@@ -31,7 +33,7 @@ class ServiceAddonController extends Controller
     }
     public function index_data(DataTables $datatable,Request $request)
     {
-        $query = ServiceAddon::query()->ServiceAddon();
+        $query = ServiceAddon::query()->with(['categories', 'services', 'service'])->ServiceAddon();
 
         $filter = $request->filter;
 
@@ -60,8 +62,20 @@ class ServiceAddonController extends Controller
                 return '<a class="btn-link btn-link-hover"  href='.route('serviceaddon.create', ['id' => $query->id]).'>'.$query->name.'</a>';
             })
 
-            ->editColumn('service_id', function ($query) {
-                return ($query->service_id != null && isset($query->service)) ? $query->service->name : 'All Services';
+            ->addColumn('targets', function ($query) {
+                $targets = [];
+
+                if ($query->categories->isNotEmpty()) {
+                    $targets[] = 'Categories: '.$query->categories->pluck('name')->implode(', ');
+                }
+
+                if ($query->services->isNotEmpty()) {
+                    $targets[] = 'Services: '.$query->services->pluck('name')->implode(', ');
+                } elseif ($query->service_id != null && isset($query->service)) {
+                    $targets[] = 'Service: '.$query->service->name;
+                }
+
+                return !empty($targets) ? implode('<br>', $targets) : 'All Services';
             })
             ->editColumn('price', function ($query) {
                 return ($query->price != null && isset($query->price)) ? getPriceFormat($query->price) : '-';
@@ -70,7 +84,7 @@ class ServiceAddonController extends Controller
                 return view('serviceaddon.action', compact('serviceaddon'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['action', 'status','name','check','price'])
+            ->rawColumns(['action', 'status','name','check','price','targets'])
             ->toJson();
     }
 
@@ -113,7 +127,7 @@ class ServiceAddonController extends Controller
         //
         $id = $request->id;
         $auth_user = authSession();
-        $serviceaddon = ServiceAddon::find($id);
+        $serviceaddon = ServiceAddon::with(['categories', 'services'])->find($id);
         $pageTitle = trans('messages.update_form_title',['form'=>trans('messages.service_addon')]);
         
         if($serviceaddon == null){
@@ -121,7 +135,15 @@ class ServiceAddonController extends Controller
             $serviceaddon = new ServiceAddon;
         }
         
-        return view('serviceaddon.create', compact('pageTitle' ,'serviceaddon' ,'auth_user'));
+        $categories = Category::where('status', 1)->orderBy('name')->pluck('name', 'id');
+        $services = Service::where('status', 1)->where('service_type', 'service')->orderBy('name')->pluck('name', 'id');
+        $selectedCategoryIds = $serviceaddon->categories->pluck('id')->toArray();
+        $selectedServiceIds = $serviceaddon->services->pluck('id')->toArray();
+        if (empty($selectedServiceIds) && !empty($serviceaddon->service_id)) {
+            $selectedServiceIds = [$serviceaddon->service_id];
+        }
+
+        return view('serviceaddon.create', compact('pageTitle' ,'serviceaddon' ,'auth_user', 'categories', 'services', 'selectedCategoryIds', 'selectedServiceIds'));
     }
 
     /**
@@ -137,12 +159,16 @@ class ServiceAddonController extends Controller
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
-        $data = $request->all();
-        $data['service_id'] = $request->filled('service_id') ? $request->service_id : null;
+        $data = $request->except(['category_ids', 'service_ids']);
+        $serviceIds = collect($request->input('service_ids', []))->filter()->unique()->values();
+        $categoryIds = collect($request->input('category_ids', []))->filter()->unique()->values();
+        $data['service_id'] = $serviceIds->count() === 1 ? $serviceIds->first() : null;
 
         $data['created_by'] = auth()->user()->id;
        
         $result = ServiceAddon::updateOrCreate(['id' => $data['id'] ?? null],$data);
+        $result->categories()->sync($categoryIds->all());
+        $result->services()->sync($serviceIds->all());
         
             storeMediaFile($result,$request->serviceaddon_image, 'serviceaddon_image');
         
@@ -197,13 +223,22 @@ class ServiceAddonController extends Controller
             'name' => 'required|string|max:255',
             'name_ar' => 'required|string|max:255',
             'service_id' => 'nullable|exists:services,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'exists:categories,id',
+            'service_ids' => 'nullable|array',
+            'service_ids.*' => 'exists:services,id',
             'price' => 'required|numeric|min:0',
             'status' => 'nullable|boolean',
             'serviceaddon_image' => 'nullable|mimes:jpg,jpeg,png,webp',
         ]);
-        $data['service_id'] = $request->filled('service_id') ? $request->service_id : null;
+        $serviceIds = collect($request->input('service_ids', []))->filter()->unique()->values();
+        $categoryIds = collect($request->input('category_ids', []))->filter()->unique()->values();
+        $data['service_id'] = $serviceIds->count() === 1 ? $serviceIds->first() : null;
         $data['created_by'] = $serviceAddon->created_by ?: auth()->id();
+        unset($data['category_ids'], $data['service_ids']);
         $serviceAddon->update($data);
+        $serviceAddon->categories()->sync($categoryIds->all());
+        $serviceAddon->services()->sync($serviceIds->all());
         if ($request->hasFile('serviceaddon_image')) {
             storeMediaFile($serviceAddon, $request->file('serviceaddon_image'), 'serviceaddon_image');
         }

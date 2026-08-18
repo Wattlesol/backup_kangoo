@@ -37,6 +37,26 @@
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
+                            <div class="form-group col-md-6">
+                                {{ Form::label('category_ids', 'Show For Categories', ['class' => 'form-control-label']) }}
+                                {{ Form::select('category_ids[]', $categories, $selectedCategoryIds, [
+                                    'class' => 'form-control select2js',
+                                    'multiple' => 'multiple',
+                                    'data-placeholder' => 'Select one or more categories',
+                                ]) }}
+                                <small class="help-block text-muted">Leave empty to avoid category targeting.</small>
+                            </div>
+
+                            <div class="form-group col-md-6">
+                                {{ Form::label('service_ids', 'Show For Services', ['class' => 'form-control-label']) }}
+                                {{ Form::select('service_ids[]', $services, $selectedServiceIds, [
+                                    'class' => 'form-control select2js',
+                                    'multiple' => 'multiple',
+                                    'data-placeholder' => 'Select one or more services',
+                                ]) }}
+                                <small class="help-block text-muted">If both fields are empty, this add-on appears for all services.</small>
+                            </div>
+
                             <div class="form-group col-md-4">
                                 <label class="form-control-label" for="serviceaddon_image">{{ __('messages.image') }}</label>
                                 <div class="custom-file">

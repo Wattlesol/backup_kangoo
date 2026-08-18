@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ServiceAddon;
+use App\Models\Service;
 use App\Http\Resources\API\ServiceAddonResource;
 
 class ServiceAddonController extends Controller
@@ -12,7 +13,12 @@ class ServiceAddonController extends Controller
     //
     public function getServiceAddonList(Request $request){
 
-        $serviceaddon = ServiceAddon::with('media')->ServiceAddon();
+        $serviceaddon = ServiceAddon::with(['media', 'categories', 'services'])->ServiceAddon();
+
+        if ($request->filled('service_id')) {
+            $service = Service::findOrFail($request->service_id);
+            $serviceaddon->forService($service);
+        }
 
         $per_page = config('constant.PER_PAGE_LIMIT');
         if( $request->has('per_page') && !empty($request->per_page)){

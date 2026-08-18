@@ -3,7 +3,7 @@
 <div class="modal-dialog" role="document">
     <div class="modal-content">
         <div class="modal-header">
-            <h5 class="modal-title" id="exampleModalLabel">{{ $pageTitle }}</h5>
+            <h5 class="modal-title" id="exampleModalLabel">{{ $bookingdata->provider_id ? 'Transfer Order to Partner' : $pageTitle }}</h5>
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
@@ -58,7 +58,11 @@
                 </div>
                 <div class="col-md-6 form-group">
                     {{ Form::label('assignment_reason', __('messages.assignment_reason'), ['class'=>'form-control-label']) }}
-                    {{ Form::text('assignment_reason', $bookingdata->assignment_reason, ['class'=>'form-control', 'maxlength'=>2000]) }}
+                    {{ Form::text('assignment_reason', $bookingdata->assignment_reason, [
+                        'class'=>'form-control',
+                        'maxlength'=>2000,
+                        'placeholder' => 'Required when moving an order from one partner to another',
+                    ]) }}
                 </div>
                 
                 <div class="col-md-12 form-group ">

@@ -19,6 +19,7 @@
         :auth_user_id="auth_user_id"
         :servicetitle="data.name"
         :serviceprice="data.price"
+        :originalprice="data.original_price"
         :servicetime="data.servicetime"
         :servicedesc="data.description"
         :serviceimage="data.attchments[0]"
@@ -33,7 +34,6 @@
 </template>
 
 <script setup>
-import { defineProps } from 'vue';
 import ServicePackageCard from '../components/ServicePackageCard.vue';
 import { Navigation, Pagination, Scrollbar, A11y } from 'swiper';
 import { Swiper, SwiperSlide } from 'swiper/vue'

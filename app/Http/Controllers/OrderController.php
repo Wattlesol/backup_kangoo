@@ -7,7 +7,10 @@ use App\Models\Order;
 use App\Models\OrderStatusHistory;
 use App\Models\User;
 use App\Models\Store;
+use App\Exports\OrdersExport;
 use Yajra\DataTables\DataTables;
+use Maatwebsite\Excel\Facades\Excel;
+use PDF;
 
 class OrderController extends Controller
 {
@@ -38,7 +41,8 @@ class OrderController extends Controller
         $auth_user = authSession();
         $assets = ['datatable'];
         $stores = Store::where('status', 'approved')->get();
-        return view('order.index', compact('pageTitle','auth_user','assets','filter','stores','statistics'));
+        $partners = $this->partnerOptions();
+        return view('order.index', compact('pageTitle','auth_user','assets','filter','stores','statistics','partners'));
     }
 
     public function index_data(DataTables $datatable, Request $request)
@@ -129,7 +133,8 @@ class OrderController extends Controller
 
         $pageTitle = trans('messages.view_form_title',['form'=>trans('messages.order')]);
         $auth_user = authSession();
-        return view('order.view', compact('pageTitle','order','auth_user'));
+        $partners = $this->partnerOptions();
+        return view('order.view', compact('pageTitle','order','auth_user','partners'));
     }
 
     /**
@@ -250,11 +255,66 @@ class OrderController extends Controller
      */
     public function export(Request $request)
     {
-        // Implementation for exporting orders to CSV/Excel
-        // This would typically use Laravel Excel or similar package
+        $format = $request->get('format', 'excel');
+        abort_unless(in_array($format, ['pdf', 'excel']), 404);
 
-        $message = trans('messages.export_feature_coming_soon');
-        return comman_custom_response(['message'=> $message , 'status' => false]);
+        $orders = $this->orderExportQuery($request)->get();
+        $summary = $this->orderSummary($orders);
+        $filename = 'orders-summary-report-'.now()->format('Y-m-d-His');
+
+        if ($format === 'pdf') {
+            $pdf = PDF::loadView('order.exports.pdf', [
+                'orders' => $orders,
+                'summary' => $summary,
+                'generatedAt' => now(),
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download($filename.'.pdf');
+        }
+
+        return Excel::download(new OrdersExport($orders, $summary), $filename.'.xlsx');
+    }
+
+    public function reassignPartner(Request $request, $id)
+    {
+        $data = $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $order = Order::with('store.provider')->findOrFail($id);
+        $newStore = Store::with('provider')->where('status', 'approved')->findOrFail($data['store_id']);
+        $oldPartner = optional(optional($order->store)->provider)->display_name ?: 'Unassigned';
+        $newPartner = optional($newStore->provider)->display_name ?: $newStore->name;
+
+        if ((int) $order->store_id === (int) $newStore->id) {
+            return comman_custom_response([
+                'message' => 'Order is already assigned to this partner.',
+                'status' => false,
+            ]);
+        }
+
+        $order->update([
+            'store_id' => $newStore->id,
+            'order_type' => 'store',
+        ]);
+
+        $notes = 'Partner reassigned from '.$oldPartner.' to '.$newPartner;
+        if (!empty($data['reason'])) {
+            $notes .= '. Reason: '.$data['reason'];
+        }
+
+        $order->statusHistories()->create([
+            'status' => $order->status,
+            'notes' => $notes,
+            'changed_by' => auth()->id(),
+            'changed_at' => now(),
+        ]);
+
+        return comman_custom_response([
+            'message' => 'Order partner reassigned successfully. Order data, items, documents, and chats remain attached to the same order.',
+            'status' => true,
+        ]);
     }
 
     /**
@@ -303,6 +363,58 @@ class OrderController extends Controller
         }
 
         return comman_custom_response(['message'=> trans('messages.invalid_action') , 'status' => false]);
+    }
+
+    private function orderExportQuery(Request $request)
+    {
+        $query = Order::with(['customer', 'store.provider', 'items']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        if ($request->filled('store_id')) {
+            $request->store_id === 'admin'
+                ? $query->whereNull('store_id')
+                : $query->where('store_id', $request->store_id);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        return $query->latest();
+    }
+
+    private function orderSummary($orders): array
+    {
+        return [
+            'total_orders' => $orders->count(),
+            'pending_orders' => $orders->where('status', 'pending')->count(),
+            'processing_orders' => $orders->whereIn('status', ['confirmed', 'processing', 'shipped'])->count(),
+            'delivered_orders' => $orders->where('status', 'delivered')->count(),
+            'cancelled_orders' => $orders->where('status', 'cancelled')->count(),
+            'paid_orders' => $orders->where('payment_status', 'paid')->count(),
+            'unpaid_orders' => $orders->where('payment_status', '!=', 'paid')->count(),
+            'total_revenue' => $orders->where('payment_status', 'paid')->sum('total_amount'),
+            'total_value' => $orders->sum('total_amount'),
+        ];
+    }
+
+    private function partnerOptions()
+    {
+        return Store::with('provider')
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get();
     }
 
     /**

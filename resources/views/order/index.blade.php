@@ -10,8 +10,11 @@
                                 <button type="button" class="btn btn-sm btn-info" onclick="showStatistics()">
                                     <i class="fa fa-chart-bar"></i> {{ __('messages.statistics') }}
                                 </button>
-                                <button type="button" class="btn btn-sm btn-success" onclick="exportOrders()">
-                                    <i class="fa fa-download"></i> {{ __('messages.export') }}
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="exportOrders('pdf')">
+                                    <i class="fa fa-file-pdf"></i> PDF
+                                </button>
+                                <button type="button" class="btn btn-sm btn-success" onclick="exportOrders('excel')">
+                                    <i class="fa fa-file-excel"></i> Excel
                                 </button>
                             </div>
                         </div>
@@ -165,6 +168,43 @@
             </div>
         </div>
     </div>
+
+    @can('order edit')
+    <div class="modal fade" id="reassignPartnerModal" tabindex="-1" aria-labelledby="reassignPartnerModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="reassign-partner-form">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="reassignPartnerModalLabel">Reassign Partner</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="reassign-order-id">
+                    <div class="form-group">
+                        <label class="form-label">New Partner</label>
+                        <select name="store_id" class="form-control" required>
+                            <option value="">Select partner</option>
+                            @foreach($partners as $store)
+                                <option value="{{ $store->id }}">
+                                    {{ optional($store->provider)->display_name ?: $store->name }} - {{ $store->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Reason</label>
+                        <textarea name="reason" class="form-control" rows="3" placeholder="Example: previous partner delayed the service"></textarea>
+                    </div>
+                    <p class="text-muted mb-0">The same order record is moved, so its documents, items, timeline, and chats stay attached.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Reassign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endcan
 
 @section('bottom_script')
 <style>
@@ -363,16 +403,60 @@ function showStatistics() {
         });
 }
 
-function exportOrders() {
+function exportOrders(format) {
     const filters = {
         status: $('#column_status').val(),
         payment_status: $('#column_payment_status').val(),
-        store_id: $('#column_store').val()
+        store_id: $('#column_store').val(),
+        format: format || 'excel'
     };
 
     const queryString = new URLSearchParams(filters).toString();
     window.open('{{ route("order.export") }}?' + queryString, '_blank');
 }
+
+window.openReassignPartnerModal = function(orderId) {
+    $('#reassign-order-id').val(orderId);
+    $('#reassign-partner-form')[0].reset();
+    $('#reassign-order-id').val(orderId);
+    $('#reassignPartnerModal').modal('show');
+};
+
+$('#reassign-partner-form').on('submit', function(e) {
+    e.preventDefault();
+    const orderId = $('#reassign-order-id').val();
+
+    $.ajax({
+        url: '{{ url("order") }}/' + orderId + '/reassign-partner',
+        type: 'POST',
+        data: $(this).serialize(),
+        success: function(response) {
+            if (response.status) {
+                $('#reassignPartnerModal').modal('hide');
+                if (typeof window.renderedDataTable !== 'undefined') {
+                    window.renderedDataTable.ajax.reload();
+                }
+                if (typeof showAlert === 'function') {
+                    showAlert('success', response.message);
+                } else {
+                    alert(response.message);
+                }
+            } else if (typeof showAlert === 'function') {
+                showAlert('error', response.message);
+            } else {
+                alert(response.message);
+            }
+        },
+        error: function(xhr) {
+            const message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : '{{ __("messages.something_went_wrong") }}';
+            if (typeof showAlert === 'function') {
+                showAlert('error', message);
+            } else {
+                alert(message);
+            }
+        }
+    });
+});
 </script>
 @endsection
 </x-master-layout>

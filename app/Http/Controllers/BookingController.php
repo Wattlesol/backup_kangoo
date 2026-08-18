@@ -17,6 +17,8 @@ use App\Models\Service;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\SanadPartnerServicePerformance;
+use App\Models\SanadRequestAction;
+use App\Exports\BookingsExport;
 use App\Models\BookingStatus;
 use App\Models\PostJobRequest;
 use App\Models\ProviderAddressMapping;
@@ -34,8 +36,9 @@ use App\Models\BookingRating;
 use App\Models\Setting;
 use App\Models\Country;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 class BookingController extends Controller
 {
     use NotificationTrait;
@@ -192,6 +195,27 @@ class BookingController extends Controller
             ->toJson();
     }
 
+    public function export(Request $request, string $format)
+    {
+        abort_unless(in_array($format, ['pdf', 'excel']), 404);
+
+        $bookings = $this->bookingExportQuery($request)->get();
+        $summary = $this->bookingSummary($bookings);
+        $filename = 'orders-report-'.now()->format('Y-m-d-His');
+
+        if ($format === 'excel') {
+            return Excel::download(new BookingsExport($bookings, $summary), $filename.'.xlsx');
+        }
+
+        $pdf = PDF::loadView('booking.exports.pdf', [
+            'bookings' => $bookings,
+            'summary' => $summary,
+            'generatedAt' => now(),
+        ]);
+
+        return $pdf->download($filename.'.pdf');
+    }
+
     /* bulck action method */
     public function bulk_action(Request $request)
     {
@@ -265,6 +289,7 @@ class BookingController extends Controller
             'customer_phone' => 'nullable|string|max:255',
             'customer_email' => 'nullable|email|max:255',
             'customer_address' => 'nullable|string|max:1000',
+            'customer_password' => 'nullable|string|min:8|max:255|confirmed',
             'date' => 'required',
             'address' => 'nullable|string|max:2000',
             'description' => 'nullable|string|max:4000',
@@ -291,9 +316,10 @@ class BookingController extends Controller
         }
         $service_data = Service::find($data['service_id']);
         $customer = $this->resolveBookingCustomer($request);
+        $plainPassword = $customer->wasRecentlyCreated ? $customer->plain_password_for_admin ?? null : null;
         $data['customer_id'] = $customer->id;
         $data['address'] = $request->input('address') ?: $request->input('customer_address') ?: optional($customer)->address;
-        unset($data['customer_name'], $data['customer_phone'], $data['customer_email'], $data['customer_address']);
+        unset($data['customer_mode'], $data['customer_name'], $data['customer_phone'], $data['customer_email'], $data['customer_address'], $data['customer_password'], $data['customer_password_confirmation']);
 
         // Customers never select or inherit a Partner. Assignment belongs to
         // the Sanad Operations workflow and starts as Suggested/Unassigned.
@@ -419,7 +445,15 @@ class BookingController extends Controller
             ];
             return comman_custom_response($response);
 		}
-		return  redirect(route('booking.index'))->withSuccess($message);
+        $redirect = redirect(route('booking.index'))->withSuccess($message);
+        if ($plainPassword) {
+            $redirect->with('created_customer_credentials', [
+                'name' => $customer->display_name,
+                'email' => $customer->email,
+                'password' => $plainPassword,
+            ]);
+        }
+		return  $redirect;
 
     }
 
@@ -447,7 +481,8 @@ class BookingController extends Controller
         $request->validate([
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required_without:customer_email|string|max:255',
-            'customer_email' => 'nullable|email|max:255',
+            'customer_email' => 'required|email|max:255',
+            'customer_password' => 'nullable|string|min:8|max:255|confirmed',
         ]);
 
         $customer = null;
@@ -477,7 +512,8 @@ class BookingController extends Controller
         $nameParts = preg_split('/\s+/', trim($request->customer_name), 2);
         $firstName = $nameParts[0] ?: 'Customer';
         $lastName = $nameParts[1] ?? '';
-        $email = $request->customer_email ?: 'customer+' . Str::lower(Str::random(10)) . '@sanad.local';
+        $email = $request->customer_email;
+        $plainPassword = $request->filled('customer_password') ? $request->customer_password : Str::random(12);
 
         $customer = User::create([
             'username' => $this->uniqueCustomerUsername($firstName),
@@ -485,12 +521,13 @@ class BookingController extends Controller
             'last_name' => $lastName,
             'display_name' => trim($request->customer_name),
             'email' => $email,
-            'password' => Hash::make(Str::random(16)),
+            'password' => Hash::make($plainPassword),
             'user_type' => 'user',
             'contact_number' => $request->customer_phone,
             'address' => $request->customer_address,
             'status' => 1,
         ]);
+        $customer->plain_password_for_admin = $plainPassword;
 
         if (method_exists($customer, 'assignRole')) {
             try {
@@ -501,6 +538,19 @@ class BookingController extends Controller
         }
 
         return $customer;
+    }
+
+    public function customerDetails($id)
+    {
+        $customer = User::where('user_type', 'user')->where('status', 1)->findOrFail($id);
+
+        return response()->json([
+            'id' => $customer->id,
+            'display_name' => $customer->display_name,
+            'contact_number' => $customer->contact_number,
+            'email' => $customer->email,
+            'address' => $customer->address,
+        ]);
     }
 
     private function uniqueCustomerUsername(string $name): string
@@ -718,6 +768,9 @@ class BookingController extends Controller
     public function bookingAssigned(Request $request)
     {
         $bookingdata =  Booking::find($request->id);
+        $previousProviderId = $bookingdata->provider_id;
+        $previousStatus = $bookingdata->status;
+        $previousStage = $bookingdata->sanad_stage;
 
         $request->merge(['assignment_mode' => $request->assignment_mode ?: 'suggested']);
         $request->validate([
@@ -782,6 +835,8 @@ class BookingController extends Controller
         }
 
         $assigned_handyman_ids = [];
+        $isPartnerTransfer = $previousProviderId && $partnerId && (int) $previousProviderId !== (int) $partnerId;
+
         if($bookingdata->handymanAdded()->count() > 0){
             $assigned_handyman_ids = $bookingdata->handymanAdded()->pluck('handyman_id')->toArray();
             $bookingdata->handymanAdded()->delete();
@@ -818,7 +873,35 @@ class BookingController extends Controller
         $bookingdata->assignment_reason = $request->assignment_reason;
         $bookingdata->assigned_by = auth()->id();
         $bookingdata->assigned_at = now();
+        if ($isPartnerTransfer) {
+            $bookingdata->sanad_stage = 'assigned_to_partner';
+            $bookingdata->chat_owner_type = 'partner_team';
+            $bookingdata->chat_owner_user_id = $partnerId;
+            $bookingdata->chat_assigned_by = auth()->id();
+            $bookingdata->chat_assigned_at = now();
+            $bookingdata->chat_assignment_note = $request->assignment_reason;
+            $bookingdata->sanadWorkflowStages()->delete();
+        }
         $bookingdata->save();
+
+        if ($isPartnerTransfer) {
+            SanadRequestAction::create([
+                'booking_id' => $bookingdata->id,
+                'actor_id' => auth()->id(),
+                'actor_role' => optional(auth()->user())->user_type,
+                'action' => 'transfer_partner',
+                'previous_status' => $previousStatus,
+                'current_status' => $bookingdata->status,
+                'previous_stage' => $previousStage,
+                'current_stage' => $bookingdata->sanad_stage,
+                'reason' => $request->assignment_reason,
+                'internal_note' => 'Order transferred to a different partner. Documents, chats, add-ons, payments, and request history remain attached to the same order.',
+                'metadata' => [
+                    'previous_provider_id' => $previousProviderId,
+                    'new_provider_id' => $partnerId,
+                ],
+            ]);
+        }
 
         $activity_data = [
             'activity_type' => $activity_type,
@@ -1329,5 +1412,48 @@ if ( in_array($package->package_type,['Breaks','specific_place']) && count($pack
         return redirect()->back()->with('success','Change Date Done');
 
 
+    }
+
+    private function bookingExportQuery(Request $request)
+    {
+        $query = Booking::query()
+            ->myBooking()
+            ->with(['customer', 'service', 'provider', 'payment']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('sanad_reference', 'like', "%{$search}%")
+                    ->orWhere('id', $search)
+                    ->orWhereHas('service', fn ($serviceQuery) => $serviceQuery->where('name', 'like', "%{$search}%")->orWhere('name_en', 'like', "%{$search}%"))
+                    ->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('display_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
+                    ->orWhereHas('provider', fn ($providerQuery) => $providerQuery->where('display_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+            });
+        }
+
+        if (auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            $query->withTrashed();
+        }
+
+        return $query->latest();
+    }
+
+    private function bookingSummary($bookings): array
+    {
+        return [
+            'total_orders' => $bookings->count(),
+            'unassigned_orders' => $bookings->whereNull('provider_id')->count(),
+            'high_priority_orders' => $bookings->where('sanad_priority', 'high')->count(),
+            'completed_orders' => $bookings->whereIn('sanad_stage', ['completed', 'closed'])->count(),
+            'cancelled_orders' => $bookings->where('status', 'cancelled')->count(),
+            'pending_orders' => $bookings->whereIn('sanad_stage', ['submitted', 'pending_review'])->count(),
+            'in_progress_orders' => $bookings->whereIn('sanad_stage', ['assigned_to_partner', 'assigned_to_employee', 'in_progress'])->count(),
+            'overdue_orders' => $bookings->filter(fn ($booking) => $booking->expected_completion_at && $booking->expected_completion_at->isPast() && !in_array($booking->sanad_stage, ['completed', 'closed']))->count(),
+            'total_value' => $bookings->sum(fn ($booking) => (float) ($booking->total_amount ?: $booking->amount)),
+        ];
     }
 }

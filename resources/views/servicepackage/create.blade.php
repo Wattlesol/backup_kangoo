@@ -95,9 +95,14 @@
                         </div>
 
                         <div class="form-group col-md-4" id="price_div">
-                                {{ Form::label('price',__('messages.price').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                {{ Form::number('price',null, [ 'min' => 0, 'step' => 'any' , 'placeholder' => 'Auto-calculated from selected services if left empty','class' =>'form-control','id' => 'price' ]) }}
-                                <small class="help-block text-muted">Leave empty to use the total of selected service prices.</small>
+                                {{ Form::label('price','Bundle Price (After Discount) <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
+                                {{ Form::number('price',null, [ 'min' => 0, 'step' => 'any' , 'placeholder' => 'Enter discounted bundle price','class' =>'form-control','id' => 'price' ]) }}
+                                <small class="help-block text-muted">Customer pays this price. Leave empty to use the original total.</small>
+                            </div>
+                        <div class="form-group col-md-4">
+                                <label class="form-control-label">Original Price (Before Discount)</label>
+                                <input type="text" class="form-control" id="original_price_preview" value="0.00" readonly>
+                                <small class="help-block text-muted">Auto-calculated from selected service prices.</small>
                             </div>
                         <div class="form-group col-md-4">
                             {{ Form::label('status',trans('messages.status').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
@@ -336,11 +341,11 @@
             }
 
             function refreshBundleTotal() {
-                if ($('#price').val() !== '') return;
                 var total = selectedServiceIds().reduce(function(sum, serviceId) {
                     return sum + parseFloat(servicePrices[serviceId] || 0);
                 }, 0);
-                $('#price').attr('placeholder', total > 0 ? formatPrice(total) : 'Auto-calculated from selected services if left empty');
+                $('#original_price_preview').val(formatPrice(total));
+                $('#price').attr('placeholder', total > 0 ? formatPrice(total) : 'Enter discounted bundle price');
             }
 
             function addServiceRow(serviceId) {

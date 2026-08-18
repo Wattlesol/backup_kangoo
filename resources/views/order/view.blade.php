@@ -13,6 +13,11 @@
                                 <button type="button" class="btn btn-xs btn-info" onclick="printOrder()">
                                     <i class="fa fa-print"></i> Print
                                 </button>
+                                @can('order edit')
+                                    <button type="button" class="btn btn-xs btn-dark" onclick="openReassignPartnerModal({{ $order->id }})">
+                                        <i class="fa fa-random"></i> Reassign Partner
+                                    </button>
+                                @endcan
                                 @if($order->can_be_cancelled)
                                     <button type="button" class="btn btn-xs btn-danger" onclick="cancelOrder({{ $order->id }})">
                                         <i class="fa fa-times"></i> Cancel
@@ -25,6 +30,43 @@
             </div>
         </div>
     </div>
+
+    @can('order edit')
+    <div class="modal fade" id="reassignPartnerModal" tabindex="-1" aria-labelledby="reassignPartnerModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="reassign-partner-form">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="reassignPartnerModalLabel">Reassign Partner</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="reassign-order-id" value="{{ $order->id }}">
+                    <div class="form-group">
+                        <label class="form-label">New Partner</label>
+                        <select name="store_id" class="form-control" required>
+                            <option value="">Select partner</option>
+                            @foreach($partners as $store)
+                                <option value="{{ $store->id }}" {{ $order->store_id == $store->id ? 'disabled' : '' }}>
+                                    {{ optional($store->provider)->display_name ?: $store->name }} - {{ $store->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Reason</label>
+                        <textarea name="reason" class="form-control" rows="3" placeholder="Example: previous partner delayed the service"></textarea>
+                    </div>
+                    <p class="text-muted mb-0">The same order record is moved, so its documents, items, timeline, and chats stay attached.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Reassign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endcan
 
     <div class="row">
         <!-- Order Information -->
@@ -578,6 +620,37 @@ function cancelOrder(orderId) {
         });
     }
 }
+
+function openReassignPartnerModal(orderId) {
+    $('#reassign-order-id').val(orderId);
+    $('#reassign-partner-form')[0].reset();
+    $('#reassign-order-id').val(orderId);
+    $('#reassignPartnerModal').modal('show');
+}
+
+$('#reassign-partner-form').on('submit', function(e) {
+    e.preventDefault();
+    const orderId = $('#reassign-order-id').val();
+
+    $.ajax({
+        url: '{{ url("order") }}/' + orderId + '/reassign-partner',
+        type: 'POST',
+        data: $(this).serialize(),
+        success: function(response) {
+            if (response.status) {
+                $('#reassignPartnerModal').modal('hide');
+                toastr.success(response.message);
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                toastr.error(response.message);
+            }
+        },
+        error: function(xhr) {
+            const message = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'An error occurred while reassigning the partner.';
+            toastr.error(message);
+        }
+    });
+});
 </script>
 @endsection
 </x-master-layout>

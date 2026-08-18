@@ -25,6 +25,38 @@ class ServicePackage extends Model implements  HasMedia
 
     ];
 
+    public function getOriginalPriceAttribute(): float
+    {
+        if ($this->relationLoaded('package_service_data') || $this->package_service_data()->exists()) {
+            $packageServiceTotal = (float) $this->package_service_data->sum('price');
+
+            if ($packageServiceTotal > 0) {
+                return $packageServiceTotal;
+            }
+        }
+
+        if ($this->relationLoaded('packageServices')) {
+            return (float) $this->packageServices
+                ->sum(fn ($mapping) => (float) optional($mapping->service)->price);
+        }
+
+        return (float) Service::whereIn('id', $this->packageServices()->pluck('service_id'))->sum('price');
+    }
+
+    public function getDiscountAmountAttribute(): float
+    {
+        return max(0, $this->original_price - (float) $this->price);
+    }
+
+    public function getDiscountPercentageAttribute(): int
+    {
+        if ($this->original_price <= 0 || $this->discount_amount <= 0) {
+            return 0;
+        }
+
+        return (int) round(($this->discount_amount / $this->original_price) * 100);
+    }
+
     public function packageServices(){
         return $this->hasMany(PackageServiceMapping::class, 'service_package_id','id');
     }

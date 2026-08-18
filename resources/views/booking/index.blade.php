@@ -22,6 +22,19 @@
     </div>
     <div class="card">
         <div class="card-body">
+        @if(session('created_customer_credentials'))
+            @php($credentials = session('created_customer_credentials'))
+            <div class="alert alert-info d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <strong>Customer account created:</strong>
+                    {{ $credentials['name'] }} can sign in with
+                    <strong>{{ $credentials['email'] }}</strong>
+                    and password
+                    <strong>{{ $credentials['password'] }}</strong>
+                    to upload documents.
+                </div>
+            </div>
+        @endif
         <div class="row justify-content-between">
             <div>
                 <div class="col-md-12">
@@ -45,6 +58,12 @@
             </form>
           </div>
               <div class="d-flex justify-content-end">
+                <a href="{{ route('booking.export', ['format' => 'pdf']) }}" class="btn btn-sm btn-outline-primary mr-2 booking-export-link" data-format="pdf">
+                    <i class="ri-file-pdf-line"></i> Summary PDF
+                </a>
+                <a href="{{ route('booking.export', ['format' => 'excel']) }}" class="btn btn-sm btn-outline-success mr-2 booking-export-link" data-format="excel">
+                    <i class="ri-file-excel-line"></i> Export Excel
+                </a>
                
                 <div class="input-group ml-2">
                     <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
@@ -176,6 +195,16 @@
 
   $('#quick-action-type').change(function () {
     resetQuickAction()
+  });
+
+  $('.booking-export-link').on('click', function (event) {
+    const search = $('.dt-search').val();
+    const url = new URL(this.href);
+    if (search) {
+        url.searchParams.set('search', search);
+    }
+    event.preventDefault();
+    window.location.href = url.toString();
   });
 
   $(document).on('update_quick_action', function() {

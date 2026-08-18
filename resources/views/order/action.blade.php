@@ -43,6 +43,10 @@
         @endif
 
         @if(auth()->user()->can('order edit'))
+            <button type="button" class="btn btn-sm btn-dark" onclick="openReassignPartnerModal({{ $order->id }})" title="Reassign Partner">
+                <i class="fas fa-random"></i>
+            </button>
+
             <div class="btn-group">
                 <button type="button" class="btn btn-sm btn-warning dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="{{ __('messages.payment_status') }}">
                     <i class="fas fa-credit-card"></i>
@@ -217,6 +221,7 @@
                 });
             }
         }
+
 
         function printOrder(id) {
             window.open(`{{ url('/order') }}/${id}/print`, '_blank');

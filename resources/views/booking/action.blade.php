@@ -5,6 +5,12 @@ $auth_user= authSession();
 {{ Form::open(['route' => ['booking.destroy', $booking->id], 'method' => 'delete','data--submit'=>'booking'.$booking->id]) }}
 <div class="d-flex justify-content-end align-items-center">
 @if(!$booking->trashed())
+    @hasanyrole('admin|demo_admin')
+    <a class="mr-3 loadRemoteModel" href="{{ route('booking.assign_form',['id'=> $booking->id ]) }}"
+        title="Transfer Partner">
+        <i class="fas fa-exchange-alt text-primary"></i>
+    </a>
+    @endhasanyrole
     @if($auth_user->can('booking delete') && !$booking->trashed())
     <a class="mr-3" href="{{ route('booking.destroy', $booking->id) }}" data--submit="booking{{$booking->id}}" 
         data--confirmation='true'
