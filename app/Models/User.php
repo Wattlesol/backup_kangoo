@@ -28,7 +28,7 @@ class User extends Authenticatable implements HasMedia
         'display_name', 'providertype_id' , 'is_featured' , 'time_zone' ,'last_notification_seen' ,
         'login_type','service_address_id' , 'uid','is_subscribe',
         'social_image','is_available','designation','last_online_time',
-        'known_languages','skills','description','why_choose_me','is_email_verified','language',
+        'known_languages','skills','description','why_choose_me','is_email_verified','language','language_option',
         'sanad_job_title','sanad_department','sanad_employee_status','sanad_permissions','sanad_permission_matrix',
         'sanad_working_hours','sanad_daily_capacity','sanad_quality_score','sanad_sla_compliance_rate','sanad_acceptance_rate','sanad_cancellation_rate','sanad_average_completion_minutes'
     ];

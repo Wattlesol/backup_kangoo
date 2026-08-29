@@ -95,7 +95,7 @@ class PaymentController extends Controller
         if ($this->isSanadFinancePartner($user)) {
             return [
                 'label' => 'Partner finance scope',
-                'description' => 'Partners see only payments and settlements connected to their assigned Sanad requests. Admin-only delete and bulk actions are hidden.',
+                'description' => 'Partners see only payments and settlements connected to their assigned Quick requests. Admin-only delete and bulk actions are hidden.',
                 'can_bulk_manage' => false,
             ];
         }
@@ -110,7 +110,7 @@ class PaymentController extends Controller
 
         return [
             'label' => 'Customer finance scope',
-            'description' => 'Customers see only their own Sanad payment, invoice, refund, and wallet context. Internal partner settlement and commission data are not exposed.',
+            'description' => 'Customers see only their own Quick payment, invoice, refund, and wallet context. Internal partner settlement and commission data are not exposed.',
             'can_bulk_manage' => false,
         ];
     }

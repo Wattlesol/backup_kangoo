@@ -35,6 +35,7 @@ use App\Http\Resources\API\{
     CategoryResource,
     SliderResource,
     UserResource,
+    PublicUserResource,
     PaymentGatewayResource,
     BookingRatingResource,
     HandymanRatingResource,
@@ -98,7 +99,7 @@ class DashboardController extends Controller
         if ($request->has('city_id') && !empty($request->city_id)) {
             $provider = $provider->where('city_id', $request->city_id);
         }
-        $provider = UserResource::collection($provider->paginate($per_page));
+        $provider = PublicUserResource::collection($provider->paginate($per_page));
 
         $featured_service_section = FrontendSetting::getValueByKey('section_4');
         $service_ids = [];
@@ -128,13 +129,15 @@ class DashboardController extends Controller
             $featured_service = ServiceResource::collection($featured_service);
         }
 
-        if($request->has('customer_id') && isset($request->customer_id)){
-            $customer_review = BookingRating::with('customer','service')->where('customer_id',$request->customer_id)->get();
+        $authenticatedCustomer = auth('sanctum')->user();
+        if ($authenticatedCustomer && in_array($authenticatedCustomer->user_type, ['user', 'customer'], true)) {
+            $customerId = $authenticatedCustomer->id;
+            $customer_review = BookingRating::with('customer','service')->where('customer_id', $customerId)->get();
             if (!empty($customer_review))
             {
                 $customer_review = BookingRatingResource::collection($customer_review);
             }
-            $user = User::where('id',$request->customer_id)->first();
+            $user = $authenticatedCustomer;
 
             $notification=0;
 
@@ -143,7 +146,7 @@ class DashboardController extends Controller
                 $notification = count($user->unreadNotifications);
             }
         
-            $upcomming_booking = Booking::where('customer_id',$request->customer_id)
+            $upcomming_booking = Booking::where('customer_id', $customerId)
             ->with('customer')->where('status', 'accept')->orderBy('id', 'DESC')->first();
 
             if(!empty($upcomming_booking)){

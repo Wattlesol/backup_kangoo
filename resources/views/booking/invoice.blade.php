@@ -3,7 +3,7 @@
 <html>
 
 <head>
-    <title>{{env('APP_NAME')}}</title>
+    <title>{{ config('sanad.brand.name', 'Quick') }}</title>
 </head>
 <style type="text/css">
     :root {
@@ -438,8 +438,8 @@
     // $app = \App\Models\AppSetting::first();
     $sitesetup = App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
     $generalsetting = App\Models\Setting::where('type','general-setting')->where('key', 'general-setting')->first();
-    $generaldata = json_decode($generalsetting->value);
-    $app = json_decode($sitesetup->value);
+    $generaldata = $generalsetting ? json_decode($generalsetting->value) : (object) [];
+    $app = $sitesetup ? json_decode($sitesetup->value) : (object) [];
     $extraValue =0 ;
     ?>
 <body>
@@ -451,11 +451,11 @@
                         <div class="invoice-title">
                             
                             <div class="mb-4">
-                                <h2 class="mb-1 text-muted">{{ $generaldata->site_name}}</h2>
+                                <h2 class="mb-1 text-muted">{{ $generaldata->site_name ?? config('sanad.brand.name', 'Quick') }}</h2>
                             </div>
                             <div class="text-muted">
-                                <p class="mb-1"><i class="uil uil-envelope-alt me-1"></i>{{ $generaldata->inquriy_email}}</p>
-                                <p><i class="uil uil-phone me-1"></i>{{ $generaldata->helpline_number}}</p>
+                                <p class="mb-1"><i class="uil uil-envelope-alt me-1"></i>{{ $generaldata->inquriy_email ?? config('mail.from.address') }}</p>
+                                <p><i class="uil uil-phone me-1"></i>{{ $generaldata->helpline_number ?? '-' }}</p>
                             </div>
                         </div>
 
@@ -588,7 +588,7 @@
             </div>
         </div>
                        
-                        <footer>{{$app->site_copyright}}</footer>
+                        <footer>{{ $app->site_copyright ?? ('© '.date('Y').' '.config('sanad.brand.name', 'Quick')) }}</footer>
                     </div>
                 </div>
             </div>

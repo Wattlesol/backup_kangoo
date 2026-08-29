@@ -41,6 +41,7 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\LanguageTranslator::class,
             \App\Http\Middleware\ThemeInjectionMiddleware::class,
+            \App\Http\Middleware\RenderQuickBrand::class,
         ],
 
         'api' => [

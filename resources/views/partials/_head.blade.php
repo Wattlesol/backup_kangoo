@@ -12,8 +12,12 @@
 <!-- <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css')}}"> -->
 <link rel="stylesheet" href="{{ asset('css/themes/select2.min.css')}}">
 <link rel="stylesheet" href="{{ asset('vendor/magnific-popup/magnific-popup.css') }}">
-<link rel="stylesheet" href="{{ asset('css/custom.css')}}">
+<link rel="stylesheet" href="{{ asset('css/custom.css?v=' . time())}}">
 <link rel="stylesheet" href="{{ asset('css/provide.css?v=' . time()) }}">
+<link rel="stylesheet" href="{{ asset('css/quick-portal-shell.css?v=' . time()) }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Dynamic Theme Colors CSS -->
 <link rel="stylesheet" href="{{ route('theme.css', ['role' => auth()->user()->user_type ?? 'customer', 'theme' => 'light']) }}?v={{ time() }}" id="dynamic-theme-css">
 <script src="{{ asset('js/role-based-theming.js?v=' . time()) }}" defer></script>

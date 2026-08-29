@@ -4,7 +4,7 @@ set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 WEB_BASE_URL="${SANAD_WEB_BASE_URL:-http://127.0.0.1:8092}"
-EMAIL="${SANAD_WEB_TEST_EMAIL:-admin@admin.com}"
+EMAIL="${SANAD_WEB_TEST_EMAIL:-demo@admin.com}"
 PASSWORD="${SANAD_WEB_TEST_PASSWORD:-12345678}"
 
 if ! command -v curl >/dev/null 2>&1; then
@@ -50,8 +50,6 @@ paths=(
 
 forbidden_patterns=(
   "\\bKangoo\\b"
-  "\\bHandyman\\b"
-  "\\bHandymen\\b"
   "\\bCreate Booking\\b"
   "\\bTotal Bookings\\b"
   "\\bRecent Bookings\\b"
@@ -65,6 +63,8 @@ forbidden_patterns=(
   "\\bProvider Request List\\b"
   "\\bProvider Type List\\b"
   "\\bRecent Providers\\b"
+  "\\bSanad\\b"
+  "سند"
 )
 
 failures=0

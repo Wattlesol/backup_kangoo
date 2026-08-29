@@ -65,7 +65,7 @@
                             <button type="button" class="btn btn-outline-primary btn-sm" id="use-location">
                                 <i class="fas fa-map-marker-alt"></i> Use My Location
                             </button>
-                            <small class="text-muted d-block mt-2">Find products available near you</small>
+                            <small class="text-muted d-block mt-2">{{ $isAr ? 'ابحث عن المنتجات المتاحة بالقرب منك' : 'Find products available near you' }}</small>
                         </div>
                     </div>
                 </div>
@@ -80,7 +80,7 @@
                     </div>
                     <div class="sort-options">
                         <select class="form-select" id="sort-select" style="width: auto;">
-                            <option value="created_at-desc">Newest First</option>
+                            <option value="created_at-desc">{{ $isAr ? 'الأحدث أولاً' : 'Newest First' }}</option>
                             <option value="created_at-asc">Oldest First</option>
                             <option value="name-asc">Name A-Z</option>
                             <option value="name-desc">Name Z-A</option>

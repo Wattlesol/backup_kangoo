@@ -205,6 +205,8 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('ai', [SanadCustomerPortalController::class, 'askAi'])->name('ai.ask');
         Route::post('ai/interactions/{id}/handover', [SanadCustomerPortalController::class, 'handleAiHandover'])->name('ai.handover');
         Route::get('profile', [SanadCustomerPortalController::class, 'profile'])->name('profile');
+        Route::post('profile', [SanadCustomerPortalController::class, 'updateProfile'])->name('profile.update');
+        Route::post('profile/password', [SanadCustomerPortalController::class, 'updatePassword'])->name('profile.password');
     });
 
     Route::group(['namespace' => '', 'middleware' => ['permission:permission list']], function () {

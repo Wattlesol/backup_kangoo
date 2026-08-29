@@ -1,4 +1,5 @@
 <x-master-layout>
+    @php $isAr = app()->getLocale() === 'ar'; @endphp
     <div class="container-fluid">
         <div class="row">
             <div class="col-lg-12">
@@ -137,20 +138,67 @@
                                 {{ Form::textarea('address', null, ['class'=>"form-control textarea" , 'rows'=>3  , 'placeholder'=> __('messages.address') ]) }}
                             </div>
                             <div class="form-group col-md-12">
-                                <label class="form-control-label">Partner Verification Requirements <span class="text-danger">*</span></label>
-                                @if($partnerVerificationDocuments->isNotEmpty())
-                                    <div class="verification-checklist">
-                                        @foreach($partnerVerificationDocuments as $document)
-                                            <label class="verification-option">
-                                                <input type="checkbox" name="partner_verification_document_ids[]" value="{{ $document->id }}" {{ in_array($document->id, old('partner_verification_document_ids', $selectedVerificationDocumentIds), true) ? 'checked' : '' }}>
-                                                <span>{{ $document->name }} {{ $document->is_required ? '(Default required)' : '' }}</span>
-                                            </label>
-                                        @endforeach
+                                <div class="partner-requirements-editor">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                        <div>
+                                            <label class="form-control-label font-weight-bold mb-1">{{ $isAr ? 'متطلبات التحقق من الشريك' : 'Partner Verification Requirements' }} <span class="text-danger">*</span></label>
+                                            <div class="small text-muted">{{ $isAr ? 'اختر من مكتبة المستندات أو أنشئ متطلبات مخصصة لهذا الشريك.' : 'Select from the document library or create custom requirements for this partner.' }}</div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="add-partner-verification-document">
+                                            <i class="fa fa-plus"></i> {{ $isAr ? 'إضافة مستند مخصص' : 'Add Custom Document' }}
+                                        </button>
                                     </div>
-                                    <small class="text-muted">These requirements will appear on the partner profile until Sanad verifies the uploaded documents.</small>
-                                @else
-                                    <div class="alert alert-warning mb-0">Create document types under System Documents before adding a partner.</div>
-                                @endif
+
+                                    @error('partner_verification_document_ids')
+                                        <div class="alert alert-danger py-2">{{ $message }}</div>
+                                    @enderror
+                                    @error('custom_partner_verification_documents')
+                                        <div class="alert alert-danger py-2">{{ $message }}</div>
+                                    @enderror
+                                    @error('custom_partner_verification_documents.*.text')
+                                        <div class="alert alert-danger py-2">{{ $message }}</div>
+                                    @enderror
+
+                                    <div class="verification-library mb-3">
+                                        <div class="verification-section-title">{{ $isAr ? 'مكتبة المستندات' : 'Document Library' }}</div>
+                                        @forelse($partnerVerificationDocuments as $document)
+                                            <label class="verification-option">
+                                                <input type="checkbox" name="partner_verification_document_ids[]" value="{{ $document->id }}" {{ in_array($document->id, old('partner_verification_document_ids', $selectedVerificationDocumentIds), false) ? 'checked' : '' }}>
+                                                <span class="verification-option-copy">
+                                                    <strong>{{ $document->localized_name }}</strong>
+                                                    @if($document->is_required)
+                                                        <small>{{ $isAr ? 'متطلب افتراضي' : 'Default requirement' }}</small>
+                                                    @else
+                                                        <small>{{ $isAr ? 'متاح للاختيار' : 'Optional library item' }}</small>
+                                                    @endif
+                                                </span>
+                                            </label>
+                                        @empty
+                                            <div class="text-muted small p-3">{{ $isAr ? 'مكتبة المستندات فارغة. يمكنك إضافة مستندات مخصصة أدناه.' : 'The document library is empty. You can add custom documents below.' }}</div>
+                                        @endforelse
+                                    </div>
+
+                                    <div class="verification-section-title mb-2">{{ $isAr ? 'المستندات المخصصة لهذا الشريك' : 'Custom Documents for This Partner' }}</div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm partner-custom-documents mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>{{ $isAr ? 'اسم المستند بالعربية' : 'Document Name' }} <span class="text-danger">*</span></th>
+                                                    <th class="verification-remove-column"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="partner-verification-document-rows">
+                                                @foreach($customVerificationDocumentRows as $index => $document)
+                                                    <tr class="partner-verification-document-row">
+                                                        <td><input type="text" name="custom_partner_verification_documents[{{ $index }}][text]" value="{{ $document['text'] ?? '' }}" class="form-control" maxlength="100" dir="{{ $isAr ? 'rtl' : 'ltr' }}" placeholder="{{ $isAr ? 'مثال: شهادة عضوية الغرفة التجارية' : 'Example: Chamber membership certificate' }}"></td>
+                                                        <td class="text-center align-middle"><button type="button" class="btn btn-link text-danger p-0 remove-partner-verification-document" title="{{ $isAr ? 'إزالة المستند' : 'Remove document' }}"><i class="ri-close-circle-line"></i></button></td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">{{ $isAr ? 'ستظهر المتطلبات المختارة في ملف الشريك إلى أن يرفع المستندات ويعتمدها فريق كويك.' : 'Selected requirements appear on the partner profile until the documents are uploaded and approved by Quick.' }}</small>
+                                </div>
                             </div>
                         </div>
                         <div class="row">
@@ -175,15 +223,46 @@
     @endphp
     @section('bottom_script')
     <style>
-        .verification-checklist { max-height: 180px; overflow-y: auto; border: 1px solid #e3e7ee; border-radius: 4px; padding: 8px 10px; background: #fff; }
-        .verification-option { display: flex; align-items: center; gap: 8px; padding: 6px 2px; margin: 0; font-weight: 400; cursor: pointer; }
-        .verification-option input { margin: 0; }
+        .partner-requirements-editor { border: 1px solid #e3e7ee; border-radius: 10px; padding: 16px; background: #fbfcfe; }
+        .verification-section-title { color: #344054; font-size: 13px; font-weight: 700; }
+        .verification-library { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; max-height: 240px; overflow-y: auto; border: 1px solid #e3e7ee; border-radius: 8px; padding: 10px; background: #fff; }
+        .verification-library .verification-section-title { grid-column: 1 / -1; padding: 2px 4px 5px; }
+        .verification-option { display: flex; align-items: flex-start; gap: 9px; padding: 10px; margin: 0; border: 1px solid #edf0f5; border-radius: 8px; background: #fff; font-weight: 400; cursor: pointer; }
+        .verification-option:hover { border-color: #b9c5ff; background: #f8f9ff; }
+        .verification-option input { margin-top: 3px; flex: 0 0 auto; }
+        .verification-option-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .verification-option-copy strong { color: #344054; font-size: 13px; }
+        .verification-option-copy small { color: #98a2b3; }
+        .partner-custom-documents th { color: #667085; font-size: 12px; border-top: 0; }
+        .partner-custom-documents td { vertical-align: middle; }
+        .partner-custom-documents .verification-remove-column { width: 42px; }
+        .partner-custom-documents tbody:empty::after { content: '{{ $isAr ? 'لا توجد مستندات مخصصة بعد.' : 'No custom documents added yet.' }}'; display: block; padding: 14px 8px; color: #98a2b3; font-size: 12px; }
     </style>
     <script type="text/javascript">
     (function($) {
         "use strict";
-        $(document).ready(function() {
-            var country_id = "{{ isset($providerdata->country_id) ? $providerdata->country_id : 0 }}";
+	        $(document).ready(function() {
+                var partnerVerificationDocumentIndex = $('#partner-verification-document-rows .partner-verification-document-row').length;
+
+                function partnerVerificationDocumentRow(index) {
+                    return [
+                        '<tr class="partner-verification-document-row">',
+                            '<td><input type="text" name="custom_partner_verification_documents[' + index + '][text]" class="form-control" maxlength="100" dir="{{ $isAr ? 'rtl' : 'ltr' }}" placeholder="{{ $isAr ? 'مثال: شهادة عضوية الغرفة التجارية' : 'Example: Chamber membership certificate' }}" required></td>',
+                            '<td class="text-center align-middle"><button type="button" class="btn btn-link text-danger p-0 remove-partner-verification-document" title="{{ $isAr ? 'إزالة المستند' : 'Remove document' }}"><i class="ri-close-circle-line"></i></button></td>',
+                        '</tr>'
+                    ].join('');
+                }
+
+                $('#add-partner-verification-document').on('click', function() {
+                    $('#partner-verification-document-rows').append(partnerVerificationDocumentRow(partnerVerificationDocumentIndex));
+                    partnerVerificationDocumentIndex += 1;
+                });
+
+                $(document).on('click', '.remove-partner-verification-document', function() {
+                    $(this).closest('.partner-verification-document-row').remove();
+                });
+
+                var country_id = "{{ isset($providerdata->country_id) ? $providerdata->country_id : 0 }}";
             var state_id = "{{ isset($providerdata->state_id) ? $providerdata->state_id : 0 }}";
             var city_id = "{{ isset($providerdata->city_id) ? $providerdata->city_id : 0 }}";
 

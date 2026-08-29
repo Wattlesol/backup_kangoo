@@ -68,7 +68,7 @@
                 </div>
                 <div class="input-group ml-2">
                     <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control dt-search" placeholder="Search..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
+                    <input type="text" class="form-control dt-search" placeholder="{{ __("messages.search") }}..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
                   </div>
               </div>
                
@@ -113,17 +113,17 @@
                     {
                         data: 'name',
                         name: 'name',
-                        title: "English Name"
+                        title: "{{ __("messages.english_name") }}"
                     },
                     {
                         data: 'name_ar',
                         name: 'name_ar',
-                        title: "Arabic Name"
+                        title: "{{ __("messages.arabic_name") }}"
                     },
                     {
                         data: 'display_order',
                         name: 'display_order',
-                        title: "Display Order"
+                        title: "{{ __("messages.display_order") }}"
                     },
                     {
                         data: 'is_featured',

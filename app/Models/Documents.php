@@ -11,7 +11,7 @@ class Documents extends Model
     use HasFactory,SoftDeletes;
     protected $table = 'documents';
     protected $fillable = [
-        'name', 'status','is_required'
+        'name', 'name_ar', 'status','is_required'
     ];
 
     protected $casts = [
@@ -21,6 +21,15 @@ class Documents extends Model
 
     public function providerDocument(){
         return $this->hasMany(ProviderDocument::class, 'document_id','id');
+    }
+
+    public function getLocalizedNameAttribute()
+    {
+        if (app()->getLocale() === 'ar' && filled($this->name_ar)) {
+            return $this->name_ar;
+        }
+
+        return $this->name;
     }
     
 }

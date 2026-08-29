@@ -79,7 +79,39 @@ class FrontendController extends Controller
             }
         }
 
-        return view('landing-page.index',compact('sectionData','postjobservice','auth_user_id','favourite','totalRating','providers_service_rating'));
+        $landingCategories = Category::query()
+            ->where('status', 1)
+            ->withCount(['services' => fn ($query) => $query->where('status', 1)])
+            ->orderBy('display_order')
+            ->orderBy('name')
+            ->limit(4)
+            ->get();
+
+        $landingServices = Service::query()
+            ->where('status', 1)
+            ->with('category:id,name,name_ar,name_en')
+            ->orderByDesc('is_featured')
+            ->orderByDesc('updated_at')
+            ->limit(3)
+            ->get();
+
+        $landingMetrics = [
+            'completed' => Booking::query()->whereIn('status', ['completed', 'done'])->count(),
+            'services' => Service::query()->where('status', 1)->count(),
+            'categories' => Category::query()->where('status', 1)->count(),
+        ];
+
+        return view('landing-page.index', compact(
+            'sectionData',
+            'postjobservice',
+            'auth_user_id',
+            'favourite',
+            'totalRating',
+            'providers_service_rating',
+            'landingCategories',
+            'landingServices',
+            'landingMetrics'
+        ));
     }
 
     public function userLoginView(Request $request){

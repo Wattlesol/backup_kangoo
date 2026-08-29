@@ -3,7 +3,7 @@
 <div class="modal-dialog" role="document">
     <div class="modal-content">
         <div class="modal-header">
-            <h5 class="modal-title" id="exampleModalLabel">{{ $bookingdata->provider_id ? 'Transfer Order to Partner' : $pageTitle }}</h5>
+            <h5 class="modal-title" id="exampleModalLabel">@php $isAr = app()->getLocale() === 'ar'; @endphp</h5>
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>

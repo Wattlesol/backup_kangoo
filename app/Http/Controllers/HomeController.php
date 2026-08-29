@@ -19,6 +19,7 @@ use App\Models\HandymanPayout;
 use App\Models\ServiceAddon;
 use App\Models\AppDownload;
 use App\Models\FrontendSetting;
+use App\Models\Bank;
 use App\Models\SanadAiInteraction;
 use App\Models\SanadBuzzAlert;
 use App\Models\SanadChatThread;
@@ -160,7 +161,7 @@ class HomeController extends Controller
      */
     public function adminDashboard($data)
     {
-        return view('dashboard.dashboard', compact('data'));
+        return app(\App\Http\Controllers\SanadWebController::class)->dashboard();
     }
     public function providerDashboard($data)
     {
@@ -656,24 +657,44 @@ class HomeController extends Controller
                 $items = $items->get();
                 break;
             case 'category':
-                $items = \App\Models\Category::select('id', 'name as text')->where('status', 1);
+                $isAr = app()->getLocale() === 'ar';
+                $itemsQuery = \App\Models\Category::where('status', 1);
                 if (isset($request->is_featured)) {
-                    $items->where('is_featured', $request->is_featured);
+                    $itemsQuery->where('is_featured', $request->is_featured);
                 }
                 if ($value != '') {
-                    $items->where('name', 'LIKE', '%' . $value . '%');
+                    $itemsQuery->where(function ($q) use ($value) {
+                        $q->where('name', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_ar', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_en', 'LIKE', '%' . $value . '%');
+                    });
                 }
-
-                $items = $items->get();
+                $items = $itemsQuery->get()->map(function ($row) use ($isAr) {
+                    return [
+                        'id' => $row->id,
+                        'text' => ($isAr && !empty($row->name_ar)) ? $row->name_ar : ($row->name_en ?: $row->name),
+                    ];
+                });
                 break;
             case 'subcategory':
-                $items = \App\Models\SubCategory::select('id', 'name as text')->where('status', 1);
-
-                if ($value != '') {
-                    $items->where('name', 'LIKE', '%' . $value . '%');
+                $isAr = app()->getLocale() === 'ar';
+                $itemsQuery = \App\Models\SubCategory::where('status', 1);
+                if (isset($request->category_id)) {
+                    $itemsQuery->where('category_id', $request->category_id);
                 }
-
-                $items = $items->get();
+                if ($value != '') {
+                    $itemsQuery->where(function ($q) use ($value) {
+                        $q->where('name', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_ar', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_en', 'LIKE', '%' . $value . '%');
+                    });
+                }
+                $items = $itemsQuery->get()->map(function ($row) use ($isAr) {
+                    return [
+                        'id' => $row->id,
+                        'text' => ($isAr && !empty($row->name_ar)) ? $row->name_ar : ($row->name_en ?: $row->name),
+                    ];
+                });
                 break;
             case 'sub_araeas':
                 $items = \App\Models\Region::select('city_id', 'name as text');
@@ -912,11 +933,17 @@ class HomeController extends Controller
                 break;
 
             case 'documents':
-                $items = \App\Models\Documents::select('id', 'name', 'status', 'is_required', \DB::raw('(CASE WHEN is_required = 1 THEN CONCAT(name," * ") ELSE CONCAT(name,"") END) AS text'))->where('status', 1);
+                $items = \App\Models\Documents::select('id', 'name', 'name_ar', 'status', 'is_required')->where('status', 1);
                 if ($value != '') {
-                    $items->where('name', 'LIKE', $value . '%');
+                    $items->where(function ($query) use ($value) {
+                        $query->where('name', 'LIKE', $value . '%')
+                            ->orWhere('name_ar', 'LIKE', $value . '%');
+                    });
                 }
-                $items = $items->get();
+                $items = $items->get()->map(function ($document) {
+                    $document->text = $document->localized_name . ($document->is_required ? ' * ' : '');
+                    return $document;
+                });
                 break;
             case 'handymantype':
                 $items = \App\Models\HandymanType::select('id', 'name as text')
@@ -956,6 +983,19 @@ class HomeController extends Controller
 
     public function removeFile(Request $request)
     {
+        $allowedTypes = [
+            'slider_image', 'profile_image', 'service_attachment', 'category_image', 'category_icon',
+            'subcategory_image', 'provider_document', 'booking_attachment', 'bank_attachment',
+            'app_image', 'app_image_full', 'package_attachment', 'blog_attachment',
+            'serviceaddon_image', 'section5_attachment', 'main_image', 'google_play',
+            'app_store', 'vimage', 'login_register_image', 'logo', 'favicon', 'footer_logo', 'loader',
+        ];
+        $validated = $request->validate([
+            'id' => 'required|integer',
+            'type' => 'required|string|in:'.implode(',', $allowedTypes),
+        ]);
+        $this->authorizeFileRemoval($validated['type'], $validated['id']);
+
         // Demo admin is allowed to add/remove catalog media during QA. Keep the
         // legacy demo restriction for unrelated destructive settings/actions.
         $demoMediaTypes = [
@@ -977,7 +1017,7 @@ class HomeController extends Controller
             return comman_custom_response($response);
         }
 
-        $type = $request->type;
+        $type = $validated['type'];
         $data = null;
         switch ($type) {
             case 'slider_image':
@@ -989,7 +1029,7 @@ class HomeController extends Controller
                 $message = __('messages.msg_removed', ['name' => __('messages.profile_image')]);
                 break;
             case 'service_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
@@ -1010,12 +1050,12 @@ class HomeController extends Controller
                 $message = __('messages.msg_removed', ['name' => __('messages.providerdocument')]);
                 break;
             case 'booking_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
             case 'bank_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
@@ -1028,12 +1068,12 @@ class HomeController extends Controller
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
             case 'package_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
             case 'blog_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
@@ -1042,7 +1082,7 @@ class HomeController extends Controller
                 $message = __('messages.msg_removed', ['name' => __('messages.service_addon')]);
                 break;
             case 'section5_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
@@ -1103,6 +1143,49 @@ class HomeController extends Controller
         return comman_custom_response($response);
     }
 
+    private function authorizeFileRemoval(string $type, int $id): void
+    {
+        $user = auth()->user();
+        abort_unless($user, 401);
+
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return;
+        }
+
+        if ($type === 'profile_image') {
+            abort_unless((int) $id === (int) $user->id, 403);
+            return;
+        }
+
+        if ($type === 'provider_document') {
+            abort_unless(
+                $user->hasRole('provider')
+                && ProviderDocument::where('provider_id', $user->id)->whereKey($id)->exists(),
+                403
+            );
+            return;
+        }
+
+        if (in_array($type, ['booking_attachment', 'bank_attachment'], true)) {
+            $media = Media::findOrFail($id);
+            $model = $media->model;
+            if ($model instanceof Booking) {
+                abort_unless(Booking::query()->myBooking()->whereKey($model->id)->exists(), 403);
+                return;
+            }
+            if ($model instanceof Bank) {
+                abort_unless($user->hasRole('provider') && (int) $model->provider_id === (int) $user->id, 403);
+                return;
+            }
+            if (isset($model->booking_id)) {
+                abort_unless(Booking::query()->myBooking()->whereKey($model->booking_id)->exists(), 403);
+                return;
+            }
+        }
+
+        abort(403);
+    }
+
     public function lang($locale)
     {
         \App::setLocale($locale);
@@ -1119,6 +1202,12 @@ class HomeController extends Controller
             $user->language_option = $locale;
             $user->save();
         }
+
+        $prev = url()->previous();
+        if (str_contains($prev, '.css') || str_contains($prev, '.js') || str_contains($prev, 'switch-language') || str_contains($prev, '/lang/')) {
+            return redirect()->route('frontend.index');
+        }
+
         return redirect()->back();
     }
 

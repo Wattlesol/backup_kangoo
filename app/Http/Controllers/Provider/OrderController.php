@@ -46,7 +46,7 @@ class OrderController extends Controller
         $auth_user = auth()->user();
         $query = $this->assignedBookingsQuery($auth_user);
 
-        $pageTitle = 'Partner Operations Dashboard';
+        $pageTitle = app()->getLocale() === 'ar' ? 'لوحة تحكم عمليات الشريك' : 'Partner Operations Dashboard';
         $dashboard = $this->dashboardData($query, $auth_user);
 
         return view('provider.dashboard', compact('pageTitle', 'auth_user', 'dashboard'));
@@ -54,7 +54,7 @@ class OrderController extends Controller
 
     public function index(Request $request)
     {
-        $pageTitle = 'Assigned Orders';
+        $pageTitle = app()->getLocale() === 'ar' ? 'الطلبات المسندة' : 'Assigned Orders';
         $assets = ['datatable'];
         $filter = [
             'sanad_stage' => $request->sanad_stage,
@@ -82,13 +82,37 @@ class OrderController extends Controller
 
         return $datatable->eloquent($query)
             ->editColumn('sanad_reference', function ($booking) {
-                $label = e($booking->sanad_reference ?: ('SANAD-' . str_pad($booking->id, 6, '0', STR_PAD_LEFT)));
+                $label = e($booking->quick_reference);
                 return '<a class="btn-link btn-link-hover" href="' . route('provider.order.show', $booking->id) . '">' . $label . '</a>';
             })
             ->addColumn('customer', fn ($booking) => e(optional($booking->customer)->display_name ?: '-'))
-            ->addColumn('service', fn ($booking) => e(optional($booking->service)->name_en ?: optional($booking->service)->name ?: '-'))
-            ->editColumn('sanad_priority', fn ($booking) => '<span class="badge badge-' . $this->priorityColor($booking->sanad_priority) . '">' . e(ucfirst($booking->sanad_priority ?: 'normal')) . '</span>')
-            ->editColumn('sanad_stage', fn ($booking) => '<span class="badge badge-primary">' . e(\Str::headline($booking->sanad_stage ?: $booking->status ?: 'submitted')) . '</span>')
+            ->addColumn('service', function ($booking) {
+                if (!$booking->service) {
+                    return '-';
+                }
+                $isAr = app()->getLocale() === 'ar';
+                return e($isAr && !empty($booking->service->name_ar) ? $booking->service->name_ar : ($booking->service->name_en ?: $booking->service->name));
+            })
+            ->editColumn('sanad_priority', function ($booking) {
+                $priority = strtolower($booking->sanad_priority ?: 'normal');
+                $label = ucfirst($priority);
+                if (app()->getLocale() === 'ar') {
+                    $map = [
+                        'low' => 'منخفض',
+                        'normal' => 'عادي',
+                        'high' => 'مرتفع',
+                        'urgent' => 'طارئ',
+                        'critical' => 'حرج',
+                    ];
+                    $label = $map[$priority] ?? $label;
+                }
+                return '<span class="badge badge-' . $this->priorityColor($booking->sanad_priority) . '">' . e($label) . '</span>';
+            })
+            ->editColumn('sanad_stage', function ($booking) {
+                $stage = $booking->sanad_stage ?: $booking->status ?: 'submitted';
+
+                return '<span class="badge badge-primary">' . e(quick_status_label($stage)) . '</span>';
+            })
             ->addColumn('assigned_employees', function ($booking) {
                 return e($booking->handymanAdded->pluck('handyman.display_name')->filter()->implode(', ') ?: '-');
             })
@@ -122,7 +146,7 @@ class OrderController extends Controller
             ])
             ->findOrFail($id);
 
-        $pageTitle = 'Assigned Order #' . ($booking->sanad_reference ?: $booking->id);
+        $pageTitle = (app()->getLocale() === 'ar' ? 'طلب مسند #' : 'Assigned Order #') . $booking->quick_reference;
         $employees = $this->employeesQuery()->get();
         $recommendations = $this->employeeRecommendations($booking, $employees);
         $workflowTemplates = SanadPartnerWorkflowTemplate::with(['steps', 'serviceLinks.service'])
@@ -272,7 +296,7 @@ class OrderController extends Controller
 
     public function workflows()
     {
-        $pageTitle = 'Employee Workflows';
+        $pageTitle = app()->getLocale() === 'ar' ? 'مسارات عمل الموظفين' : 'Employee Workflows';
         $workflows = SanadPartnerWorkflowTemplate::with(['steps', 'serviceLinks.service'])
             ->where('provider_id', auth()->id())
             ->latest()
@@ -384,7 +408,7 @@ class OrderController extends Controller
 
     public function services()
     {
-        $pageTitle = 'Sanad Services Availability';
+        $pageTitle = app()->getLocale() === 'ar' ? 'توفر خدمات كويك' : 'Quick Services Availability';
         $services = Service::where('service_type', 'service')->where('status', 1)->orderBy('name')->get();
         $availability = SanadPartnerServiceAvailability::where('provider_id', auth()->id())->get()->keyBy('service_id');
 
@@ -424,7 +448,7 @@ class OrderController extends Controller
 
     public function kanban()
     {
-        $pageTitle = 'Operations Board';
+        $pageTitle = app()->getLocale() === 'ar' ? 'لوحة العمليات' : 'Operations Board';
         $columns = collect($this->kanbanStages)->mapWithKeys(function ($stage) {
             return [$stage => $this->assignedBookingsQuery(auth()->user())
                 ->with(['customer', 'service', 'handymanAdded.handyman'])
@@ -454,7 +478,7 @@ class OrderController extends Controller
 
     public function employees()
     {
-        $pageTitle = 'Employees';
+        $pageTitle = app()->getLocale() === 'ar' ? 'الموظفون' : 'Employees';
         $employees = $this->employeesQuery()
             ->withCount(['handyman as assigned_orders_count' => function ($query) {
                 $query->whereHas('bookings', fn ($booking) => $booking->whereNotIn('sanad_stage', ['completed', 'closed'])->where('status', '!=', 'cancelled'));
@@ -467,7 +491,7 @@ class OrderController extends Controller
 
     public function performance()
     {
-        $pageTitle = 'Employee Performance';
+        $pageTitle = app()->getLocale() === 'ar' ? 'أداء الموظفين' : 'Employee Performance';
         $employees = $this->employeesQuery()->get()->map(function ($employee) {
             $assigned = Booking::whereHas('handymanAdded', fn ($query) => $query->where('handyman_id', $employee->id));
             $completed = (clone $assigned)->whereIn('sanad_stage', ['completed', 'closed'])->count();
@@ -493,7 +517,7 @@ class OrderController extends Controller
 
     public function financial()
     {
-        $pageTitle = 'Financial Center';
+        $pageTitle = app()->getLocale() === 'ar' ? 'المركز المالي' : 'Financial Center';
         $bookings = $this->assignedBookingsQuery(auth()->user())->with('payment')->get();
         $payments = Payment::whereIn('booking_id', $bookings->pluck('id'))->latest()->get();
         $paid = $payments->where('payment_status', 'paid')->sum('total_amount');
@@ -507,7 +531,7 @@ class OrderController extends Controller
 
     public function notifications()
     {
-        $pageTitle = 'Notification Center';
+        $pageTitle = app()->getLocale() === 'ar' ? 'مركز الإشعارات' : 'Notification Center';
         $notifications = auth()->user()->notifications()->latest()->paginate(20);
 
         return view('provider.notifications', compact('pageTitle', 'notifications'));
@@ -515,7 +539,7 @@ class OrderController extends Controller
 
     public function profile()
     {
-        $pageTitle = 'Partner Profile';
+        $pageTitle = app()->getLocale() === 'ar' ? 'الملف التعريفي للشريك' : 'Partner Profile';
         $provider = auth()->user()->load(['providerDocument.document', 'providerbank', 'providerslotsmapping']);
         $services = SanadPartnerServiceAvailability::with('service')->where('provider_id', auth()->id())->get();
 
@@ -565,22 +589,23 @@ class OrderController extends Controller
         $settled = ProviderPayout::where('provider_id', $provider->id)->sum('amount');
         $revenue = $payments->where('payment_status', 'paid')->sum('total_amount');
 
+        $isAr = app()->getLocale() === 'ar';
         return [
             'kpis' => [
-                'Total Orders' => $total,
-                'New Orders' => $new,
-                'Orders In Progress' => $inProgress,
-                'Completed Orders' => $completed,
-                'Delayed Orders' => $delayed,
-                'Waiting for Customer' => $waitingCustomer,
-                'Waiting for Government' => $waitingGovernment,
-                'Average SLA' => $this->averageSlaLabel($query),
-                'Customer Satisfaction' => '0%',
-                'Active Employees' => $this->employeesQuery()->where('sanad_employee_status', 'available')->count(),
-                'Current Workload' => $inProgress,
-                'Monthly Revenue' => getPriceFormat($revenue),
-                'Pending Settlement' => getPriceFormat(max($revenue - $settled, 0)),
-                'Platform Commission' => getPriceFormat(max($revenue - $settled, 0)),
+                ($isAr ? 'إجمالي الطلبات' : 'Total Orders') => $total,
+                ($isAr ? 'الطلبات الجديدة' : 'New Orders') => $new,
+                ($isAr ? 'طلبات قيد التنفيذ' : 'Orders In Progress') => $inProgress,
+                ($isAr ? 'الطلبات المكتملة' : 'Completed Orders') => $completed,
+                ($isAr ? 'الطلبات المتأخرة' : 'Delayed Orders') => $delayed,
+                ($isAr ? 'بانتظار العميل' : 'Waiting for Customer') => $waitingCustomer,
+                ($isAr ? 'بانتظار الجهة الحكومية' : 'Waiting for Government') => $waitingGovernment,
+                ($isAr ? 'متوسط اتفاقية مستوى الخدمة' : 'Average SLA') => $this->averageSlaLabel($query),
+                ($isAr ? 'رضا العملاء' : 'Customer Satisfaction') => '0%',
+                ($isAr ? 'الموظفون النشطون' : 'Active Employees') => $this->employeesQuery()->where('sanad_employee_status', 'available')->count(),
+                ($isAr ? 'حجم العمل الحالي' : 'Current Workload') => $inProgress,
+                ($isAr ? 'الإيرادات الشهرية' : 'Monthly Revenue') => getPriceFormat($revenue),
+                ($isAr ? 'تسويات معلقة' : 'Pending Settlement') => getPriceFormat(max($revenue - $settled, 0)),
+                ($isAr ? 'عمولة المنصة' : 'Platform Commission') => getPriceFormat(max($revenue - $settled, 0)),
             ],
             'today_tasks' => (clone $query)->whereDate('updated_at', now()->toDateString())->latest()->take(6)->get(),
             'recent_orders' => (clone $query)->with(['customer', 'service'])->latest()->take(8)->get(),
@@ -728,8 +753,9 @@ class OrderController extends Controller
         return collect(optional($service)->required_documents ?: [])
             ->map(function ($document, $index) {
                 if (is_array($document)) {
-                    $name = trim((string) ($document['name'] ?? $document['label'] ?? $document['title'] ?? $document['key'] ?? ''));
-                    $key = trim((string) ($document['key'] ?? \Str::slug($name ?: 'document-'.$index, '_')));
+                    $storedName = trim((string) ($document['name'] ?? $document['label'] ?? $document['title'] ?? $document['key'] ?? ''));
+                    $name = localized_service_document_name($document, '');
+                    $key = trim((string) ($document['key'] ?? \Str::slug($storedName ?: 'document-'.$index, '_')));
 
                     return $name ? ['key' => $key, 'name' => $name] : null;
                 }

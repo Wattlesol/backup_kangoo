@@ -12,8 +12,11 @@ class SanadAiKnowledgeItem extends Model
 
     protected $fillable = [
         'title',
+        'title_ar',
         'category',
+        'category_ar',
         'content',
+        'content_ar',
         'visible_to',
         'metadata',
         'is_active',

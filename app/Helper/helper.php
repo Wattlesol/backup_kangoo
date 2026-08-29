@@ -862,6 +862,41 @@ function verify_provider_document($provider_id){
     }
 }
 
+function localized_service_document_name($document, $fallback = 'Document')
+{
+    if (is_string($document)) {
+        return trim($document) ?: $fallback;
+    }
+
+    if (!is_array($document)) {
+        return $fallback;
+    }
+
+    $name = trim((string) ($document['name'] ?? $document['document_name'] ?? ''));
+    $nameAr = trim((string) ($document['name_ar'] ?? ''));
+
+    if (app()->getLocale() === 'ar') {
+        return $nameAr ?: $name ?: ($document['key'] ?? $fallback);
+    }
+
+    return $name ?: $nameAr ?: ($document['key'] ?? $fallback);
+}
+
+function localized_model_name($model, $fallback = '-')
+{
+    if (!$model) {
+        return $fallback;
+    }
+
+    $name = trim((string) ($model->name ?? ''));
+    $nameEn = trim((string) ($model->name_en ?? ''));
+    $nameAr = trim((string) ($model->name_ar ?? ''));
+
+    return app()->getLocale() === 'ar'
+        ? ($nameAr ?: $name ?: $nameEn ?: $fallback)
+        : ($nameEn ?: $name ?: $nameAr ?: $fallback);
+}
+
 function calculate_commission($total_amount = 0,$provider_commission = 0, $commission_type = 'percent',$type = '', $totalEarning = 0,$count=0){
     if($total_amount === 0){
         return [
@@ -2017,4 +2052,186 @@ if (!function_exists('Labels')) {
         }
     }
 
+}
+
+if (!function_exists('formatNotificationTitle')) {
+    function formatNotificationTitle($notification) {
+        $data = is_array($notification) ? $notification : (is_object($notification) ? (is_array($notification->data ?? null) ? $notification->data : (json_decode($notification->data ?? '{}', true) ?: [])) : []);
+        $type = $data['type'] ?? '';
+        $id = $data['id'] ?? ($data['booking_id'] ?? '');
+        $isAr = app()->getLocale() === 'ar';
+
+        if ($isAr) {
+            $arTitles = [
+                'partner_verification_document_submitted' => 'مستند تحقق الشريك',
+                'sanad_document_review' => 'مراجعة المستند',
+                'sanad_chat_assignment' => 'تعيين محادثة',
+                'add_booking' => 'طلب جديد',
+                'booking_added' => 'طلب جديد',
+                'assigned_booking' => 'إسناد طلب',
+                'transfer_booking' => 'تحويل طلب',
+                'update_booking_status' => 'تحديث حالة الطلب',
+                'cancel_booking' => 'إلغاء الطلب',
+                'cancelled_booking' => 'إلغاء الطلب',
+                'reject_booking' => 'رفض الطلب',
+                'accept_booking' => 'قبول الطلب',
+                'payment_message_status' => 'حالة الدفع',
+                'wallet_top_up' => 'شحن المحفظة',
+                'wallet_refund' => 'استرداد المحفظة',
+                'payout' => 'سداد المستحقات',
+                'payout_paid' => 'سداد المستحقات',
+                'buzz_alert' => 'تنبيه عاجل',
+                'post_request' => 'طلب خدمة جديد',
+                'bid_accepted' => 'قبول العرض',
+                'incomming_bid' => 'عرض أسعار جديد',
+                'provider_registered' => 'شريك جديد',
+                'customer_registered' => 'عميل جديد',
+            ];
+
+            $label = $arTitles[$type] ?? (isset($data['subject']) && $data['subject'] !== '' ? formatNotificationMessage($data['subject']) : str_replace('_', ' ', $type));
+            if (!empty($id)) {
+                return $label . ' #' . $id;
+            }
+            return $label;
+        }
+
+        $label = ucwords(str_replace('_', ' ', $type ?: ($data['subject'] ?? 'Notification')));
+        if (!empty($id)) {
+            return $label . ' #' . $id;
+        }
+        return $label;
+    }
+}
+
+if (!function_exists('formatNotificationMessage')) {
+    function formatNotificationMessage($messageOrNotification) {
+        if (is_array($messageOrNotification) || (is_object($messageOrNotification) && isset($messageOrNotification->data))) {
+            $data = is_array($messageOrNotification) ? $messageOrNotification : (is_array($messageOrNotification->data) ? $messageOrNotification->data : (json_decode($messageOrNotification->data ?? '{}', true) ?: []));
+            $msg = $data['message'] ?? ($data['subject'] ?? '');
+        } else {
+            $msg = (string) $messageOrNotification;
+        }
+
+        if (empty($msg)) {
+            return app()->getLocale() === 'ar' ? 'إشعار جديد' : 'New notification';
+        }
+
+        if (app()->getLocale() !== 'ar') {
+            return $msg;
+        }
+
+        $docReplacements = [
+            'Commercial Registration' => 'السجل التجاري',
+            'Trade License' => 'الرخصة التجارية',
+            'National ID' => 'الهوية الوطنية',
+            'Passport' => 'جواز السفر',
+            'Driving License' => 'رخصة القيادة',
+            'Tax Certificate' => 'الشهادة الضريبية',
+            'Certificate of Incorporation' => 'شهادة التأسيس',
+            'Bank Statement' => 'كشف حساب بنكي',
+            'Emirates ID' => 'الهوية الإماراتية',
+            'Identity Document' => 'وثيقة إثبات الهوية',
+            'Business License' => 'رخصة مزاولة الأعمال',
+            'Address Proof' => 'إثبات العنوان',
+        ];
+
+        if (preg_match('/^(.*?)\s+submitted\s+(.*?)\s+for\s+verification\.?$/i', $msg, $m)) {
+            $provider = trim($m[1]);
+            $doc = trim($m[2]);
+            $docAr = $docReplacements[$doc] ?? $doc;
+            return "قام {$provider} بتقديم {$docAr} للتحقق.";
+        }
+
+        if (preg_match('/^Your\s+document\s+was\s+marked\s+(Approved|Rejected|Pending)\.?$/i', $msg, $m)) {
+            $status = strtolower($m[1]);
+            if ($status === 'approved') return 'تمت الموافقة على المستند الخاص بك.';
+            if ($status === 'rejected') return 'تم رفض المستند الخاص بك.';
+            return 'المستند الخاص بك قيد المراجعة.';
+        }
+
+        if (stripos($msg, 'Chat assignment request') !== false) {
+            return str_replace(
+                ['Chat assignment request.', 'Chat assignment request', 'Request:', 'Customer:', 'Assigned by:', 'Please accept to entertain the customer.'],
+                ['طلب تعيين محادثة.', 'طلب تعيين محادثة', 'الطلب:', 'العميل:', 'تم التعيين بواسطة:', 'يرجى القبول لخدمة العميل.'],
+                $msg
+            );
+        }
+
+        if (preg_match('/^New\s+booking\s+(?:#(\d+)\s+)?added\s+by\s+(.*?)$/i', $msg, $m)) {
+            $id = $m[1] ?? '';
+            $name = $m[2] ?? '';
+            return $id ? "تمت إضافة طلب جديد #{$id} بواسطة {$name}" : "تمت إضافة طلب جديد بواسطة {$name}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+has\s+been\s+assigned\s+to\s+(.*?)$/i', $msg, $m)) {
+            return "تم إسناد الطلب #{$m[1]} إلى {$m[2]}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+has\s+been\s+transferred\s+to\s+(.*?)$/i', $msg, $m)) {
+            return "تم تحويل الطلب #{$m[1]} إلى {$m[2]}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+status\s+has\s+been\s+changed\s+to\s+(.*?)$/i', $msg, $m)) {
+            return "تم تغيير حالة الطلب #{$m[1]} إلى {$m[2]}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+has\s+been\s+cancelled/i', $msg, $m)) {
+            return "تم إلغاء الطلب #{$m[1]}";
+        }
+
+        $search = [
+            'Partner verification document submitted' => 'تم تقديم مستند تحقق الشريك',
+            'Document review' => 'مراجعة المستند',
+            'Chat assigned to you' => 'تم تعيين محادثة لك',
+            'Wallet top up' => 'شحن المحفظة',
+            'Payout paid' => 'سداد المستحقات',
+        ];
+        return str_replace(array_keys($search), array_values($search), $msg);
+    }
+}
+
+if (!function_exists('quick_status_label')) {
+    function quick_status_label($status, ?string $locale = null): string {
+        $status = \Illuminate\Support\Str::snake((string) $status);
+        $locale = $locale ?: app()->getLocale();
+
+        if ($locale !== 'ar') {
+            return \Illuminate\Support\Str::headline($status);
+        }
+
+        $labels = [
+            'submitted' => 'تم تقديم الطلب',
+            'pending_review' => 'قيد المراجعة',
+            'assigned_to_partner' => 'تم الإسناد إلى الشريك',
+            'assigned_to_employee' => 'تم الإسناد إلى الموظف',
+            'in_progress' => 'قيد التنفيذ',
+            'awaiting_customer_action' => 'بانتظار إجراء العميل',
+            'awaiting_quality_review' => 'بانتظار مراجعة الجودة',
+            'completed' => 'مكتمل',
+            'closed' => 'مغلق',
+            'escalated' => 'مصعّد',
+            'pending' => 'قيد الانتظار',
+            'paid' => 'مدفوع',
+            'refunded' => 'مسترد',
+            'approved' => 'معتمد',
+            'verified' => 'موثّق',
+            'rejected' => 'مرفوض',
+            'replacement_requested' => 'مطلوب استبدال',
+            'stored' => 'محفوظ',
+            'processing' => 'قيد المعالجة',
+            'failed' => 'فشل',
+            'urgent' => 'عاجل',
+            'high' => 'مرتفع',
+            'normal' => 'عادي',
+            'low' => 'منخفض',
+            'open' => 'مفتوح',
+            'resolved' => 'تم الحل',
+            'cancelled' => 'ملغي',
+            'acknowledged' => 'تم التأكيد',
+            'unread' => 'غير مقروء',
+            'answered' => 'تمت الإجابة',
+        ];
+
+        return $labels[$status] ?? \Illuminate\Support\Str::headline($status);
+    }
 }

@@ -18,12 +18,12 @@
                   <table id="datatable" class="table table-striped border">
                       <thead>
                       <tr>
-                          <th>Package Name</th>
-                          <th>Service</th>
-                          <th>Booking Number</th>
-                          <th>complaint type</th>
-                          <th>complaint details</th>
-                          <th>Date</th>
+                          @php $isAr = app()->getLocale() === 'ar'; @endphp<th>{{ $isAr ? 'اسم باقة الخدمات' : 'Service Bundle Name' }}</th>
+                          <th>{{ $isAr ? 'الخدمة' : 'Service' }}</th>
+                          <th>{{ $isAr ? 'رقم الطلب' : 'Order Number' }}</th>
+                          <th>{{ $isAr ? 'نوع الشكوى' : 'complaint type' }}</th>
+                          <th>{{ $isAr ? 'تفاصيل الشكوى' : 'complaint details' }}</th>
+                          <th>{{ $isAr ? 'التاريخ' : 'Date' }}</th>
                           <th>file</th>
                       </tr>
                           <tr>
@@ -46,7 +46,7 @@
                     <thead>
                         <tr>
                             <th>Comment</th>
-                            <th>Date</th>
+                            <th>{{ $isAr ? 'التاريخ' : 'Date' }}</th>
                             <th>file</th>
 
                             <th>Added by</th>

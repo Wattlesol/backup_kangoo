@@ -9,14 +9,14 @@
                             <div class="d-flex gap-2 align-items-center">
                                 @if($store)
                                     <a href="{{ route('store.edit', $store->id) }}" class="btn btn-sm btn-primary">
-                                        <i class="fa fa-edit"></i> Edit Store
+                                        @php $isAr = app()->getLocale() === 'ar'; @endphp<i class="fa fa-edit"></i> {{ $isAr ? 'تعديل المتجر' : 'Edit Store' }}
                                     </a>
                                     <a href="{{ url('/store') }}" target="_blank" class="btn btn-sm btn-success">
-                                        <i class="fa fa-external-link-alt"></i> View Store
+                                        <i class="fa fa-external-link-alt"></i> {{ $isAr ? 'عرض المتجر' : 'View Store' }}
                                     </a>
                                 @else
                                     <a href="{{ route('store.create') }}" class="btn btn-sm btn-primary">
-                                        <i class="fa fa-plus-circle"></i> Create Store
+                                        <i class="fa fa-plus-circle"></i> {{ $isAr ? 'إنشاء متجر' : 'Create Store' }}
                                     </a>
                                 @endif
                             </div>
@@ -192,7 +192,7 @@
                 <h4 class="mb-3">No Store Created</h4>
                 <p class="text-muted mb-4">Create your store to start selling products and managing your e-commerce business.</p>
                 <a href="{{ route('store.create') }}" class="btn btn-primary">
-                    <i class="fa fa-plus-circle"></i> Create Store Now
+                    <i class="fa fa-plus-circle"></i> {{ $isAr ? 'إنشاء متجر' : 'Create Store' }} Now
                 </a>
             </div>
         </div>

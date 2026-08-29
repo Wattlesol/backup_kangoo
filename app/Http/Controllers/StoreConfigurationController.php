@@ -40,7 +40,7 @@ class StoreConfigurationController extends Controller
             // Combine all settings
             $storeSettings = [
                 'general' => [
-                    'store_name' => $generalData['site_name'] ?? 'Sanad Solutions',
+                    'store_name' => $generalData['site_name'] ?? 'Quick',
                     'store_tagline' => $generalData['site_description'] ?? 'Your one-stop shop for everything',
                     'inquiry_email' => $generalData['inquriy_email'] ?? '',
                     'helpline_number' => $generalData['helpline_number'] ?? '',

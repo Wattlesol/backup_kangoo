@@ -14,7 +14,10 @@ class ServiceResource extends JsonResource
      */
     public function toArray($request)
     {
-        $user_id = request()->customer_id;
+        $authenticatedCustomer = auth('sanctum')->user();
+        $user_id = $authenticatedCustomer && in_array($authenticatedCustomer->user_type, ['user', 'customer'], true)
+            ? $authenticatedCustomer->id
+            : null;
         $image = getSingleMedia($this,'service_attachment', null);
         $file_extention = config('constant.IMAGE_EXTENTIONS');
         $extention = in_array(strtolower(imageExtention($image)),$file_extention);

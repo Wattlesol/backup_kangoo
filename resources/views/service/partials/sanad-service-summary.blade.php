@@ -1,119 +1,33 @@
 @php
+    $isAr = app()->getLocale() === 'ar';
     $summary = $sanadServiceSummary ?? [];
-    $isCustomerCatalog = auth()->user()->hasAnyRole(['customer', 'user']);
-    $serviceCatalogRoute = $isCustomerCatalog ? route('service.user-service-list') : route('service.index');
-    $packageCatalogRoute = $isCustomerCatalog ? route('service.user-service-list') : route('servicepackage.index');
-    $addonCatalogRoute = $isCustomerCatalog ? route('service.user-service-list') : route('serviceaddon.index');
+    $total = (int) ($summary['total_services'] ?? 0);
+    $active = (int) ($summary['active_services'] ?? 0);
+    $readiness = $total > 0 ? (int) round(($active / $total) * 100) : 0;
 @endphp
-
-@if(auth()->user()->hasAnyRole(['provider', 'admin', 'demo_admin', 'customer', 'user']))
-    <div class="col-lg-12">
-        <div class="card sanad-service-summary">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+<div class="col-lg-12">
+    <div class="card card-block card-stretch mb-3 quick-service-catalog-summary">
+        <div class="card-body quick-service-catalog-hero">
+            <div class="d-flex justify-content-between align-items-start flex-wrap mb-3">
                 <div>
-                    <h4 class="font-weight-bold mb-1">Sanad Service Catalog</h4>
-                    <span class="text-muted">Service availability, packages, add-ons, and partner catalog readiness</span>
+                    <h4 class="font-weight-bold mb-1">{{ $isAr ? 'دليل خدمات كويك' : 'Quick Service Catalog' }}</h4>
+                    <span class="text-muted">{{ $isAr ? 'إدارة الخدمات والباقات والإضافات المتاحة للشركاء والعملاء.' : 'Manage the services, packages, and add-ons available to partners and customers.' }}</span>
                 </div>
-                @if(auth()->user()->can('service add'))
-                    <a href="{{ route('service.create') }}" class="btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> Add Service</a>
-                @endif
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge badge-primary px-3 py-2">{{ $isAr ? 'جاهزية الدليل' : 'Catalog Readiness' }}: {{ $readiness }}%</span>
+                    @if(isset($auth_user) && $auth_user->can('service add') && Route::currentRouteName() !== 'servicepackage.service')
+                        <a href="{{ route('service.create') }}" class="btn btn-primary"><x-quick-icon name="check" /> {{ $isAr ? 'إضافة خدمة' : 'Add Service' }}</a>
+                    @endif
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-xl-3 col-md-6 mb-3">
-                        <a class="sanad-service-kpi" href="{{ $serviceCatalogRoute }}">
-                            <span>Total Services</span>
-                            <strong>{{ $summary['total_services'] ?? 0 }}</strong>
-                        </a>
-                    </div>
-                    <div class="col-xl-3 col-md-6 mb-3">
-                        <a class="sanad-service-kpi" href="{{ $isCustomerCatalog ? route('service.user-service-list', ['status' => 1]) : route('service.index', ['status' => 1]) }}">
-                            <span>Active Services</span>
-                            <strong>{{ $summary['active_services'] ?? 0 }}</strong>
-                        </a>
-                    </div>
-                    <div class="col-xl-3 col-md-6 mb-3">
-                        <a class="sanad-service-kpi" href="{{ $isCustomerCatalog ? route('service.user-service-list', ['status' => 0]) : route('service.index', ['status' => 0]) }}">
-                            <span>Inactive Services</span>
-                            <strong>{{ $summary['inactive_services'] ?? 0 }}</strong>
-                        </a>
-                    </div>
-                    <div class="col-xl-3 col-md-6 mb-3">
-                        <a class="sanad-service-kpi" href="{{ $packageCatalogRoute }}">
-                            <span>Packages</span>
-                            <strong>{{ $summary['active_packages'] ?? 0 }}/{{ $summary['packages'] ?? 0 }}</strong>
-                        </a>
-                    </div>
-                    <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
-                        <a class="sanad-service-kpi" href="{{ $addonCatalogRoute }}">
-                            <span>Add-ons</span>
-                            <strong>{{ $summary['active_addons'] ?? 0 }}/{{ $summary['addons'] ?? 0 }}</strong>
-                        </a>
-                    </div>
-                    <div class="col-xl-9 mb-0">
-                        <div class="sanad-service-note">
-                            <span>Catalog Readiness</span>
-                            <strong>{{ ($summary['active_services'] ?? 0) > 0 ? 'Ready for customer booking' : 'No active services available' }}</strong>
-                        </div>
-                    </div>
-                </div>
+            <div class="row">
+                <div class="col-6 col-md-4 col-xl-2 mb-2"><div class="border rounded p-3 h-100"><small class="text-muted d-block">{{ $isAr ? 'إجمالي الخدمات' : 'Total Services' }}</small><strong class="h4 mb-0">{{ $total }}</strong></div></div>
+                <div class="col-6 col-md-4 col-xl-2 mb-2"><div class="border rounded p-3 h-100"><small class="text-muted d-block">{{ $isAr ? 'الخدمات النشطة' : 'Active Services' }}</small><strong class="h4 mb-0 text-success">{{ $active }}</strong></div></div>
+                <div class="col-6 col-md-4 col-xl-2 mb-2"><div class="border rounded p-3 h-100"><small class="text-muted d-block">{{ $isAr ? 'غير النشطة' : 'Inactive Services' }}</small><strong class="h4 mb-0">{{ (int) ($summary['inactive_services'] ?? 0) }}</strong></div></div>
+                <div class="col-6 col-md-4 col-xl-2 mb-2"><div class="border rounded p-3 h-100"><small class="text-muted d-block">{{ $isAr ? 'باقات الخدمات' : 'Service Bundles' }}</small><strong class="h4 mb-0">{{ (int) ($summary['packages'] ?? 0) }}</strong></div></div>
+                <div class="col-6 col-md-4 col-xl-2 mb-2"><div class="border rounded p-3 h-100"><small class="text-muted d-block">{{ $isAr ? 'الخدمات الإضافية' : 'Additional Services' }}</small><strong class="h4 mb-0">{{ (int) ($summary['addons'] ?? 0) }}</strong></div></div>
+                <div class="col-6 col-md-4 col-xl-2 mb-2"><div class="border rounded p-3 h-100"><small class="text-muted d-block">{{ $isAr ? 'نطاق الشريك' : 'Partner Scope' }}</small><strong class="h6 mb-0">{{ auth()->user()->hasAnyRole(['admin','demo_admin']) ? ($isAr ? 'كامل' : 'Full') : ($isAr ? 'مخصص' : 'Assigned') }}</strong></div></div>
             </div>
         </div>
     </div>
-@endif
-
-@once
-    <style>
-        .sanad-service-summary .card-header {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-        }
-
-        .sanad-service-kpi,
-        .sanad-service-note {
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
-            background: #fff;
-        }
-
-        .sanad-service-kpi {
-            min-height: 82px;
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            color: inherit;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .sanad-service-kpi:hover {
-            color: inherit;
-            border-color: rgba(255, 111, 0, 0.35);
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-            text-decoration: none;
-        }
-
-        .sanad-service-note {
-            min-height: 82px;
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .sanad-service-kpi span,
-        .sanad-service-note span {
-            color: #6c757d;
-            font-size: 13px;
-        }
-
-        .sanad-service-kpi strong,
-        .sanad-service-note strong {
-            font-size: 20px;
-            line-height: 1.1;
-            text-align: right;
-            overflow-wrap: anywhere;
-        }
-    </style>
-@endonce
+</div>

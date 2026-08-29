@@ -20,6 +20,7 @@ use App\Models\Service;
 use App\Models\PackageServiceMapping;
 use Yajra\DataTables\DataTables;
 use App\Models\BookingPackageMapping;
+use Illuminate\Validation\ValidationException;
 
 class ServicePackageController extends Controller
 {
@@ -75,11 +76,17 @@ class ServicePackageController extends Controller
 
             ->editColumn('name', function($query){
                 if (auth()->user()->can('service list')) {
-                    $link ='<a class="btn-link btn-link-hover"  href='.route('servicepackage.service',$query->id).'>'.$query->name.'</a>';
+                    $link ='<a class="btn-link btn-link-hover" href='.route('servicepackage.create', ['id' => $query->id]).'>'.$query->name.'</a>';
                 } else {
                     $link = $query->name;
                 }
                 return $link;
+            })
+            ->editColumn('name_ar', function($query){
+                if (auth()->user()->can('service list') && !empty($query->name_ar)) {
+                    return '<a class="btn-link btn-link-hover" href='.route('servicepackage.create', ['id' => $query->id]).' dir="rtl">'.$query->name_ar.'</a>';
+                }
+                return $query->name_ar ? '<span dir="rtl">'.$query->name_ar.'</span>' : '-';
             })
 
             ->editColumn('category_id', function ($query) {
@@ -98,7 +105,7 @@ class ServicePackageController extends Controller
                 return view('servicepackage.action', compact('servicepackage'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['action', 'status','name','check'])
+            ->rawColumns(['action', 'status','name','name_ar','check'])
             ->toJson();
     }
 
@@ -179,8 +186,12 @@ class ServicePackageController extends Controller
             'name_ar' => 'required|string|max:255',
             'service_id' => 'nullable',
             'service_id_data' => 'required_without:service_id|array|min:1',
-            'status' => 'required',
+            'service_id_data.*' => 'integer|distinct|exists:services,id',
+            'status' => 'required|boolean',
             'price' => 'nullable|numeric|min:0',
+            'description' => 'nullable|string|max:4000',
+            'package_attachment' => 'nullable',
+            'package_attachment.*' => 'file|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
         $data = $request->all();
         $provider_id = admin_id();
@@ -191,6 +202,11 @@ class ServicePackageController extends Controller
         $serviceIds = is_array($serviceIds) ? $serviceIds : (empty($serviceIds) ? [] : explode(',', $serviceIds));
         $serviceIds = collect($serviceIds)->filter()->unique()->values()->all();
         $servicePrices = Service::whereIn('id', $serviceIds)->pluck('price', 'id')->map(fn ($price) => (float) $price);
+        if ($servicePrices->count() !== count($serviceIds)) {
+            throw ValidationException::withMessages([
+                'service_id_data' => __('validation.exists', ['attribute' => __('messages.service')]),
+            ]);
+        }
         $bundlePrice = $request->filled('price') ? (float) $request->price : (float) $servicePrices->sum();
 
         if ($bundlePrice <= 0) {

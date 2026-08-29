@@ -1,12 +1,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="X-UA-Compatible" content="ie=edge">
-<title>{{env('APP_NAME')}} Service </title>
+<title>{{ config('sanad.brand.name', 'Quick') }} | {{ config('sanad.brand.tagline_ar') }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="shortcut icon" class="favicon_preview" href="{{ getSingleMedia(imageSession('get'),'favicon',null) }}" />
 <link rel="stylesheet" href="{{ asset('css/swiper-bundle.min.css') }}"/>
 <link rel="stylesheet" href="{{ asset('css/landing-page.min.css') }}">
 <link rel="stylesheet" href="{{ asset('css/landing-page-rtl.min.css') }}">
 <link rel="stylesheet" href="{{ asset('css/landing-page-custom.min.css') }}">
+<link rel="stylesheet" href="{{ asset('css/custom.css?v=' . time()) }}">
 <link rel="stylesheet" href="{{ asset('css/store-dark-mode.css?v=' . time()) }}">
 <link rel="stylesheet" href="{{ asset('vendor/@fortawesome/fontawesome-free/css/all.min.css')}}">
 @if(in_array(app()->getLocale(), ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']))
@@ -141,5 +145,3 @@ window.currentLocale = '{{ app()->getLocale() }}';
             };
         </script>
     @endforeach
-
-

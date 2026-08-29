@@ -105,7 +105,11 @@ class BookingController extends Controller
 
         $id = $request->booking_id;
 
-        $booking_data = Booking::with('customer','provider','service','bookingRating','bookingPostJob','bookingAddonService','bookingPackage')->where('id',$id)->first();
+        $booking_data = Booking::query()
+            ->myBooking()
+            ->with('customer','provider','service','bookingRating','bookingPostJob','bookingAddonService','bookingPackage')
+            ->where('id', $id)
+            ->first();
 
         if($booking_data == null){
             $message = __('messages.booking_not_found');
@@ -120,17 +124,20 @@ class BookingController extends Controller
         $handyman_data = HandymanResource::collection($booking_detail->handymanAdded);
 
         $customer_review = null;
-        if($request->customer_id != null){
-            $customer_review = BookingRating::where('customer_id',$request->customer_id)->where('service_id',$booking_detail->service_id)->where('booking_id',$id)->first();
+        $reviewCustomerId = in_array(auth()->user()->user_type, ['user', 'customer'], true)
+            ? auth()->id()
+            : $booking_data->customer_id;
+        if($reviewCustomerId != null){
+            $customer_review = BookingRating::where('customer_id',$reviewCustomerId)->where('service_id',$booking_detail->service_id)->where('booking_id',$id)->first();
             if (!empty($customer_review))
             {
                 $customer_review = new BookingRatingResource($customer_review);
             }
         }
 
-        $auth_user = auth()->user();
-        if(count($auth_user->unreadNotifications) > 0 ) {
-            $auth_user->unreadNotifications->where('data.id',$id)->markAsRead();
+        $authenticatedUser = auth()->user();
+        if(count($authenticatedUser->unreadNotifications) > 0 ) {
+            $authenticatedUser->unreadNotifications->where('data.id',$id)->markAsRead();
         }
 
         $booking_activity = BookingActivity::where('booking_id',$id)->orderBy('id', 'asc')->get();
@@ -166,11 +173,38 @@ class BookingController extends Controller
 
     public function saveBookingRating(Request $request)
     {
-        $rating_data = $request->all();
-        $result = BookingRating::updateOrCreate(['id' => $request->id], $rating_data);
+        abort_unless(auth()->check() && in_array(auth()->user()->user_type, ['user', 'customer'], true), 403);
+
+        $validated = $request->validate([
+            'id' => 'nullable|integer',
+            'booking_id' => 'required|integer',
+            'rating' => 'required|numeric|min:1|max:5',
+            'review' => 'nullable|string|max:2000',
+        ]);
+        $booking = Booking::query()
+            ->where('customer_id', auth()->id())
+            ->with('service')
+            ->findOrFail($validated['booking_id']);
+
+        $rating = !empty($validated['id'])
+            ? BookingRating::where('customer_id', auth()->id())->findOrFail($validated['id'])
+            : new BookingRating();
+        if ($rating->exists && (int) $rating->booking_id !== (int) $booking->id) {
+            abort(403);
+        }
+
+        $rating->fill([
+            'booking_id' => $booking->id,
+            'customer_id' => auth()->id(),
+            'service_id' => $booking->service_id,
+            'rating' => $validated['rating'],
+            'review' => $validated['review'] ?? null,
+        ]);
+        $wasRecentlyCreated = !$rating->exists;
+        $rating->save();
 
         $message = __('messages.update_form',[ 'form' => __('messages.rating') ] );
-		if($result->wasRecentlyCreated){
+		if($wasRecentlyCreated){
 			$message = __('messages.save_form',[ 'form' => __('messages.rating') ] );
 		}
 
@@ -196,18 +230,46 @@ class BookingController extends Controller
 
     public function bookingUpdate(Request $request)
     {
+        abort_unless(
+            auth()->check() && in_array(auth()->user()->user_type, ['admin', 'provider', 'handyman'], true),
+            403
+        );
+
+        $request->validate([
+            'id' => 'required|integer',
+            'status' => 'required|string|max:50',
+            'payment_status' => 'nullable|string|max:50',
+            'service_addon' => 'nullable|array',
+            'service_addon.*' => 'integer|distinct',
+            'extra_charges' => 'nullable|array',
+            'extra_charges.*.title' => 'required|string|max:255',
+            'extra_charges.*.price' => 'required|numeric|min:0',
+            'extra_charges.*.qty' => 'required|integer|min:1',
+        ]);
+
         $data = $request->all();
         $id = $request->id;
+        unset(
+            $data['id'],
+            $data['customer_id'],
+            $data['provider_id'],
+            $data['service_id'],
+            $data['payment_id'],
+            $data['created_by'],
+            $data['sanad_reference'],
+            $data['sanad_stage'],
+            $data['sanad_priority']
+        );
         $data['start_at'] = isset($request->start_at) ? date('Y-m-d H:i:s',strtotime($request->start_at)) : null;
         $data['end_at'] = isset($request->end_at) ? date('Y-m-d H:i:s',strtotime($request->end_at)) : null;
 
 
-        $bookingdata = Booking::find($id);
+        $bookingdata = Booking::query()->myBooking()->findOrFail($id);
         $paymentdata = Payment::where('booking_id',$id)->first();
         if($request->type == 'service_addon'){
             if($request->has('service_addon') && $request->service_addon != null ){
                 foreach($request->service_addon as $serviceaddon){
-                    $get_addon = BookingServiceAddonMapping::where('id',$serviceaddon)->first();
+                    $get_addon = BookingServiceAddonMapping::where('booking_id', $bookingdata->id)->findOrFail($serviceaddon);
                     $get_addon->status = 1;
                     $get_addon->update();
                 }
@@ -220,7 +282,7 @@ class BookingController extends Controller
         }
         if($request->has('service_addon') && $request->service_addon != null ){
             foreach($request->service_addon as $serviceaddon){
-                $get_addon = BookingServiceAddonMapping::where('id',$serviceaddon)->first();
+                $get_addon = BookingServiceAddonMapping::where('booking_id', $bookingdata->id)->findOrFail($serviceaddon);
                 $get_addon->status = 1;
                 $get_addon->update();
             }
@@ -434,13 +496,17 @@ class BookingController extends Controller
         return comman_message_response($message);
     }
     public function bookingRatingByCustomer(Request $request){
-        $customer_review = null;
-        if($request->customer_id != null){
-            $customer_review = BookingRating::where('customer_id',$request->customer_id)->where('service_id',$request->service_id)->where('booking_id',$request->booking_id)->first();
-            if (!empty($customer_review))
-            {
-                $customer_review = new BookingRatingResource($customer_review);
-            }
+        abort_unless(auth()->check() && in_array(auth()->user()->user_type, ['user', 'customer'], true), 403);
+        $validated = $request->validate([
+            'booking_id' => 'required|integer',
+        ]);
+        $booking = Booking::where('customer_id', auth()->id())->findOrFail($validated['booking_id']);
+        $customer_review = BookingRating::where('customer_id', auth()->id())
+            ->where('booking_id', $booking->id)
+            ->first();
+        if (!empty($customer_review))
+        {
+            $customer_review = new BookingRatingResource($customer_review);
         }
         return comman_custom_response($customer_review);
 

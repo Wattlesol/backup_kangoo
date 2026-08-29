@@ -7,8 +7,8 @@
     <div class="card sanad-customer-card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h4 class="font-weight-bold mb-1">Customer Request Overview</h4>
-                <span class="text-muted">Requests, actions, documents, messages, and payment status</span>
+                <h4 class="font-weight-bold mb-1">{{ app()->getLocale() === "ar" ? "نظرة عامة على طلبات العميل" : "Customer Request Overview" }}</h4>
+                <span class="text-muted">{{ app()->getLocale() === "ar" ? "الطلبات والإجراءات والمستندات والرسائل وحالة الدفع" : "Requests, actions, documents, messages, and payment status" }}</span>
             </div>
             <a href="{{ route('sanad.requests.index') }}" class="btn-link btn-link-hover"><u>{{ __('messages.view_all') }}</u></a>
         </div>
@@ -82,14 +82,14 @@
                             <div class="sanad-customer-request">
                                 <div>
                                     <a href="{{ route('sanad.requests.show', $request->id) }}">
-                                        <strong>#{{ $request->sanad_reference ?: $request->id }}</strong>
+                                        <strong>{{ $request->quick_reference }}</strong>
                                     </a>
                                     <span>{{ optional($request->service)->name ?: '-' }}</span>
                                 </div>
                                 <span>{{ Str::headline($request->sanad_stage ?: 'submitted') }}</span>
                             </div>
                         @empty
-                            <div class="sanad-customer-empty">No Sanad requests yet</div>
+                            <div class="sanad-customer-empty">No Quick requests yet</div>
                         @endforelse
                     </div>
                 </div>

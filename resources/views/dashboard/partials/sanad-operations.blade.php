@@ -1,18 +1,47 @@
 @php
+    $isArabic = app()->getLocale() === 'ar';
     $sanad = $data['sanad'] ?? [];
     $stageCounts = $sanad['stage_counts'] ?? [];
     $recentRequests = $sanad['recent_requests'] ?? collect();
     $attentionRequests = $sanad['attention_requests'] ?? collect();
     $requestLabel = ucfirst($sanad['terminology']['request'] ?? 'Request');
     $paidRevenue = getPriceFormat($sanad['paid_revenue'] ?? 0);
+
+    $stageLabels = [
+        'draft' => $isArabic ? 'مسودة' : 'Draft',
+        'submitted' => $isArabic ? 'تم التقديم' : 'Submitted',
+        'assigned_to_partner' => $isArabic ? 'مسند للشريك' : 'Assigned To Partner',
+        'assigned_to_employee' => $isArabic ? 'مسند للموظف' : 'Assigned To Employee',
+        'pending_review' => $isArabic ? 'قيد المراجعة' : 'Pending Review',
+        'in_progress' => $isArabic ? 'قيد التنفيذ' : 'In Progress',
+        'waiting_for_documents' => $isArabic ? 'بانتظار المستندات' : 'Waiting For Documents',
+        'government_processing' => $isArabic ? 'المعالجة الحكومية' : 'Government Processing',
+        'legal_review' => $isArabic ? 'المراجعة القانونية' : 'Legal Review',
+        'accounting' => $isArabic ? 'المحاسبة' : 'Accounting',
+        'quality_review' => $isArabic ? 'مراجعة الجودة' : 'Quality Review',
+        'ready_for_delivery' => $isArabic ? 'جاهز للتسليم' : 'Ready For Delivery',
+        'awaiting_customer_action' => $isArabic ? 'بانتظار إجراء العميل' : 'Awaiting Customer Action',
+        'awaiting_quality_review' => $isArabic ? 'بانتظار مراجعة الجودة' : 'Awaiting Quality Review',
+        'completed' => $isArabic ? 'مكتمل' : 'Completed',
+        'rejected' => $isArabic ? 'مرفوض' : 'Rejected',
+        'cancelled' => $isArabic ? 'ملغي' : 'Cancelled',
+        'escalated' => $isArabic ? 'تم التصعيد' : 'Escalated',
+    ];
+
+    $priorityLabels = [
+        'high' => $isArabic ? 'عالية' : 'High',
+        'normal' => $isArabic ? 'عادية' : 'Normal',
+        'low' => $isArabic ? 'منخفضة' : 'Low',
+        'urgent' => $isArabic ? 'عاجلة' : 'Urgent',
+    ];
 @endphp
 
 <div class="col-md-12">
     <div class="card sanad-operations-card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h4 class="font-weight-bold mb-1">Sanad Operations</h4>
-                <span class="text-muted">{{ $requestLabel }} lifecycle and alerts</span>
+                <h4 class="font-weight-bold mb-1">{{ $isArabic ? 'عمليات كويك' : 'Quick Operations' }}</h4>
+                <span class="text-muted">{{ $isArabic ? 'دورة حياة الطلبات والتنبيهات' : ($requestLabel . ' lifecycle and alerts') }}</span>
             </div>
             <a href="{{ route('sanad.requests.index') }}" class="btn-link btn-link-hover"><u>{{ __('messages.view_all') }}</u></a>
         </div>
@@ -20,25 +49,25 @@
             <div class="row">
                 <div class="col-lg-3 col-md-6 mb-3">
                     <div class="sanad-metric">
-                        <span>Active {{ Str::plural($requestLabel) }}</span>
+                        <span>{{ $isArabic ? 'الطلبات النشطة' : ('Active ' . Str::plural($requestLabel)) }}</span>
                         <strong>{{ $sanad['active_requests'] ?? 0 }}</strong>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-3">
                     <div class="sanad-metric">
-                        <span>Buzz Alerts</span>
+                        <span>{{ $isArabic ? 'تنبيهات Buzz' : 'Buzz Alerts' }}</span>
                         <strong>{{ $sanad['unread_buzz'] ?? 0 }}</strong>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-3">
                     <div class="sanad-metric">
-                        <span>Pending Documents</span>
+                        <span>{{ $isArabic ? 'المستندات المعلقة' : 'Pending Documents' }}</span>
                         <strong>{{ $sanad['pending_documents'] ?? 0 }}</strong>
                     </div>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-3">
                     <div class="sanad-metric">
-                        <span>AI Escalations</span>
+                        <span>{{ $isArabic ? 'تصعيدات الذكاء الاصطناعي' : 'AI Escalations' }}</span>
                         <strong>{{ $sanad['ai_escalations'] ?? 0 }}</strong>
                     </div>
                 </div>
@@ -47,37 +76,37 @@
             <div class="row">
                 <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
                     <a class="sanad-action-metric" href="{{ route('sanad.requests.index', ['action_state' => 'needs_action']) }}">
-                        <span>Needs Action</span>
+                        <span>{{ $isArabic ? 'تتطلب إجراءً' : 'Needs Action' }}</span>
                         <strong>{{ $sanad['needs_action'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
                     <a class="sanad-action-metric" href="{{ route('sanad.requests.index', ['assignment_state' => 'unassigned']) }}">
-                        <span>Unassigned</span>
+                        <span>{{ $isArabic ? 'غير مسندة' : 'Unassigned' }}</span>
                         <strong>{{ $sanad['unassigned_requests'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
                     <a class="sanad-action-metric" href="{{ route('sanad.requests.index', ['sla_state' => 'overdue']) }}">
-                        <span>Overdue SLA</span>
+                        <span>{{ $isArabic ? 'تجاوزت الوقت المحدد' : 'Overdue SLA' }}</span>
                         <strong>{{ $sanad['overdue_sla'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
                     <a class="sanad-action-metric" href="{{ route('sanad.requests.index', ['sla_state' => 'due_soon']) }}">
-                        <span>Due Soon</span>
+                        <span>{{ $isArabic ? 'قريبة الاستحقاق' : 'Due Soon' }}</span>
                         <strong>{{ $sanad['due_soon_sla'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
                     <a class="sanad-action-metric" href="{{ route('sanad.requests.index', ['payment_state' => 'pending']) }}">
-                        <span>Payment Pending</span>
+                        <span>{{ $isArabic ? 'بانتظار الدفع' : 'Payment Pending' }}</span>
                         <strong>{{ $sanad['payment_pending'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-2 col-lg-4 col-md-6 mb-3">
                     <a class="sanad-action-metric" href="{{ route('sanad.requests.index', ['payment_state' => 'paid']) }}">
-                        <span>Paid Revenue</span>
+                        <span>{{ $isArabic ? 'الإيرادات المحصلة' : 'Paid Revenue' }}</span>
                         <strong>{{ $paidRevenue }}</strong>
                     </a>
                 </div>
@@ -88,7 +117,7 @@
                     <div class="sanad-stage-grid">
                         @foreach($stageCounts as $stage => $count)
                             <div class="sanad-stage-item">
-                                <span>{{ Str::headline($stage) }}</span>
+                                <span>{{ $stageLabels[$stage] ?? Str::headline($stage) }}</span>
                                 <strong>{{ $count }}</strong>
                             </div>
                         @endforeach
@@ -97,25 +126,28 @@
                 <div class="col-xl-4 col-lg-6 mb-3 mb-xl-0">
                     <div class="sanad-recent-box">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="font-weight-bold mb-0">Attention Queue</h5>
-                            <span class="badge badge-light">{{ ($sanad['overdue_sla'] ?? 0) }} overdue</span>
+                            <h5 class="font-weight-bold mb-0">{{ $isArabic ? 'قائمة الاهتمام العاجل' : 'Attention Queue' }}</h5>
+                            <span class="badge badge-light">{{ ($sanad['overdue_sla'] ?? 0) }} {{ $isArabic ? 'متأخر' : 'overdue' }}</span>
                         </div>
                         @forelse($attentionRequests as $request)
                             <div class="sanad-request-row">
                                 <div>
                                     <a href="{{ route('sanad.requests.show', $request->id) }}">
-                                        <strong>#{{ $request->sanad_reference ?: $request->id }}</strong>
+                                        <strong>{{ $request->quick_reference }}</strong>
                                     </a>
                                     <span>{{ optional($request->customer)->display_name ?: optional($request->customer)->first_name ?: '-' }}</span>
                                 </div>
                                 <div class="sanad-request-actions">
-                                    <span class="badge badge-warning">{{ Str::headline($request->sanad_priority ?: 'normal') }}</span>
-                                    <a href="{{ route('sanad.requests.show', $request->id) }}" class="btn-link btn-link-hover">Open</a>
+                                    @php
+                                        $pKey = strtolower($request->sanad_priority ?: 'normal');
+                                    @endphp
+                                    <span class="badge badge-warning">{{ $priorityLabels[$pKey] ?? Str::headline($request->sanad_priority ?: 'normal') }}</span>
+                                    <a href="{{ route('sanad.requests.show', $request->id) }}" class="btn-link btn-link-hover">{{ $isArabic ? 'فتح' : 'Open' }}</a>
                                 </div>
                             </div>
                         @empty
                             <div class="sanad-empty-state">
-                                No urgent Sanad {{ Str::plural(strtolower($requestLabel)) }}
+                                {{ $isArabic ? 'لا توجد طلبات كويك عاجلة' : ('No urgent Quick ' . Str::plural(strtolower($requestLabel))) }}
                             </div>
                         @endforelse
                     </div>
@@ -123,25 +155,28 @@
                 <div class="col-xl-4">
                     <div class="sanad-recent-box">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="font-weight-bold mb-0">Recent {{ Str::plural($requestLabel) }}</h5>
-                            <span class="badge badge-light">{{ $sanad['open_chats'] ?? 0 }} open chats</span>
+                            <h5 class="font-weight-bold mb-0">{{ $isArabic ? 'أحدث الطلبات' : ('Recent ' . Str::plural($requestLabel)) }}</h5>
+                            <span class="badge badge-light">{{ $sanad['open_chats'] ?? 0 }} {{ $isArabic ? 'محادثة نشطة' : 'open chats' }}</span>
                         </div>
                         @forelse($recentRequests as $request)
                             <div class="sanad-request-row">
                                 <div>
                                     <a href="{{ route('sanad.requests.show', $request->id) }}">
-                                        <strong>#{{ $request->sanad_reference ?: $request->id }}</strong>
+                                        <strong>{{ $request->quick_reference }}</strong>
                                     </a>
-                                    <span>{{ optional($request->service)->name ?: '-' }}</span>
+                                    <span>{{ ($isArabic && optional($request->service)->name_ar) ? optional($request->service)->name_ar : (optional($request->service)->name ?: '-') }}</span>
                                 </div>
                                 <div class="sanad-request-actions">
-                                    <span class="badge badge-primary">{{ Str::headline($request->sanad_stage) }}</span>
-                                    <a href="{{ route('sanad.requests.show', $request->id) }}" class="btn-link btn-link-hover">Open</a>
+                                    @php
+                                        $sKey = $request->sanad_stage;
+                                    @endphp
+                                    <span class="badge badge-primary">{{ $stageLabels[$sKey] ?? Str::headline($request->sanad_stage) }}</span>
+                                    <a href="{{ route('sanad.requests.show', $request->id) }}" class="btn-link btn-link-hover">{{ $isArabic ? 'فتح' : 'Open' }}</a>
                                 </div>
                             </div>
                         @empty
                             <div class="sanad-empty-state">
-                                No Sanad {{ Str::plural(strtolower($requestLabel)) }} yet
+                                {{ $isArabic ? 'لا توجد طلبات كويك حالياً' : ('No Quick ' . Str::plural(strtolower($requestLabel)) . ' yet') }}
                             </div>
                         @endforelse
                     </div>
@@ -212,6 +247,10 @@
             line-height: 1.1;
             text-align: right;
             overflow-wrap: anywhere;
+        }
+
+        html[dir="rtl"] .sanad-action-metric strong {
+            text-align: left;
         }
 
         .sanad-stage-grid {

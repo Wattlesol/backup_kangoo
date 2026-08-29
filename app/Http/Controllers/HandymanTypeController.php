@@ -19,7 +19,7 @@ class HandymanTypeController extends Controller
         $filter = [
             'status' => $request->status,
         ];
-        $pageTitle = 'Employee Type List';
+        $pageTitle = __('messages.list_form_title', ['form' => __('messages.handymantype')]);
         $auth_user = authSession();
         $assets = ['datatable'];
         return view('handymantype.index', compact('pageTitle','auth_user','assets','filter'));
@@ -132,10 +132,10 @@ class HandymanTypeController extends Controller
         $auth_user = authSession();
 
         $handymantypedata = HandymanType::find($id);
-        $pageTitle = 'Update Employee Type';
+        $pageTitle = __('messages.update_form_title', ['form' => __('messages.handymantype')]);
         
         if($handymantypedata == null){
-            $pageTitle = 'Add Employee Type';
+            $pageTitle = __('messages.add_button_form', ['form' => __('messages.handymantype')]);
             $handymantypedata = new HandymanType;
         }
         

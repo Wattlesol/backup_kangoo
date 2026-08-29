@@ -34,12 +34,20 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = \Auth::user();
-
-        if($request->login == 'user_login' && $user->user_type === 'user'){
-            // For customer login, check if there's an intended URL (e.g., checkout page)
-            return redirect()->intended(RouteServiceProvider::FRONTEND);
+        if ($user && !empty($user->language_option)) {
+            session(['locale' => $user->language_option]);
+            $dir = in_array($user->language_option, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']) ? 'rtl' : 'ltr';
+            session(['dir' => $dir]);
+            \App::setLocale($user->language_option);
+        } else {
+            session(['locale' => 'ar', 'dir' => 'rtl']);
+            \App::setLocale('ar');
         }
-        elseif($request->login == 'user_login' && $user->user_type !== 'user') {
+
+        if($request->login == 'user_login' && in_array($user->user_type, ['user', 'customer'], true)){
+            return redirect()->intended(route('customer-portal.dashboard'));
+        }
+        elseif($request->login == 'user_login' && !in_array($user->user_type, ['user', 'customer'], true)) {
             Auth::logout();
             return redirect()->back()->withErrors(['message' => 'You are not allowed to log in from here.']);
         }

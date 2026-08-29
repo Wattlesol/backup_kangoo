@@ -25,13 +25,13 @@
                         <!-- Basic Information -->
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="card-title mb-0">Basic Information</h5>
+                                @php $isAr = app()->getLocale() === 'ar'; @endphp<h5 class="card-title mb-0">{{ $isAr ? 'المعلومات الأساسية' : 'Basic Information' }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group">
-                                            <label class="form-label" for="name">Store Name <span class="text-danger">*</span></label>
+                                            <label class="form-label" for="name">{{ $isAr ? 'اسم المتجر' : 'Store Name' }} <span class="text-danger">*</span></label>
                                             <input type="text" class="form-control @error('name') is-invalid @enderror" 
                                                    id="name" name="name" value="{{ old('name') }}" required>
                                             @error('name')
@@ -41,7 +41,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
-                                            <label class="form-label" for="email">Email</label>
+                                            <label class="form-label" for="email">{{ $isAr ? 'البريد الإلكتروني' : 'Email' }}</label>
                                             <input type="email" class="form-control @error('email') is-invalid @enderror" 
                                                    id="email" name="email" value="{{ old('email') }}">
                                             @error('email')
@@ -51,7 +51,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
-                                            <label class="form-label" for="phone">Phone</label>
+                                            <label class="form-label" for="phone">{{ $isAr ? 'الهاتف' : 'Phone' }}</label>
                                             <input type="text" class="form-control @error('phone') is-invalid @enderror" 
                                                    id="phone" name="phone" value="{{ old('phone') }}">
                                             @error('phone')
@@ -61,7 +61,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
-                                            <label class="form-label" for="website">Website</label>
+                                            <label class="form-label" for="website">{{ $isAr ? 'الموقع الإلكتروني' : 'Website' }}</label>
                                             <input type="url" class="form-control @error('website') is-invalid @enderror" 
                                                    id="website" name="website" value="{{ old('website') }}">
                                             @error('website')
@@ -71,7 +71,7 @@
                                     </div>
                                     <div class="col-md-12">
                                         <div class="form-group">
-                                            <label class="form-label" for="description">Description <span class="text-danger">*</span></label>
+                                            <label class="form-label" for="description">{{ $isAr ? 'الوصف' : 'Description' }} <span class="text-danger">*</span></label>
                                             <textarea class="form-control @error('description') is-invalid @enderror" 
                                                       id="description" name="description" rows="4" required>{{ old('description') }}</textarea>
                                             @error('description')
@@ -164,7 +164,7 @@
                         <!-- Store Settings -->
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="card-title mb-0">Store Settings</h5>
+                                <h5 class="card-title mb-0">{{ $isAr ? 'إعدادات المتجر' : 'Store Settings' }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="form-group">

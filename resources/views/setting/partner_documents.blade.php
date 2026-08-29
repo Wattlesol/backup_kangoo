@@ -16,10 +16,10 @@
                     </thead>
                     <tbody>
                         @foreach($provider->providerDocument as $document)
-                            @php($hasUpload = getMediaFileExit($document, 'provider_document'))
-                            @php($media = $hasUpload ? $document->getFirstMedia('provider_document') : null)
+                            @php $hasUpload = getMediaFileExit($document, 'provider_document'); @endphp
+                            @php $media = $hasUpload ? $document->getFirstMedia('provider_document') : null; @endphp
                             <tr>
-                                <td class="align-middle"><strong>{{ optional($document->document)->name ?? 'Document' }}</strong></td>
+                                <td class="align-middle"><strong>{{ optional($document->document)->localized_name ?? 'Document' }}</strong></td>
                                 <td class="align-middle">
                                     @if($hasUpload)
                                         <span class="badge badge-{{ $document->is_verified ? 'success' : 'warning' }}">{{ $document->is_verified ? 'Approved' : 'Pending Review' }}</span>
@@ -63,7 +63,7 @@
                 </table>
             </div>
         @else
-            <p class="text-muted mb-0">No partner verification requirements assigned by Sanad admin.</p>
+            <p class="text-muted mb-0">No partner verification requirements assigned by Quick admin.</p>
         @endif
     </div>
 </div>

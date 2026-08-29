@@ -7,11 +7,12 @@
         <div class="row">
             <div class="col-lg-12">
                 <div class="card card-block card-stretch">
-                    <div class="card-body p-0">
-                        <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">Additional Services</h5>
-                            <a href="{{ route('serviceaddon.create') }}" class="float-right mr-1 btn btn-sm btn-primary "><i class="fa fa-plus-circle"></i> Create Additional Service</a>
-                        </div>
+                   <div class="card-body p-0">
+                       <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
+                            @php $isAr = app()->getLocale() === 'ar'; @endphp
+                            <h5 class="font-weight-bold">{{ $isAr ? 'الخدمات الإضافية' : 'Additional Services' }}</h5>
+                            <a href="{{ route('serviceaddon.create') }}" class="float-right mr-1 btn btn-sm btn-primary "><i class="fa fa-plus-circle"></i> {{ $isAr ? 'إنشاء خدمة إضافية' : 'Create Additional Service' }}</a>
+                       </div>
                         
                     </div>
                 </div>
@@ -58,7 +59,7 @@
                 </div>
                 <div class="input-group ml-2">
                     <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control dt-search" placeholder="Search..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
+                    <input type="text" class="form-control dt-search" placeholder="{{ __("messages.search") }}..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
                   </div>
               </div>
                
@@ -101,18 +102,23 @@
                         orderable: false,
                         searchable: false,
                     },
-                    {
-                        data: 'name',
-                        name: 'name',
-                        title: "{{ __('messages.name') }}"
+                   {
+                       data: 'name',
+                       name: 'name',
+                        title: "{{ __('messages.english_name') }}"
                     },
                     {
-                        data:'targets',
-                        name:'targets',
-                        title:"Applies To",
-                        orderable: false,
-                        searchable: false
-                    },
+                        data: 'name_ar',
+                        name: 'name_ar',
+                        title: "{{ __('messages.arabic_name') }}"
+                   },
+                   {
+                       data:'targets',
+                       name:'targets',
+                        title: "{{ app()->getLocale() === 'ar' ? 'ينطبق على' : 'Applies To' }}",
+                       orderable: false,
+                       searchable: false
+                   },
                     {
                         data:'price',
                         name:'price',

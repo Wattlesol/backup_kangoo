@@ -1,13 +1,40 @@
 <x-master-layout>
-    <div class="container-fluid">
+@php
+    $isAr = app()->getLocale() === 'ar';
+    $sanadReadOnly = $sanadReadOnly ?? [];
+    $isPartnerServiceEditor = $isPartnerServiceEditor ?? false;
+    $requiredDocumentRows = $requiredDocumentRows ?? [];
+    if (empty($requiredDocumentRows) && !empty($servicedata->required_documents)) {
+        $docs = is_array($servicedata->required_documents) ? $servicedata->required_documents : json_decode($servicedata->required_documents, true);
+        if (is_array($docs)) {
+            $requiredDocumentRows = $docs;
+        }
+    }
+    $serviceInstructionRows = $serviceInstructionRows ?? [];
+    if (empty($serviceInstructionRows) && !empty($servicedata->execution_instructions)) {
+        $steps = is_array($servicedata->execution_instructions) ? $servicedata->execution_instructions : json_decode($servicedata->execution_instructions, true);
+        if (is_array($steps)) {
+            $serviceInstructionRows = $steps;
+        }
+    }
+    $requiredSkillsText = $requiredSkillsText ?? '';
+    if (empty($requiredSkillsText) && !empty($servicedata->required_employee_skills)) {
+        $skills = is_array($servicedata->required_employee_skills) ? $servicedata->required_employee_skills : json_decode($servicedata->required_employee_skills, true);
+        if (is_array($skills)) {
+            $requiredSkillsText = implode(PHP_EOL, $skills);
+        } elseif (is_string($servicedata->required_employee_skills)) {
+            $requiredSkillsText = $servicedata->required_employee_skills;
+        }
+    }
+@endphp
+    <div class="container-fluid quick-service-form-page">
         <div class="row">
             <div class="col-lg-12">
-                <div class="card card-block card-stretch">
+                <div class="card card-block card-stretch quick-service-form-hero">
                     <div class="card-body p-0">
-                        <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? __('messages.list') }}</h5>
-                            <a href="{{ route('service.index') }}" class="float-right btn btn-sm btn-primary"><i
-                                    class="fa fa-angle-double-left"></i> {{ __('messages.back') }}</a>
+                        <div class="d-flex justify-content-between align-items-center p-4 flex-wrap gap-3">
+                            <div><div class="quick-service-form-kicker"><x-quick-icon name="briefcase" /> {{ $isAr ? 'إدارة دليل الخدمات' : 'Service catalog management' }}</div><h4 class="font-weight-bold mb-1">{{ $pageTitle ?? __('messages.list') }}</h4><span class="text-muted">{{ $isAr ? 'إدارة المحتوى والرسوم والمتطلبات وخطوات التنفيذ باللغتين.' : 'Manage bilingual content, fees, requirements, documents, and execution steps.' }}</span></div>
+                            <a href="{{ route('service.index') }}" class="btn btn-outline-primary"><x-quick-icon name="arrow" /> {{ __('messages.back') }}</a>
                             @if($auth_user->can('service list'))
                             @endif
                         </div>
@@ -15,99 +42,23 @@
                 </div>
             </div>
             <div class="col-lg-12">
-                <div class="card">
+                <div class="card quick-service-form-card">
                     <div class="card-body">
                         {{ Form::model($servicedata,['method' => 'POST','route'=>'service.store', 'enctype'=>'multipart/form-data', 'data-toggle'=>"validator" ,'id'=>'service'] ) }}
                         {{ Form::hidden('id') }}
                         {{ Form::hidden('provider_id', old('provider_id', $servicedata->provider_id ?: admin_id()), ['id' => 'provider_id']) }}
                         {{ Form::hidden('type', old('type', $servicedata->type ?: 'fixed')) }}
                         {{ Form::hidden('price', old('price', $servicedata->price ?: $servicedata->service_fee ?: 0), ['id' => 'price']) }}
-                        @php
-                            $isPartnerServiceEditor = auth()->user()->hasRole('provider') && !empty($servicedata->id);
-                            $sanadReadOnly = $isPartnerServiceEditor ? ['readonly' => true] : [];
-                            $requiredSkillsText = old('required_employee_skills', is_array($servicedata->required_employee_skills) ? implode("\n", $servicedata->required_employee_skills) : $servicedata->required_employee_skills);
-                            $storedRequiredDocuments = old('required_documents', $servicedata->required_documents);
-                            if (is_string($storedRequiredDocuments)) {
-                                $decodedRequiredDocuments = json_decode($storedRequiredDocuments, true);
-                                $storedRequiredDocuments = json_last_error() === JSON_ERROR_NONE ? $decodedRequiredDocuments : preg_split('/\r\n|\r|\n/', $storedRequiredDocuments);
-                            }
-                            $requiredDocumentRows = collect($storedRequiredDocuments ?: [])->map(function ($document) {
-                                if (is_string($document)) {
-                                    $name = trim($document);
-                                    return [
-                                        'key' => \Illuminate\Support\Str::slug($name, '_'),
-                                        'name' => $name,
-                                        'required' => true,
-                                        'approval_required' => true,
-                                        'mime_types' => '',
-                                        'max_size_mb' => 10,
-                                    ];
-                                }
-                                $mimeTypes = $document['mime_types'] ?? '';
-                                if (is_array($mimeTypes)) {
-                                    $mimeTypes = implode(', ', $mimeTypes);
-                                }
-                                return [
-                                    'key' => $document['key'] ?? \Illuminate\Support\Str::slug($document['name'] ?? '', '_'),
-                                    'name' => $document['name'] ?? '',
-                                    'required' => filter_var($document['required'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                                    'approval_required' => filter_var($document['approval_required'] ?? true, FILTER_VALIDATE_BOOLEAN),
-                                    'mime_types' => $mimeTypes,
-                                    'max_size_mb' => $document['max_size_mb'] ?? 10,
-                                ];
-                            })->filter(function ($document) {
-                                return trim($document['name'] ?? '') !== '';
-                            })->values()->all();
-                            if (empty($requiredDocumentRows)) {
-                                $requiredDocumentRows = [[
-                                    'key' => '',
-                                    'name' => '',
-                                    'required' => true,
-                                    'approval_required' => true,
-                                    'mime_types' => 'image/jpeg, image/png, application/pdf',
-                                    'max_size_mb' => 10,
-                                ]];
-                            }
-                            $storedInstructionSteps = old('service_instructions', $servicedata->service_instructions);
-                            if (is_string($storedInstructionSteps)) {
-                                $decodedInstructionSteps = json_decode($storedInstructionSteps, true);
-                                if (json_last_error() === JSON_ERROR_NONE && is_array($decodedInstructionSteps)) {
-                                    $storedInstructionSteps = $decodedInstructionSteps;
-                                } else {
-                                    $storedInstructionSteps = preg_split('/\r\n|\r|\n/', $storedInstructionSteps);
-                                }
-                            }
-                            $serviceInstructionRows = collect($storedInstructionSteps ?: [])->map(function ($step, $index) {
-                                if (is_string($step)) {
-                                    return [
-                                        'title' => 'Step '.($index + 1),
-                                        'instruction' => trim($step),
-                                    ];
-                                }
-                                return [
-                                    'title' => $step['title'] ?? 'Step '.($index + 1),
-                                    'instruction' => $step['instruction'] ?? $step['description'] ?? '',
-                                ];
-                            })->filter(function ($step) {
-                                return trim($step['title'] ?? '') !== '' || trim($step['instruction'] ?? '') !== '';
-                            })->values()->all();
-                            if (empty($serviceInstructionRows)) {
-                                $serviceInstructionRows = [[
-                                    'title' => 'Step 1',
-                                    'instruction' => '',
-                                ]];
-                            }
-                        @endphp
                         <div class="row">
                             <div class="form-group col-md-4">
-                                {{ Form::label('name_en', 'English Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name_en', old('name_en', $servicedata->name_en ?: $servicedata->name), array_merge(['placeholder' => 'Service name in English', 'class' => 'form-control', 'required'], $sanadReadOnly)) }}
+                                {{ Form::label('name_en', __('messages.english_name') . ' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_en', old('name_en', $servicedata->name_en ?: $servicedata->name), array_merge(['placeholder' => $isAr ? 'اسم الخدمة بالإنجليزية' : 'Service name in English', 'class' => 'form-control', 'required'], $sanadReadOnly)) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
                             <div class="form-group col-md-4">
-                                {{ Form::label('name_ar', 'Arabic Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name_ar', old('name_ar'), array_merge(['class' => 'form-control', 'placeholder' => 'Service name in Arabic', 'required', 'dir' => 'rtl'], $sanadReadOnly)) }}
+                                {{ Form::label('name_ar', __('messages.arabic_name') . ' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_ar', old('name_ar'), array_merge(['class' => 'form-control', 'placeholder' => $isAr ? 'اسم الخدمة بالعربية' : 'Service name in Arabic', 'required', 'dir' => 'rtl'], $sanadReadOnly)) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
@@ -131,41 +82,6 @@
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.subcategory') ]),
                                     ]) }}
                             </div>
-
-                            @if(false && auth()->user()->hasAnyRole(['admin','demo_admin']))
-                            <div class="form-group col-md-4 d-none">
-                                {{ Form::label('name', 'Select Partner <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                <br />
-                                {{ Form::select('provider_id', [ optional($servicedata->providers)->id => optional($servicedata->providers)->display_name ], optional($servicedata->providers)->id, [
-                                            'class' => 'select2js form-group',
-                                            'id' => 'provider_id',
-                                            'onchange' => 'selectprovider(this)',
-                                            'disabled',
-                                            'data-placeholder' => 'Select Partner',
-                                            'data-ajax--url' => route('ajax-list', ['type' => 'provider']),
-                                        ]) }}
-                            </div>
-                            @endif
-                            <div class="form-group col-md-4 d-none">
-                                {{ Form::label('name', 'Select Partner Address',['class'=>'form-control-label'],false) }}
-                                <br />
-                                {{ Form::select('provider_address_id[]', [], old('provider_address_id'), [
-                                        'class' => 'select2js form-group provider_address_id',
-                                        'id' =>'provider_address_id',
-                                        'multiple' => 'multiple',
-                                        'disabled',
-                                        'data-placeholder' => 'Select Partner Address',
-                                    ]) }}
-                                   
-                               
-                                 @if(auth()->user()->hasAnyRole(['provider']))
-                                    <a href="{{ route('provideraddress.create', ['provideraddress' => auth()->id()]) }}" id="add_provider_address_link" class=""><i class="fa fa-plus-circle mt-2"></i>
-                                 Add Partner Address</a>
-                                 @else
-                                    <a href="#" id="add_provider_address_link" class=""><i class="fa fa-plus-circle mt-2"></i>
-                                 Add Partner Address</a>
-                                 @endif
-                            </div> 
 
                             <div class="form-group col-md-4 d-none">
                                 {{ Form::label('type',__('messages.price_type').' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
@@ -196,12 +112,6 @@
                                 {{ Form::select('status',['1' => __('messages.active') , '0' => __('messages.inactive') ],old('status'),[ 'class' =>'form-control select2js','required']) }}
                             </div>
                             
-                            <div class="form-group col-md-4 d-none">
-                                    {{ Form::label('visit_type', __('messages.visit_type').' ',['class'=>'form-control-label'],false) }}
-                                    <br />
-                                    {{ Form::select('visit_type',$visittype,old('visit_type'),[ 'id' => 'visit_type' ,'class' =>'form-control select2js','disabled']) }}
-                                </div>
-
                             <div class="form-group col-md-4">
                                 <label class="form-control-label" for="service_attachment">{{ __('messages.image') }}
                                 </label>
@@ -278,8 +188,8 @@
                                 <div class="sanad-service-master-data">
                                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                                         <div>
-                                            <h5 class="font-weight-bold mb-1">Sanad Service Master Data</h5>
-                                            <span class="text-muted">Centralized government-service metadata used by web dashboards and mobile apps</span>
+                                            <h5 class="font-weight-bold mb-1">{{ $isAr ? "البيانات الأساسية لخدمة كويك" : "Quick Service Master Data" }}</h5>
+                                            <span class="text-muted">{{ $isAr ? "بيانات وصفية مركزية للخدمات الحكومية مستخدمة في لوحات التحكم وتطبيقات الجوال" : "Centralized government-service metadata used by web dashboards and mobile apps" }}</span>
                                         </div>
                                         @if($isPartnerServiceEditor)
                                             <span class="badge badge-light">Partner pricing and public details are read-only</span>
@@ -287,27 +197,27 @@
                                     </div>
                                     <div class="row">
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('government_entity', 'Government Entity', ['class' => 'form-control-label']) }}
-                                            {{ Form::text('government_entity', null, array_merge(['class' => 'form-control', 'placeholder' => 'Ministry or authority'], $sanadReadOnly)) }}
+                                            {{ Form::label('government_entity', __('messages.government_entity'), ['class' => 'form-control-label']) }}
+                                            {{ Form::text('government_entity', null, array_merge(['class' => 'form-control', 'placeholder' => $isAr ? 'الوزارة أو الهيئة الحكومية' : 'Ministry or authority'], $sanadReadOnly)) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('estimated_completion_time', 'Estimated Completion Time', ['class' => 'form-control-label']) }}
-                                            {{ Form::text('estimated_completion_time', null, array_merge(['class' => 'form-control', 'placeholder' => 'Example: 3 business days'], $sanadReadOnly)) }}
+                                            {{ Form::label('estimated_completion_time', $isAr ? 'وقت الإنجاز المتوقع' : 'Estimated Completion Time', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('estimated_completion_time', null, array_merge(['class' => 'form-control', 'placeholder' => $isAr ? 'مثال: 3 أيام عمل' : 'Example: 3 business days'], $sanadReadOnly)) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('government_fee', 'Government Fees', ['class' => 'form-control-label']) }}
+                                            {{ Form::label('government_fee', __('messages.government_fee'), ['class' => 'form-control-label']) }}
                                             {{ Form::number('government_fee', null, array_merge(['class' => 'form-control', 'min' => 0, 'step' => 'any'], $sanadReadOnly)) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('service_fee', 'Service Fees', ['class' => 'form-control-label']) }}
+                                            {{ Form::label('service_fee', $isAr ? 'رسوم خدمة كويك' : 'Quick Service Fee', ['class' => 'form-control-label']) }}
                                             {{ Form::number('service_fee', null, array_merge(['class' => 'form-control', 'min' => 0, 'step' => 'any'], $sanadReadOnly)) }}
                                         </div>
                                         <div class="form-group col-md-12">
                                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                                {{ Form::label('required_documents', 'Required Documents', ['class' => 'form-control-label mb-0']) }}
+                                                {{ Form::label('required_documents', $isAr ? 'المستندات والمتطلبات المطلوبة' : 'Required Documents', ['class' => 'form-control-label mb-0']) }}
                                                 @if(!$isPartnerServiceEditor)
                                                     <button type="button" class="btn btn-sm btn-outline-primary" id="add-required-document">
-                                                        <i class="fa fa-plus"></i> Add Document
+                                                        <i class="fa fa-plus"></i> {{ $isAr ? "إضافة مستند" : "Add Document" }}
                                                     </button>
                                                 @endif
                                             </div>
@@ -315,12 +225,13 @@
                                                 <table class="table table-sm mb-0">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 24%;">Document Name</th>
-                                                            <th style="width: 18%;">Key</th>
-                                                            <th style="width: 14%;">Requirement</th>
-                                                            <th style="width: 16%;">Approval</th>
-                                                            <th style="width: 18%;">Accepted File Types</th>
-                                                            <th style="width: 8%;">Max MB</th>
+                                                            <th style="width: 18%;">{{ $isAr ? "اسم المستند بالإنجليزية" : "English Name" }} <span class="text-danger">*</span></th>
+                                                            <th style="width: 18%;">{{ $isAr ? "اسم المستند بالعربية" : "Arabic Name" }} <span class="text-danger">*</span></th>
+                                                            <th style="width: 14%;">{{ $isAr ? "الرمز البرمجي" : "Key" }} <span class="text-danger">*</span></th>
+                                                            <th style="width: 12%;">{{ $isAr ? "نوع المتطلب" : "Requirement" }}</th>
+                                                            <th style="width: 14%;">{{ $isAr ? "الاعتماد" : "Approval" }}</th>
+                                                            <th style="width: 16%;">{{ $isAr ? "أنواع الملفات المقبولة" : "Accepted File Types" }}</th>
+                                                            <th style="width: 6%;">{{ $isAr ? "الحد الأقصى MB" : "Max MB" }}</th>
                                                             <th style="width: 2%;"></th>
                                                         </tr>
                                                     </thead>
@@ -328,25 +239,28 @@
                                                         @foreach($requiredDocumentRows as $index => $document)
                                                             <tr class="required-document-row">
                                                                 <td>
-                                                                    <input type="text" name="required_documents[{{ $index }}][name]" value="{{ $document['name'] }}" class="form-control required-document-name" placeholder="Example: Driving license front" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                    <input type="text" name="required_documents[{{ $index }}][name]" value="{{ $document['name'] ?? '' }}" class="form-control required-document-name" placeholder="Example: Driving license front" required {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
                                                                 </td>
                                                                 <td>
-                                                                    <input type="text" name="required_documents[{{ $index }}][key]" value="{{ $document['key'] }}" class="form-control required-document-key" placeholder="driving_license_front" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                    <input type="text" name="required_documents[{{ $index }}][name_ar]" value="{{ $document['name_ar'] ?? '' }}" class="form-control required-document-name-ar" placeholder="مثال: رخصة القيادة من الأمام" dir="rtl" required {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                </td>
+                                                                <td>
+                                                                    <input type="text" name="required_documents[{{ $index }}][key]" value="{{ $document['key'] ?? '' }}" class="form-control required-document-key" placeholder="driving_license_front" required {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
                                                                 </td>
                                                                 <td>
                                                                     <select name="required_documents[{{ $index }}][required]" class="form-control" {{ $isPartnerServiceEditor ? 'disabled' : '' }}>
-                                                                        <option value="1" {{ $document['required'] ? 'selected' : '' }}>Required</option>
-                                                                        <option value="0" {{ !$document['required'] ? 'selected' : '' }}>Optional</option>
+                                                                        <option value="1" {{ $document['required'] ? 'selected' : '' }}>{{ $isAr ? "مطلوب" : "Required" }}</option>
+                                                                        <option value="0" {{ !$document['required'] ? 'selected' : '' }}>{{ $isAr ? "اختياري" : "Optional" }}</option>
                                                                     </select>
                                                                 </td>
                                                                 <td>
                                                                     <select name="required_documents[{{ $index }}][approval_required]" class="form-control" {{ $isPartnerServiceEditor ? 'disabled' : '' }}>
-                                                                        <option value="1" {{ $document['approval_required'] ? 'selected' : '' }}>Approval Required</option>
-                                                                        <option value="0" {{ !$document['approval_required'] ? 'selected' : '' }}>No Approval</option>
+                                                                        <option value="1" {{ $document['approval_required'] ? 'selected' : '' }}>{{ $isAr ? "يتطلب اعتماداً" : "Approval Required" }}</option>
+                                                                        <option value="0" {{ !$document['approval_required'] ? 'selected' : '' }}>{{ $isAr ? "بدون اعتماد" : "No Approval" }}</option>
                                                                     </select>
                                                                 </td>
                                                                 <td>
-                                                                    <input type="text" name="required_documents[{{ $index }}][mime_types]" value="{{ $document['mime_types'] }}" class="form-control" placeholder="image/jpeg, application/pdf" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                    <input type="text" name="required_documents[{{ $index }}][mime_types]" value="{{ is_array($document['mime_types'] ?? null) ? implode(', ', $document['mime_types']) : ($document['mime_types'] ?? '') }}" class="form-control" placeholder="image/jpeg, application/pdf" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
                                                                 </td>
                                                                 <td>
                                                                     <input type="number" name="required_documents[{{ $index }}][max_size_mb]" value="{{ $document['max_size_mb'] }}" class="form-control" min="1" max="100" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
@@ -367,10 +281,10 @@
                                         </div>
                                         <div class="form-group col-md-12">
                                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                                {{ Form::label('service_instructions', 'Service Instructions', ['class' => 'form-control-label mb-0']) }}
+                                                {{ Form::label('service_instructions', $isAr ? 'إرشادات وتعليمات تنفيذ الخدمة' : 'Service Instructions', ['class' => 'form-control-label mb-0']) }}
                                                 @if(!$isPartnerServiceEditor)
                                                     <button type="button" class="btn btn-sm btn-outline-primary" id="add-service-instruction">
-                                                        <i class="fa fa-plus"></i> Add Step
+                                                        <i class="fa fa-plus"></i> {{ $isAr ? "إضافة خطوة" : "Add Step" }}
                                                     </button>
                                                 @endif
                                             </div>
@@ -378,8 +292,8 @@
                                                 <table class="table table-sm mb-0">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 24%;">Step Title</th>
-                                                            <th style="width: 74%;">Instruction</th>
+                                                            <th style="width: 24%;">{{ $isAr ? "عنوان الخطوة" : "Step Title" }}</th>
+                                                            <th style="width: 74%;">{{ $isAr ? "التعليمات والتوجيه" : "Instruction" }}</th>
                                                             <th style="width: 2%;"></th>
                                                         </tr>
                                                     </thead>
@@ -387,10 +301,10 @@
                                                         @foreach($serviceInstructionRows as $index => $step)
                                                             <tr class="service-instruction-row">
                                                                 <td>
-                                                                    <input type="text" name="service_instructions[{{ $index }}][title]" value="{{ $step['title'] }}" class="form-control" placeholder="Step {{ $index + 1 }}" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
+                                                                    <input type="text" name="service_instructions[{{ $index }}][title]" value="{{ $step['title'] }}" class="form-control" placeholder="{{ $isAr ? 'الخطوة ' . ($index + 1) : 'Step ' . ($index + 1) }}" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>
                                                                 </td>
                                                                 <td>
-                                                                    <textarea name="service_instructions[{{ $index }}][instruction]" class="form-control" rows="2" placeholder="What should the customer do in this step?" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>{{ $step['instruction'] }}</textarea>
+                                                                    <textarea name="service_instructions[{{ $index }}][instruction]" class="form-control" rows="2" placeholder="{{ $isAr ? 'ما الذي يجب على العميل فعله في هذه الخطوة؟' : 'What should the customer do in this step?' }}" {{ $isPartnerServiceEditor ? 'readonly' : '' }}>{{ $step['instruction'] }}</textarea>
                                                                 </td>
                                                                 <td class="text-center align-middle">
                                                                     @if(!$isPartnerServiceEditor)
@@ -407,16 +321,16 @@
                                             <small class="text-muted d-block mt-2">These steps are shown to customers as ordered service instructions.</small>
                                         </div>
                                         <div class="form-group col-md-6">
-                                            {{ Form::label('terms_and_conditions', 'Terms & Conditions', ['class' => 'form-control-label']) }}
+                                            {{ Form::label('terms_and_conditions', __('messages.terms_condition'), ['class' => 'form-control-label']) }}
                                             {{ Form::textarea('terms_and_conditions', null, array_merge(['class' => 'form-control', 'rows' => 4], $sanadReadOnly)) }}
                                         </div>
                                         <div class="form-group col-md-6 d-none">
-                                            {{ Form::label('required_employee_skills', 'Required Employee Skills', ['class' => 'form-control-label']) }}
-                                            {{ Form::textarea('required_employee_skills', $requiredSkillsText, ['class' => 'form-control', 'rows' => 4, 'placeholder' => "One skill per line"]) }}
+                                            {{ Form::label('required_employee_skills', $isAr ? 'المهارات المطلوبة للموظف' : 'Required Employee Skills', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('required_employee_skills', $requiredSkillsText, ['class' => 'form-control', 'rows' => 4, 'placeholder' => $isAr ? 'مهارة واحدة في كل سطر' : 'One skill per line']) }}
                                         </div>
                                         <div class="form-group col-md-12 d-none">
-                                            {{ Form::label('partner_availability_notes', 'Partner Internal Notes / Availability', ['class' => 'form-control-label']) }}
-                                            {{ Form::textarea('partner_availability_notes', null, ['class' => 'form-control', 'rows' => 3, 'placeholder' => 'Execution notes, availability, capacity, or partner-only comments']) }}
+                                            {{ Form::label('partner_availability_notes', $isAr ? 'ملاحظات الشريك الداخلية / التوفر' : 'Partner Internal Notes / Availability', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('partner_availability_notes', null, ['class' => 'form-control', 'rows' => 3, 'placeholder' => $isAr ? 'ملاحظات التنفيذ، التوفر، الطاقة الاستيعابية، أو تعليقات الشريك' : 'Execution notes, availability, capacity, or partner-only comments']) }}
                                         </div>
                                     </div>
                                 </div>
@@ -470,9 +384,6 @@
             </div>
         </div>
     </div>
-    @php
-    $data = $servicedata->providerServiceAddress->pluck('provider_address_id')->implode(',');
-    @endphp
     @section('bottom_script')
     <style>
         .sanad-service-master-data {
@@ -508,35 +419,6 @@
     var discountError = document.getElementById('discount-error');
 
    
-      document.addEventListener('DOMContentLoaded', function () {
-        var initialProviderId = document.getElementById('provider_id').value;
-        selectprovider({ value: initialProviderId }); 
-        document.getElementById('add_provider_address_link').addEventListener('click', function (event) {
-            event.preventDefault();
-            var providerId = document.getElementById('provider_id').value;
-            var providerAddressCreateUrl = "{{ route('provideraddress.create', ['provideraddress' => '']) }}";
-            providerAddressCreateUrl = providerAddressCreateUrl.replace('provideraddress=', 'provideraddress=' + providerId);
-            window.location.href = providerAddressCreateUrl;
-        });
-
-
-      
-   
-
-    });
-
-    function selectprovider(selectElement){
-
-        var providerId = selectElement.value;
-        var addProviderAddressLink =  document.getElementById('add_provider_address_link');
-
-        if(providerId){
-            addProviderAddressLink.classList.remove('d-none');
-        } else {
-            addProviderAddressLink.classList.add('d-none');
-        }
-    }
-
      
     discountInput.addEventListener('input', function() {
         var discountValue = parseFloat(discountInput.value);
@@ -600,10 +482,11 @@
                 function requiredDocumentRow(index) {
                     return [
                         '<tr class="required-document-row">',
-                            '<td><input type="text" name="required_documents[' + index + '][name]" class="form-control required-document-name" placeholder="Example: Driving license front"></td>',
-                            '<td><input type="text" name="required_documents[' + index + '][key]" class="form-control required-document-key" placeholder="driving_license_front"></td>',
-                            '<td><select name="required_documents[' + index + '][required]" class="form-control"><option value="1" selected>Required</option><option value="0">Optional</option></select></td>',
-                            '<td><select name="required_documents[' + index + '][approval_required]" class="form-control"><option value="1" selected>Approval Required</option><option value="0">No Approval</option></select></td>',
+                            '<td><input type="text" name="required_documents[' + index + '][name]" class="form-control required-document-name" placeholder="Example: Driving license front" required></td>',
+                            '<td><input type="text" name="required_documents[' + index + '][name_ar]" class="form-control required-document-name-ar" placeholder="مثال: رخصة القيادة من الأمام" dir="rtl" required></td>',
+                            '<td><input type="text" name="required_documents[' + index + '][key]" class="form-control required-document-key" placeholder="driving_license_front" required></td>',
+                            '<td><select name="required_documents[' + index + '][required]" class="form-control"><option value="1" selected>{{ $isAr ? 'مطلوب' : 'Required' }}</option><option value="0">{{ $isAr ? 'اختياري' : 'Optional' }}</option></select></td>',
+                            '<td><select name="required_documents[' + index + '][approval_required]" class="form-control"><option value="1" selected>{{ $isAr ? 'يتطلب اعتماداً' : 'Approval Required' }}</option><option value="0">{{ $isAr ? 'بدون اعتماد' : 'No Approval' }}</option></select></td>',
                             '<td><input type="text" name="required_documents[' + index + '][mime_types]" class="form-control" value="image/jpeg, image/png, application/pdf" placeholder="image/jpeg, application/pdf"></td>',
                             '<td><input type="number" name="required_documents[' + index + '][max_size_mb]" class="form-control" min="1" max="100" value="10"></td>',
                             '<td class="text-center align-middle"><button type="button" class="btn btn-link text-danger p-0 remove-required-document" title="Remove document"><i class="ri-close-circle-line"></i></button></td>',
@@ -666,24 +549,15 @@
                     $(this).closest('tr').remove();
                 });
 
-	            var provider_id = "{{ isset($servicedata->provider_id) ? $servicedata->provider_id : '' }}";
-            var provider_address_id = "{{ isset($data) ? $data : [] }}";
-
             var category_id = "{{ isset($servicedata->category_id) ? $servicedata->category_id : '' }}";
             var subcategory_id =
                 "{{ isset($servicedata->subcategory_id) ? $servicedata->subcategory_id : '' }}";
 
             var price_type = "{{ isset($servicedata->type) ? $servicedata->type : '' }}";
 
-            providerAddress(provider_id, provider_address_id)
             getSubCategory(category_id, subcategory_id)
             priceformat(price_type)
 
-            $(document).on('change', '#provider_id', function() {
-                var provider_id = $(this).val();
-                $('#provider_address_id').empty();
-                providerAddress(provider_id, provider_address_id);
-            })
             $(document).on('change', '#category_id', function() {
                 var category_id = $(this).val();
                 $('#subcategory_id').empty();
@@ -731,26 +605,6 @@
                 })
             })
         })
-
-        function providerAddress(provider_id, provider_address_id = "") {
-            var provider_address_route =
-                "{{ route('ajax-list', [ 'type' => 'provider_address','provider_id' =>'']) }}" + provider_id;
-            provider_address_route = provider_address_route.replace('amp;', '');
-
-            $.ajax({
-                url: provider_address_route,
-                success: function(result) {
-                    $('#provider_address_id').select2({
-                        width: '100%',
-                        placeholder: "{{ trans('messages.select_name',['select' => trans('messages.provider_address')]) }}",
-                        data: result.results
-                    });
-                    if (provider_address_id != "") {
-                        $('#provider_address_id').val(provider_address_id.split(',')).trigger('change');
-                    }
-                }
-            });
-        }
 
         function getSubCategory(category_id, subcategory_id = "") {
             var get_subcategory_list =

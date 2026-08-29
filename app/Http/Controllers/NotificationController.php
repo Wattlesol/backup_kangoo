@@ -16,22 +16,25 @@ class NotificationController extends Controller
 
         return view('notification.index', compact('pageTitle','assets'));
     }
-    public function index_data(DataTables $datatable)
-    {
-        $row = \Auth::user()->notifications;
-        
-        return $datatable->collection($row)
-        ->editColumn('type', function ($row) {
-            if(isset($row->data['check_booking_type'])){
-                return '<a class="btn-link btn-link-hover notify-table-link" href="'.route('booking.show',$row->data['id']) .'" >Booking # '.$row->data['id'].' '.str_replace("_"," ",ucfirst($row->data['type'])).'</a>';
+   public function index_data(DataTables $datatable)
+   {
+       $row = \Auth::user()->notifications;
+
+       return $datatable->collection($row)
+       ->editColumn('type', function ($row) {
+            $title = formatNotificationTitle($row);
+            $data = is_array($row->data) ? $row->data : (json_decode($row->data ?? '{}', true) ?: []);
+            $id = $data['id'] ?? ($data['booking_id'] ?? '');
+            $type = $data['type'] ?? '';
+            if (isset($data['check_booking_type']) || in_array($type, ['add_booking', 'booking_added', 'assigned_booking', 'transfer_booking', 'update_booking_status', 'cancel_booking', 'cancelled_booking', 'reject_booking', 'accept_booking', 'sanad_chat_assignment'])) {
+                return '<a class="btn-link btn-link-hover notify-table-link" href="'.route('booking.show', $id) .'" >'.$title.'</a>';
+            } elseif ($type === 'partner_verification_document_submitted') {
+                return '<a class="btn-link btn-link-hover notify-table-link" href="'.route('providerdocument.index') .'" >'.$title.'</a>';
             }
-            else{
-                return '<a class="btn-link btn-link-hover notify-table-link" href="#" ># '.$row->data['id'].' '.str_replace("_"," ",ucfirst($row->data['type'])).'</a>';
-            }
-            
+            return '<a class="btn-link btn-link-hover notify-table-link" href="#" >'.$title.'</a>';
         })
         ->editColumn('message', function ($row) {
-            return $row->data['message'];
+            return formatNotificationMessage($row);
         })
         ->editColumn('created_at', function ($row) {
             return dateAgoFormate($row->created_at,true);
@@ -45,12 +48,15 @@ class NotificationController extends Controller
             return dateAgoFormate($row->updated_at,true);
         })
         ->editColumn('action', function ($row) {
-            if(isset($row->data['check_booking_type'])){
-                return '<a href="'.route('booking.show',$row->data['id']) .'"><span class="iq-bg-info mr-2"><i class="far fa-eye text-secondary"></i></span></a>';
+            $data = is_array($row->data) ? $row->data : (json_decode($row->data ?? '{}', true) ?: []);
+            $id = $data['id'] ?? ($data['booking_id'] ?? '');
+            $type = $data['type'] ?? '';
+            if (isset($data['check_booking_type']) || in_array($type, ['add_booking', 'booking_added', 'assigned_booking', 'transfer_booking', 'update_booking_status', 'cancel_booking', 'cancelled_booking', 'reject_booking', 'accept_booking', 'sanad_chat_assignment'])) {
+                return '<a href="'.route('booking.show', $id) .'"><span class="iq-bg-info mr-2"><i class="far fa-eye text-secondary"></i></span></a>';
+            } elseif ($type === 'partner_verification_document_submitted') {
+                return '<a href="'.route('providerdocument.index') .'"><span class="iq-bg-info mr-2"><i class="far fa-eye text-secondary"></i></span></a>';
             }
-            else{
-                return '<a href="#"><span class="iq-bg-info mr-2"><i class="far fa-eye text-secondary"></i></span></a>';
-            }
+            return '<a href="#"><span class="iq-bg-info mr-2"><i class="far fa-eye text-secondary"></i></span></a>';
         })
         ->addIndexColumn()
         ->rawColumns(['type','action','thread'])

@@ -163,7 +163,7 @@
             <div class="py-lg-5 my-lg-5 py-3 my-3">
                 <div class="row">
                     <div class="col-lg-6 py-5 position-relative pe-xl-5">
-                        <h6 class="mt-0 mb-4 font-size-18 text-capitalize">{{__('landingpage.Add-ons')}}</h6>
+                        <h6 class="mt-0 mb-4 font-size-18 text-capitalize">{{ app()->getLocale() === 'ar' ? 'الخدمات الإضافية' : 'Additional Services' }}</h6>
                         @foreach($bookingData['booking_detail']['BookingAddonService'] as $serviceaddon)
                             <div class="mb-4 pb-4 border-bottom d-flex align-items-sm-center aling-items-start flex-sm-row flex-column gap-5">
                                 <div class="flex-shrink-0 provider-image-container">
@@ -189,10 +189,10 @@
                     @endif
                     <div class="row">
                         <div class="col-lg-5 col-sm-6 position-relative">
-                            <h6 class="mt-0 mb-4 font-size-18 text-capitalize">Sanad Operations</h6>
+                            <h6 class="mt-0 mb-4 font-size-18 text-capitalize">Quick Operations</h6>
                             <div class="content">
                                 <h5 class="mt-0 mb-1 text-capitalize">Request Assigned</h5>
-                                <p class="mb-0 text-body">Sanad coordinates partner execution internally. For updates, documents, or support, continue through this request page.</p>
+                                <p class="mb-0 text-body">Quick coordinates partner execution internally. For updates, documents, or support, continue through this request page.</p>
                             </div>
                         </div>
                         
@@ -200,8 +200,8 @@
                         <div class="col-lg-5 col-sm-6 mt-sm-0 mt-5">
                             <h6 class="mt-0 mb-4 font-size-18 text-capitalize">Assigned Support</h6>
                             <div class="content">
-                                <h5 class="mt-0 mb-1 text-capitalize">Sanad employee team assigned</h5>
-                                <p class="mb-0 text-body">Employee coordination and quality tracking are handled inside Sanad. Use request chat or support for any follow-up.</p>
+                                <h5 class="mt-0 mb-1 text-capitalize">Quick employee team assigned</h5>
+                                <p class="mb-0 text-body">Employee coordination and quality tracking are handled inside Quick. Use request chat or support for any follow-up.</p>
                             </div>
                         </div>
                         @endif

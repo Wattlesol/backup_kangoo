@@ -4,9 +4,9 @@ set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 BASE_WEB_URL="${SANAD_WEB_BASE_URL:-http://127.0.0.1:8092}"
-ADMIN_EMAIL="${SANAD_ADMIN_WEB_TEST_EMAIL:-admin@admin.com}"
+ADMIN_EMAIL="${SANAD_ADMIN_WEB_TEST_EMAIL:-demo@admin.com}"
 PARTNER_EMAIL="${SANAD_PARTNER_WEB_TEST_EMAIL:-demo@provider.com}"
-EMPLOYEE_EMAIL="${SANAD_EMPLOYEE_WEB_TEST_EMAIL:-demo@employee.com}"
+EMPLOYEE_EMAIL="${SANAD_EMPLOYEE_WEB_TEST_EMAIL:-demo@handyman.com}"
 PASSWORD="${SANAD_WEB_TEST_PASSWORD:-12345678}"
 
 if ! command -v curl >/dev/null 2>&1; then
@@ -117,7 +117,7 @@ assert_shared_request_detail_markers() {
   local role="$2"
 
   assert_contains "$text" "Operational Monitoring" "$role request detail"
-  assert_contains "$text" "Sanad Request Lifecycle" "$role request detail"
+  assert_contains "$text" "Quick Request Lifecycle" "$role request detail"
   assert_contains "$text" "Document Vault" "$role request detail"
   assert_contains "$text" "documents default to a 48-hour retention window" "$role request detail"
   assert_contains "$text" "Retention Until" "$role request detail"

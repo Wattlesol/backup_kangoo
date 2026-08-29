@@ -67,12 +67,21 @@ class DocumentsController extends Controller
             })
          
             ->editColumn('name', function($query){                
+                $name = e($query->name);
                 if (auth()->user()->can('document edit')) {
-                    $link = '<a class="btn-link btn-link-hover" href='.route('document.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                    $link = '<a class="btn-link btn-link-hover" href='.route('document.create', ['id' => $query->id]).'>'.$name.'</a>';
                 } else {
-                    $link = $query->name; 
+                    $link = $name;
                 }
                 return $link;
+            })
+
+            ->editColumn('name_ar', function($query){
+                $name = e($query->name_ar ?: '—');
+                if (auth()->user()->can('document edit')) {
+                    return '<a class="btn-link btn-link-hover" dir="rtl" href='.route('document.create', ['id' => $query->id]).'>'.$name.'</a>';
+                }
+                return '<span dir="rtl">'.$name.'</span>';
             })
 
             ->editColumn('status' , function ($query){
@@ -97,7 +106,7 @@ class DocumentsController extends Controller
                 return view('document.action',compact('document'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['name','action','status','is_required','check'])
+            ->rawColumns(['name','name_ar','action','status','is_required','check'])
             ->toJson();
     }
 

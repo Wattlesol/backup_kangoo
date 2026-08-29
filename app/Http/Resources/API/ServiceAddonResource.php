@@ -17,6 +17,7 @@ class ServiceAddonResource extends JsonResource
         return [
             'id'            => $this->id,
             'name'          => $this->name,
+            'name_ar'       => $this->name_ar,
             'service_id'    => $this->service_id,
             'service_name'  => optional($this->service)->name ?: 'All Services',
             'category_ids'  => $this->categories->pluck('id')->values(),

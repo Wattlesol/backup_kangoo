@@ -599,6 +599,7 @@ class ServiceController extends Controller
                     return [
                         'key' => \Illuminate\Support\Str::slug($name, '_'),
                         'name' => $name,
+                        'name_ar' => $name,
                         'required' => true,
                         'approval_required' => true,
                         'mime_types' => [],
@@ -607,6 +608,7 @@ class ServiceController extends Controller
                 }
 
                 $name = trim($document['name'] ?? '');
+                $nameAr = trim($document['name_ar'] ?? '');
                 $key = trim($document['key'] ?? '');
                 $mimeTypes = $document['mime_types'] ?? [];
                 if (is_string($mimeTypes)) {
@@ -622,6 +624,7 @@ class ServiceController extends Controller
                 return [
                     'key' => $key !== '' ? \Illuminate\Support\Str::slug($key, '_') : \Illuminate\Support\Str::slug($name, '_'),
                     'name' => $name,
+                    'name_ar' => $nameAr,
                     'required' => filter_var($document['required'] ?? true, FILTER_VALIDATE_BOOLEAN),
                     'approval_required' => filter_var($document['approval_required'] ?? true, FILTER_VALIDATE_BOOLEAN),
                     'mime_types' => $mimeTypes,
@@ -629,7 +632,7 @@ class ServiceController extends Controller
                 ];
             })
             ->filter(function ($document) {
-                return ($document['name'] ?? '') !== '';
+                return ($document['name'] ?? '') !== '' && ($document['name_ar'] ?? '') !== '';
             })
             ->values()
             ->all() ?: null;

@@ -9,9 +9,9 @@
 <div class="sanad-lifecycle-panel c1-light-bg radius-10 py-3 px-4 mb-3">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
         <div>
-            <h4 class="mb-1">Sanad Request Lifecycle</h4>
+            <h4 class="mb-1">Quick Request Lifecycle</h4>
             <p class="mb-0 opacity-75">
-                Reference: <strong>{{ $bookingdata->sanad_reference ?: 'SANAD-' . str_pad($bookingdata->id, 6, '0', STR_PAD_LEFT) }}</strong>
+                Reference: <strong>{{ $bookingdata->quick_reference }}</strong>
             </p>
         </div>
         <div class="d-flex flex-wrap gap-2">

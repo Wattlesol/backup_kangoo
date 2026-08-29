@@ -1,4 +1,5 @@
 @php
+    $isAr = app()->getLocale() === 'ar';
     $isCustomer = !empty($isCustomerPortal) || in_array(optional(auth()->user())->user_type, ['user', 'customer'], true);
     $messagesRoute = $isCustomer ? 'customer-portal.messages' : 'sanad.chat.workspace';
     $snapshotRoute = $isCustomer ? 'customer-portal.messages.snapshot' : 'sanad.chat.workspace.snapshot';
@@ -6,15 +7,52 @@
     $requestShowRoute = $isCustomer ? 'customer-portal.requests.show' : 'sanad.requests.show';
     $roleLabel = fn ($role) => Str::headline(str_replace(['demo_admin', 'handyman'], ['admin', 'employee'], (string) $role));
     $selectedId = optional($selectedBooking)->id;
-    $selectedStage = $selectedBooking ? Str::headline($selectedBooking->sanad_stage ?: $selectedBooking->status) : '-';
+    $arabicStages = [
+        'submitted' => 'تم التقديم',
+        'pending_review' => 'قيد المراجعة',
+        'waiting_for_documents' => 'بانتظار المستندات',
+        'awaiting_customer_action' => 'بانتظار إجراء العميل',
+        'government_processing' => 'المعالجة الحكومية',
+        'legal_review' => 'المراجعة القانونية',
+        'accounting' => 'المحاسبة',
+        'quality_review' => 'مراجعة الجودة',
+        'awaiting_quality_review' => 'بانتظار مراجعة الجودة',
+        'assigned_to_partner' => 'مُسند إلى الشريك',
+        'assigned_to_employee' => 'مُسند إلى الموظف',
+        'in_progress' => 'قيد التنفيذ',
+        'ready_for_delivery' => 'جاهز للتسليم',
+        'completed' => 'مكتمل',
+        'closed' => 'مغلق',
+        'cancelled' => 'ملغي',
+    ];
+    $arabicPriorities = ['urgent' => 'عاجلة', 'high' => 'مرتفعة', 'normal' => 'عادية', 'low' => 'منخفضة'];
+    $localizedTargetRole = function ($role) use ($isAr) {
+        if (!$isAr) {
+            return $role;
+        }
+
+        return match (Str::snake((string) $role)) {
+            'sanad' => 'كويك',
+            'partner' => 'الشريك',
+            'admin', 'administrator' => 'مسؤول النظام',
+            'employee', 'staff', 'handyman' => 'موظف',
+            'customer', 'user' => 'عميل',
+            default => $role,
+        };
+    };
+    $selectedStageKey = $selectedBooking ? ($selectedBooking->sanad_stage ?: $selectedBooking->status) : null;
+    $selectedStage = $selectedStageKey
+        ? ($isAr ? ($arabicStages[Str::snake($selectedStageKey)] ?? Str::headline($selectedStageKey)) : Str::headline($selectedStageKey))
+        : '-';
     $requiredDocuments = $selectedBooking && $selectedBooking->service ? collect($selectedBooking->service->required_documents ?: [])->map(function ($doc) {
-        $name = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
-        return ['key' => is_array($doc) ? ($doc['key'] ?? Str::slug($name, '_')) : Str::slug($name, '_'), 'name' => $name];
+        $storedName = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
+        return ['key' => is_array($doc) ? ($doc['key'] ?? Str::slug($storedName, '_')) : Str::slug($storedName, '_'), 'name' => localized_service_document_name($doc)];
     })->values() : collect();
 @endphp
 
 <x-master-layout>
     <script>
+        window.sanadWorkspaceIsArabic = @json($isAr);
         window.toggleSanadAttachmentPopover = function (e) {
             if (e) {
                 e.preventDefault();
@@ -65,8 +103,10 @@
             var composerText = composer.querySelector('textarea[name="message"]');
             if (composerText) {
                 composerText.placeholder = isBuzz
-                    ? 'Send an urgent Buzz to this request customer...'
-                    : (isDocument ? 'Instructions / Reason for document request...' : 'Type a message...');
+                    ? (window.sanadWorkspaceIsArabic ? 'أرسل تنبيهاً عاجلاً إلى العميل...' : 'Send an urgent Buzz to this request customer...')
+                    : (isDocument
+                        ? (window.sanadWorkspaceIsArabic ? 'تعليمات أو سبب طلب المستند...' : 'Instructions / Reason for document request...')
+                        : (window.sanadWorkspaceIsArabic ? 'اكتب رسالة...' : 'Type a message...'));
             }
             
             var documentName = composer.querySelector('input[name="document_name"]');
@@ -99,7 +139,7 @@
                 documentName.value = '';
                 var customField = documentName.closest('.document-custom-field');
                 if (customField) customField.style.setProperty('display', 'flex', 'important');
-                documentName.placeholder = 'Document name';
+                documentName.placeholder = window.sanadWorkspaceIsArabic ? 'اسم المستند' : 'Document name';
                 documentName.required = composer.classList.contains('is-document');
             }
         };
@@ -148,7 +188,7 @@
             var hasFile = fileInput && !fileInput.disabled && fileInput.files && fileInput.files.length > 0;
 
             if (!hasVault && !hasFile) {
-                alert('Choose a vault document or attach a file first.');
+                alert(window.sanadWorkspaceIsArabic ? 'اختر مستنداً من الخزنة أو أرفق ملفاً أولاً.' : 'Choose a vault document or attach a file first.');
                 return false;
             }
 
@@ -160,7 +200,7 @@
             var fileName = form ? form.querySelector('.customer-file-name') : null;
             if (!fileName) return;
 
-            fileName.textContent = input.files && input.files[0] ? input.files[0].name : 'No file selected';
+            fileName.textContent = input.files && input.files[0] ? input.files[0].name : (window.sanadWorkspaceIsArabic ? 'لم يتم اختيار ملف' : 'No file selected');
         };
 
         window.syncChatAssignmentTarget = function (selectElem) {
@@ -187,8 +227,12 @@
                     if (selectedOption && selectedOption.hidden) targetSelect.value = '';
                 }
                 targetSelect.options[0].textContent = selectedType === 'partner_team'
-                    ? (hasVisibleOption ? 'Assign whole partner team or choose member' : 'No partner team members available')
-                    : (hasVisibleOption ? 'Assign whole Sanad team or choose member' : 'No Sanad team members available');
+                    ? (hasVisibleOption
+                        ? (window.sanadWorkspaceIsArabic ? 'إسناد إلى فريق الشريك بالكامل أو اختيار عضو' : 'Assign whole partner team or choose member')
+                        : (window.sanadWorkspaceIsArabic ? 'لا يوجد أعضاء متاحون في فريق الشريك' : 'No partner team members available'))
+                    : (hasVisibleOption
+                        ? (window.sanadWorkspaceIsArabic ? 'إسناد إلى فريق كويك بالكامل أو اختيار عضو' : 'Assign whole Quick team or choose member')
+                        : (window.sanadWorkspaceIsArabic ? 'لا يوجد أعضاء متاحون في فريق كويك' : 'No Quick team members available'));
             }
         };
     </script>
@@ -196,13 +240,13 @@
         <aside class="sanad-inbox-panel">
             <div class="inbox-top">
                 <div>
-                    <h4>Unified Inbox</h4>
-                    <span>Chat, Buzz, documents, and AI review</span>
+                    <h4>{{ app()->getLocale() === "ar" ? "صندوق الوارد الموحد" : "Unified Inbox" }}</h4>
+                    <span>{{ app()->getLocale() === "ar" ? "المحادثات، تنبيهات بز، المستندات، ومراجعة الذكاء الاصطناعي" : "Chat, Buzz, documents, and AI review" }}</span>
                 </div>
-                <a class="icon-btn" href="{{ route($messagesRoute) }}" title="Refresh inbox"><i class="fas fa-sync-alt"></i></a>
+                <a class="icon-btn" href="{{ route($messagesRoute) }}" title="{{ $isAr ? 'تحديث صندوق الوارد' : 'Refresh inbox' }}"><i class="fas fa-sync-alt"></i></a>
             </div>
             <form method="GET" action="{{ route($messagesRoute) }}" class="inbox-search">
-                <input type="search" name="search" value="{{ request('search') }}" placeholder="Search conversations">
+                <input type="search" name="search" value="{{ request('search') }}" placeholder="{{ $isAr ? 'البحث في المحادثات' : 'Search conversations' }}">
                 <input type="hidden" name="action_state" value="{{ request('action_state') }}">
             </form>
             <nav class="inbox-tabs">
@@ -214,7 +258,17 @@
                     'ai_escalations' => 'AI Review',
                 ] as $state => $label)
                     @continue($state === 'ai_escalations' && !$isAdmin)
-                    <a class="{{ request('action_state') === $state ? 'active' : '' }}" href="{{ route($messagesRoute, array_filter(['action_state' => $state, 'search' => request('search')], fn ($value) => $value !== null && $value !== '')) }}">{{ $label }}</a>
+                    @php
+                        $localizedInboxLabel = $isAr ? match ($state) {
+                            '' => 'الكل',
+                            'open_chat' => 'غير مقروء',
+                            'unread_buzz' => 'التنبيهات',
+                            'pending_documents' => 'المستندات',
+                            'ai_escalations' => 'مراجعة الذكاء الاصطناعي',
+                            default => $label,
+                        } : $label;
+                    @endphp
+                    <a class="{{ request('action_state') === $state ? 'active' : '' }}" href="{{ route($messagesRoute, array_filter(['action_state' => $state, 'search' => request('search')], fn ($value) => $value !== null && $value !== '')) }}">{{ $localizedInboxLabel }}</a>
                 @endforeach
             </nav>
             <div class="conversation-list">
@@ -236,23 +290,35 @@
                         $lastMessage = $latestThread && $latestThread->relationLoaded('messages')
                             ? optional($latestThread->messages->last())->message
                             : null;
+                        $conversationService = optional($conversation->service);
+                        $conversationServiceName = $isAr
+                            ? ($conversationService->name_ar ?: $conversationService->name_en ?: $conversationService->name ?: 'لا توجد خدمة')
+                            : ($conversationService->name_en ?: $conversationService->name ?: 'No service');
+                        $conversationStageKey = Str::snake($conversation->sanad_stage ?: $conversation->status);
+                        $conversationStage = $isAr
+                            ? ($arabicStages[$conversationStageKey] ?? Str::headline($conversationStageKey))
+                            : Str::headline($conversationStageKey);
+                        $conversationPriorityKey = Str::snake($conversation->sanad_priority ?: 'normal');
+                        $conversationPriority = $isAr
+                            ? ($arabicPriorities[$conversationPriorityKey] ?? Str::headline($conversationPriorityKey))
+                            : Str::headline($conversationPriorityKey);
                     @endphp
                     <a class="conversation-item {{ $selectedId === $conversation->id ? 'active' : '' }}" data-booking-id="{{ $conversation->id }}" href="{{ route($messagesRoute, array_filter(['booking_id' => $conversation->id, 'action_state' => request('action_state'), 'search' => request('search')])) }}">
                         <div class="avatar">{{ Str::upper(Str::substr(optional($conversation->customer)->display_name ?: 'C', 0, 1)) }}</div>
                         <div class="conversation-copy">
-                            <div class="conversation-line"><strong>{{ optional($conversation->customer)->display_name ?: 'Customer' }}</strong><time>{{ optional($conversation->updated_at)->diffForHumans() }}</time></div>
-                            <div class="conversation-ref">{{ $conversation->sanad_reference ?: '#' . $conversation->id }} · {{ optional($conversation->service)->name ?: 'No service' }}</div>
-                            <p>{{ Str::limit($lastMessage ?: Str::headline($conversation->sanad_stage ?: $conversation->status), 74) }}</p>
+                            <div class="conversation-line"><strong>{{ optional($conversation->customer)->display_name ?: ($isAr ? 'عميل' : 'Customer') }}</strong><time>{{ optional($conversation->updated_at)->diffForHumans() }}</time></div>
+                            <div class="conversation-ref">{{ $conversation->quick_reference }} · {{ $conversationServiceName }}</div>
+                            <p>{{ Str::limit($lastMessage ?: $conversationStage, 74) }}</p>
                             <div class="chips">
-                                @if($conversation->sanad_priority)<span>{{ Str::headline($conversation->sanad_priority) }}</span>@endif
-                                @if($openBuzz)<span class="danger">{{ $openBuzz }} Buzz</span>@endif
-                                @if($pendingDocs)<span class="info">{{ $pendingDocs }} Docs</span>@endif
-                                @if($aiReviews)<span class="ai">AI Review</span>@endif
+                                @if($conversation->sanad_priority)<span>{{ $conversationPriority }}</span>@endif
+                                @if($openBuzz)<span class="danger">{{ $openBuzz }} {{ $isAr ? 'تنبيه' : 'Buzz' }}</span>@endif
+                                @if($pendingDocs)<span class="info">{{ $pendingDocs }} {{ $isAr ? 'مستندات' : 'Docs' }}</span>@endif
+                                @if($aiReviews)<span class="ai">{{ $isAr ? 'مراجعة الذكاء الاصطناعي' : 'AI Review' }}</span>@endif
                             </div>
                         </div>
                     </a>
                 @empty
-                    <div class="empty-panel">No conversations found.</div>
+                    <div class="empty-panel">{{ $isAr ? 'لم يتم العثور على محادثات.' : 'No conversations found.' }}</div>
                 @endforelse
             </div>
         </aside>
@@ -307,10 +373,10 @@
                     $aiEnabled = $selectedBooking->ai_first_responder_enabled !== false;
                     $chatOwnerType = $selectedBooking->chat_owner_type ?: 'ai';
                     $chatOwnerLabel = match ($chatOwnerType) {
-                        'sanad_team' => 'Sanad Team',
-                        'partner_team' => 'Partner Team',
-                        'user' => optional(\App\Models\User::find($selectedBooking->chat_owner_user_id))->display_name ?: optional(\App\Models\User::find($selectedBooking->chat_owner_user_id))->email ?: 'Assigned Team Member',
-                        default => 'AI First Responder',
+                        'sanad_team' => $isAr ? 'فريق كويك' : 'Quick Team',
+                        'partner_team' => $isAr ? 'فريق الشريك' : 'Partner Team',
+                        'user' => optional(\App\Models\User::find($selectedBooking->chat_owner_user_id))->display_name ?: optional(\App\Models\User::find($selectedBooking->chat_owner_user_id))->email ?: ($isAr ? 'عضو الفريق المُسند إليه' : 'Assigned Team Member'),
+                        default => $isAr ? 'المستجيب الآلي الأول' : 'AI First Responder',
                     };
                     $chatTargets = !$isCustomer ? app(\App\Http\Controllers\SanadWebController::class)->assignableChatTargets($selectedBooking) : collect();
                     $selectedChatTarget = $chatTargets->firstWhere('id', (int) $selectedBooking->chat_owner_user_id);
@@ -324,12 +390,12 @@
                 <header class="chat-header">
                     <div class="avatar large">{{ Str::upper(Str::substr(optional($selectedBooking->customer)->display_name ?: 'C', 0, 1)) }}</div>
                     <div>
-                        <h4>{{ optional($selectedBooking->customer)->display_name ?: optional($selectedBooking->customer)->email ?: 'Customer' }}</h4>
-                        <span>{{ $selectedBooking->sanad_reference ?: '#' . $selectedBooking->id }} · {{ optional($selectedBooking->service)->name ?: 'No service' }}</span>
+                        <h4>{{ optional($selectedBooking->customer)->display_name ?: optional($selectedBooking->customer)->email ?: ($isAr ? 'عميل' : 'Customer') }}</h4>
+                        <span>{{ $selectedBooking->quick_reference }} · {{ $isAr ? (optional($selectedBooking->service)->name_ar ?: optional($selectedBooking->service)->name_en ?: optional($selectedBooking->service)->name ?: 'لا توجد خدمة') : (optional($selectedBooking->service)->name_en ?: optional($selectedBooking->service)->name ?: 'No service') }}</span>
                     </div>
                     <div class="chat-header-actions">
                         <span class="status-pill">{{ $selectedStage }}</span>
-                        <a class="btn btn-sm btn-outline-primary" href="{{ route($requestShowRoute, $selectedBooking->id) }}">Request</a>
+                        <a class="btn btn-sm btn-outline-primary" href="{{ route($requestShowRoute, $selectedBooking->id) }}">{{ $isAr ? 'الطلب' : 'Request' }}</a>
                     </div>
                 </header>
 
@@ -415,7 +481,7 @@
                             @php $message = $item->data; @endphp
                             @if($message->message_type === 'ai_handover_prompt')
                                 <article class="event-card ai-handover" data-event-type="ai-handover" data-message-id="{{ $message->id }}">
-                                    <div class="event-head"><strong><i class="fas fa-robot text-primary mr-1"></i> Sanad AI</strong><span>{{ Str::headline(optional($message->aiInteraction)->status ?: 'Handover Required') }}</span></div>
+                                    <div class="event-head"><strong><i class="fas fa-robot text-primary mr-1"></i> Quick AI</strong><span>{{ Str::headline(optional($message->aiInteraction)->status ?: 'Handover Required') }}</span></div>
                                     <p>{{ $message->message }}</p>
                                     @if($isCustomer && optional($message->aiInteraction)->status === 'handover_required')
                                         <div class="action-row d-flex gap-2">
@@ -431,13 +497,13 @@
                                             </form>
                                         </div>
                                     @elseif(in_array(optional($message->aiInteraction)->status, ['handover_accepted', 'handover_declined'], true))
-                                        <small class="text-muted">{{ optional($message->aiInteraction)->status === 'handover_accepted' ? 'Sanad team has been notified.' : 'No handover requested.' }}</small>
+                                        <small class="text-muted">{{ optional($message->aiInteraction)->status === 'handover_accepted' ? 'Quick team has been notified.' : 'No handover requested.' }}</small>
                                     @endif
                                 </article>
                             @else
                             <article class="message-row {{ in_array($message->sender_role, ['user', 'customer'], true) ? 'customer' : 'team' }} {{ $message->message_type === 'system_note' ? 'system' : '' }}" data-message-id="{{ $message->id }}">
                                 <div class="message-bubble">
-                                    <div class="message-meta"><strong>{{ $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: $roleLabel($message->sender_role)) }}</strong><span>{{ optional($message->created_at)->format('Y-m-d H:i') }}</span></div>
+                                    <div class="message-meta"><strong>{{ $message->sender_role === 'system' ? 'Quick AI' : (optional($message->sender)->display_name ?: $roleLabel($message->sender_role)) }}</strong><span>{{ optional($message->created_at)->format('Y-m-d H:i') }}</span></div>
                                     @if($message->message)<p>{{ $message->message }}</p>@endif
                                     @if($message->getFirstMediaUrl('sanad_chat_attachment'))
                                         <div class="mt-2">
@@ -458,8 +524,8 @@
                     @empty
                         <div class="empty-chat py-5 text-center text-muted">
                             <i class="far fa-comments fa-3x mb-3 text-muted"></i>
-                            <h5>No activity yet</h5>
-                            <p>Start a conversation by typing a message below.</p>
+                            <h5>{{ $isAr ? 'لا يوجد نشاط حتى الآن' : 'No activity yet' }}</h5>
+                            <p>{{ $isAr ? 'ابدأ المحادثة بكتابة رسالة أدناه.' : 'Start a conversation by typing a message below.' }}</p>
                         </div>
                     @endforelse
 
@@ -490,31 +556,28 @@
                     @endif
                 </section>
 
-                <form method="POST" enctype="multipart/form-data" action="{{ route($storeChatRoute, $selectedBooking->id) }}" class="chat-composer {{ (!$isCustomer && $directMessageLock['locked']) ? 'ai-blocks-message' : '' }}" data-ai-enabled="{{ $aiEnabled ? '1' : '0' }}" data-is-customer="{{ $isCustomer ? '1' : '0' }}" data-direct-message-locked="{{ $directMessageLock['locked'] ? '1' : '0' }}" data-direct-message-lock-message="{{ $directMessageLock['message'] }}">
+                <form method="POST" enctype="multipart/form-data" action="{{ route($storeChatRoute, $selectedBooking->id) }}" class="chat-composer {{ (!$isCustomer && $directMessageLock['locked']) ? 'ai-blocks-message' : '' }}" data-ai-enabled="{{ $aiEnabled ? '1' : '0' }}" data-is-customer="{{ $isCustomer ? '1' : '0' }}" data-direct-message-locked="{{ $directMessageLock['locked'] ? '1' : '0' }}" data-direct-message-lock-message="{{ $isAr ? 'عطّل المستجيب الآلي الأول لإرسال رسالة مباشرة.' : $directMessageLock['message'] }}">
                     @csrf
                     <input type="hidden" name="thread_type" value="shared">
-                    @if(!$isCustomer)
-                        <div class="composer-ai-warning">{{ $directMessageLock['message'] ?: 'Disable AI first responder to send a direct message.' }} Buzz and document requests remain available.</div>
-                    @endif
                     <div class="document-fields mb-2" dir="rtl">
                         <div class="document-request-grid">
                             <label class="document-field">
-                                <span>Document</span>
-                                <select name="document_preset" class="document-preset" title="Document to request" onchange="window.syncSanadDocumentPreset(this)">
+                                <span>{{ $isAr ? 'المستند' : 'Document' }}</span>
+                                <select name="document_preset" class="document-preset" title="{{ $isAr ? 'المستند المطلوب' : 'Document to request' }}" onchange="window.syncSanadDocumentPreset(this)">
                             @foreach($requiredDocuments as $doc)
                                 <option value="{{ $doc['key'] }}" data-key="{{ $doc['key'] }}" data-name="{{ $doc['name'] }}">{{ $doc['name'] }}</option>
                             @endforeach
-                                    <option value="custom" data-key="" data-name="">Custom document</option>
+                                    <option value="custom" data-key="" data-name="">{{ $isAr ? 'مستند مخصص' : 'Custom document' }}</option>
                                 </select>
                             </label>
                             <input type="hidden" name="document_key">
                             <label class="document-field document-custom-field">
-                                <span>Custom document name</span>
-                                <input name="document_name" id="composer-document-name" placeholder="Document name">
+                                <span>{{ $isAr ? 'اسم المستند المخصص' : 'Custom document name' }}</span>
+                                <input name="document_name" id="composer-document-name" placeholder="{{ $isAr ? 'اسم المستند' : 'Document name' }}">
                             </label>
                             <label class="document-field">
-                                <span>Submit by</span>
-                                <input name="due_at" type="date" class="composer-due-at" title="Due Date">
+                                <span>{{ $isAr ? 'موعد التسليم' : 'Submit by' }}</span>
+                                <input name="due_at" type="date" class="composer-due-at" title="{{ $isAr ? 'تاريخ الاستحقاق' : 'Due Date' }}">
                             </label>
                             <input type="hidden" name="requested_from" value="customer">
                         </div>
@@ -522,19 +585,19 @@
 
                     <div class="composer-main-bar d-flex align-items-end gap-2 w-100">
                         @if($canCreateBuzz || $canRequestDocuments)
-                            <select name="delivery_mode" class="composer-mode" title="Delivery type" onchange="window.syncSanadComposerMode(this)">
-                                <option value="message">Message</option>
-                                @if($canCreateBuzz)<option value="buzz">Buzz</option>@endif
-                                @if($canRequestDocuments)<option value="document">Document</option>@endif
+                            <select name="delivery_mode" class="composer-mode" title="{{ $isAr ? 'نوع الإرسال' : 'Delivery type' }}" onchange="window.syncSanadComposerMode(this)">
+                                <option value="message">{{ $isAr ? 'رسالة' : 'Message' }}</option>
+                                @if($canCreateBuzz)<option value="buzz">{{ $isAr ? 'تنبيه' : 'Buzz' }}</option>@endif
+                                @if($canRequestDocuments)<option value="document">{{ $isAr ? 'مستند' : 'Document' }}</option>@endif
                             </select>
                         @else
                             <input type="hidden" name="delivery_mode" value="message">
                         @endif
-                        <select name="buzz_priority" class="composer-priority" title="Buzz priority">
-                            <option value="urgent">Urgent</option>
-                            <option value="high">High</option>
-                            <option value="normal">Normal</option>
-                            <option value="low">Low</option>
+                        <select name="buzz_priority" class="composer-priority" title="{{ $isAr ? 'أولوية التنبيه' : 'Buzz priority' }}">
+                            <option value="urgent">{{ $isAr ? 'عاجلة' : 'Urgent' }}</option>
+                            <option value="high">{{ $isAr ? 'مرتفعة' : 'High' }}</option>
+                            <option value="normal">{{ $isAr ? 'عادية' : 'Normal' }}</option>
+                            <option value="low">{{ $isAr ? 'منخفضة' : 'Low' }}</option>
                         </select>
                     <!-- Hidden File & Vault Inputs -->
                     <input type="file" name="attachment" id="composer-file-input" class="d-none" accept="image/jpeg,image/png,application/pdf,.doc,.docx">
@@ -571,11 +634,14 @@
                     @endif
 
                     <div class="composer-text-wrapper position-relative w-100">
+                        @if(!$isCustomer)
+                            <div class="composer-ai-warning" role="tooltip">{{ $isAr ? 'عطّل المستجيب الآلي الأول لإرسال رسالة مباشرة. تظل التنبيهات وطلبات المستندات متاحة.' : (($directMessageLock['message'] ?: 'Disable AI first responder to send a direct message.') . ' Buzz and document requests remain available.') }}</div>
+                        @endif
                         <div id="composer-attachment-badge" class="badge badge-light border text-primary p-2 mb-1 w-100 d-flex justify-content-between align-items-center" style="display: none !important; font-size: 12px;">
                             <span><i class="fas fa-paperclip mr-1"></i> <span id="composer-attachment-name"></span></span>
                             <button type="button" class="btn btn-sm btn-link text-danger p-0 ml-2" id="btn-remove-attachment" onclick="removeSanadAttachment(event)" style="text-decoration:none;">&times;</button>
                         </div>
-                        <textarea name="message" rows="1" placeholder="Type a message..."></textarea>
+                        <textarea name="message" rows="1" placeholder="{{ $isAr ? 'اكتب رسالة...' : 'Type a message...' }}"></textarea>
                     </div>
 
                     <button class="send-btn"><i class="fas fa-paper-plane"></i></button>
@@ -590,14 +656,14 @@
             <aside class="sanad-context-panel">
                 @if($selectedBooking)
                     <section class="context-tab active" id="tab-request">
-                        <h5>Request Context</h5>
+                        <h5>{{ $isAr ? 'سياق الطلب' : 'Request Context' }}</h5>
                         <div class="context-list">
-                            <span>Stage <strong>{{ $selectedStage }}</strong></span>
-                            <span>Priority <strong>{{ Str::headline($selectedBooking->sanad_priority ?: 'normal') }}</strong></span>
-                            <span>SLA <strong>{{ optional($selectedBooking->sla_due_at)->format('Y-m-d H:i') ?: '-' }}</strong></span>
-                            <span>Partner <strong>{{ optional($selectedBooking->provider)->display_name ?: '-' }}</strong></span>
-                            <span>AI <strong data-ai-state-label>{{ $aiEnabled ? 'AI First Responder On' : 'Manual Takeover' }}</strong></span>
-                            <span>Assignment <strong data-chat-assignment-label>{{ $chatOwnerLabel }}</strong></span>
+                            <span>{{ $isAr ? 'المرحلة' : 'Stage' }} <strong>{{ $selectedStage }}</strong></span>
+                            <span>{{ $isAr ? 'الأولوية' : 'Priority' }} <strong>{{ $isAr ? ($arabicPriorities[Str::snake($selectedBooking->sanad_priority ?: 'normal')] ?? Str::headline($selectedBooking->sanad_priority ?: 'normal')) : Str::headline($selectedBooking->sanad_priority ?: 'normal') }}</strong></span>
+                            <span>{{ $isAr ? 'مهلة الخدمة' : 'SLA' }} <strong>{{ optional($selectedBooking->sla_due_at)->format('Y-m-d H:i') ?: '-' }}</strong></span>
+                            <span>{{ $isAr ? 'الشريك' : 'Partner' }} <strong>{{ optional($selectedBooking->provider)->display_name ?: '-' }}</strong></span>
+                            <span>{{ $isAr ? 'الذكاء الاصطناعي' : 'AI' }} <strong data-ai-state-label>{{ $aiEnabled ? ($isAr ? 'المستجيب الآلي الأول مفعّل' : 'AI First Responder On') : ($isAr ? 'استلام يدوي' : 'Manual Takeover') }}</strong></span>
+                            <span>{{ $isAr ? 'الإسناد' : 'Assignment' }} <strong data-chat-assignment-label>{{ $chatOwnerLabel }}</strong></span>
                         </div>
                         <div class="chat-control-panel mt-3" data-ai-toggle-url="{{ route('sanad.requests.ai-first-responder', $selectedBooking->id) }}" data-chat-assignment-url="{{ route('sanad.requests.chat-assignment', $selectedBooking->id) }}">
                             <form class="ai-toggle-form mb-3">
@@ -605,24 +671,24 @@
                                 <input type="hidden" name="enabled" value="{{ $aiEnabled ? 0 : 1 }}">
                                 <button type="submit" class="btn btn-sm {{ $aiEnabled ? 'btn-outline-danger' : 'btn-outline-success' }} w-100">
                                     <i class="fas {{ $aiEnabled ? 'fa-user-shield' : 'fa-robot' }} mr-1"></i>
-                                    {{ $aiEnabled ? 'Disable AI / Manual Takeover' : 'Re-enable AI First Responder' }}
+                                    {{ $aiEnabled ? ($isAr ? 'تعطيل الذكاء الاصطناعي / استلام يدوي' : 'Disable AI / Manual Takeover') : ($isAr ? 'إعادة تفعيل المستجيب الآلي الأول' : 'Re-enable AI First Responder') }}
                                 </button>
                             </form>
                             <form class="chat-assignment-form">
                                 @csrf
-                                <label class="small text-muted font-weight-bold mb-1">Assignment</label>
+                                <label class="small text-muted font-weight-bold mb-1">{{ $isAr ? 'الإسناد' : 'Assignment' }}</label>
                                 <select name="target_type" class="form-control form-control-sm mb-2" onchange="window.syncChatAssignmentTarget(this)">
-                                    <option value="sanad_team" {{ $assignmentFormType === 'sanad_team' ? 'selected' : '' }}>Assign to Sanad Team</option>
-                                    <option value="partner_team" {{ $assignmentFormType === 'partner_team' ? 'selected' : '' }}>Assign to Partner Team</option>
+                                    <option value="sanad_team" {{ $assignmentFormType === 'sanad_team' ? 'selected' : '' }}>{{ $isAr ? 'إسناد إلى فريق كويك' : 'Assign to Quick Team' }}</option>
+                                    <option value="partner_team" {{ $assignmentFormType === 'partner_team' ? 'selected' : '' }}>{{ $isAr ? 'إسناد إلى فريق الشريك' : 'Assign to Partner Team' }}</option>
                                 </select>
                                 <select name="target_user_id" class="form-control form-control-sm mb-2 chat-target-select">
-                                    <option value="">Select team member</option>
+                                    <option value="">{{ $isAr ? 'اختر عضو الفريق' : 'Select team member' }}</option>
                                     @foreach($chatTargets as $target)
-                                        <option value="{{ $target['id'] }}" data-team="{{ $target['team'] ?? '' }}" {{ (int) $selectedBooking->chat_owner_user_id === (int) $target['id'] ? 'selected' : '' }}>{{ $target['name'] }} · {{ $target['role'] }}</option>
+                                        <option value="{{ $target['id'] }}" data-team="{{ $target['team'] ?? '' }}" {{ (int) $selectedBooking->chat_owner_user_id === (int) $target['id'] ? 'selected' : '' }}>{{ $target['name'] }} · {{ $localizedTargetRole($target['role']) }}</option>
                                     @endforeach
                                 </select>
-                                <input name="note" class="form-control form-control-sm mb-2" placeholder="Assignment note (optional)">
-                                <button type="submit" class="btn btn-sm btn-primary w-100">Save Assignment</button>
+                                <input name="note" class="form-control form-control-sm mb-2" placeholder="{{ $isAr ? 'ملاحظة الإسناد (اختياري)' : 'Assignment note (optional)' }}">
+                                <button type="submit" class="btn btn-sm btn-primary w-100">{{ $isAr ? 'حفظ الإسناد' : 'Save Assignment' }}</button>
                             </form>
                         </div>
                     </section>
@@ -720,8 +786,9 @@
             .context-list span, .learning-card { display: flex; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid #e5e9f2; border-radius: 10px; background: #fff; }
             .chat-control-panel { border-top: 1px solid #edf1f7; padding-top: 12px; }
             .chat-target-select { display: none; }
-            .composer-ai-warning { display: none; color: #b45309; font-size: 12px; padding: 6px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; }
-            .chat-composer.ai-blocks-message:not(.is-buzz):not(.is-document) .composer-ai-warning { display: block; }
+            .composer-ai-warning { position: absolute; inset-inline: 0; bottom: calc(100% + 8px); z-index: 20; color: #92400e; font-size: 12px; line-height: 1.45; padding: 8px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; box-shadow: 0 8px 20px rgba(15, 23, 42, .12); opacity: 0; visibility: hidden; transform: translateY(4px); pointer-events: none; transition: opacity .15s ease, transform .15s ease, visibility .15s ease; }
+            .chat-composer.ai-blocks-message[data-ai-enabled="1"]:not(.is-buzz):not(.is-document) .composer-text-wrapper:hover .composer-ai-warning,
+            .chat-composer.ai-blocks-message[data-ai-enabled="1"]:not(.is-buzz):not(.is-document) .composer-text-wrapper:focus-within .composer-ai-warning { opacity: 1; visibility: visible; transform: translateY(0); }
             .compact-form { display: grid; gap: 8px; }
             .compact-form input, .compact-form select, .compact-form textarea { border: 1px solid #dce3ee; border-radius: 8px; padding: 9px 10px; width: 100%; }
             .learning-card { display: grid; margin-bottom: 8px; }
@@ -781,6 +848,43 @@
                     var chatHeader = document.querySelector('.chat-header');
                     var contextList = document.querySelector('.context-list');
                     var controlPanel = document.querySelector('.chat-control-panel');
+                    var isArabic = window.sanadWorkspaceIsArabic === true;
+                    var arabicStages = {
+                        submitted: 'تم التقديم', pending_review: 'قيد المراجعة', waiting_for_documents: 'بانتظار المستندات',
+                        awaiting_customer_action: 'بانتظار إجراء العميل', government_processing: 'المعالجة الحكومية',
+                        legal_review: 'المراجعة القانونية', accounting: 'المحاسبة', quality_review: 'مراجعة الجودة',
+                        awaiting_quality_review: 'بانتظار مراجعة الجودة', assigned_to_partner: 'مُسند إلى الشريك',
+                        assigned_to_employee: 'مُسند إلى الموظف', in_progress: 'قيد التنفيذ', ready_for_delivery: 'جاهز للتسليم',
+                        completed: 'مكتمل', closed: 'مغلق', cancelled: 'ملغي'
+                    };
+                    var arabicPriorities = {urgent: 'عاجلة', high: 'مرتفعة', normal: 'عادية', low: 'منخفضة'};
+
+                    function normalizedLabelKey(value) {
+                        return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+                    }
+
+                    function localizedStage(value) {
+                        return isArabic ? (arabicStages[normalizedLabelKey(value)] || value || '-') : (value || '-');
+                    }
+
+                    function localizedPriority(value) {
+                        return isArabic ? (arabicPriorities[normalizedLabelKey(value)] || value || 'عادية') : (value || 'Normal');
+                    }
+
+                    function localizedAssignment(value) {
+                        if (!isArabic) return value || 'AI First Responder';
+                        var labels = {
+                            ai_first_responder: 'المستجيب الآلي الأول', sanad_team: 'فريق كويك', partner_team: 'فريق الشريك',
+                            assigned_team_member: 'عضو الفريق المُسند إليه'
+                        };
+                        return labels[normalizedLabelKey(value)] || value || 'المستجيب الآلي الأول';
+                    }
+
+                    function localizedTargetRole(value) {
+                        if (!isArabic) return value || 'Staff';
+                        var labels = {sanad: 'كويك', partner: 'الشريك', admin: 'مسؤول النظام', administrator: 'مسؤول النظام', employee: 'موظف', staff: 'موظف', handyman: 'موظف', customer: 'عميل', user: 'عميل'};
+                        return labels[normalizedLabelKey(value)] || value || 'موظف';
+                    }
 
                     function isControlPanelActive() {
                         return !!(controlPanel && document.activeElement && controlPanel.contains(document.activeElement));
@@ -794,8 +898,10 @@
                         composer.classList.toggle('is-document', isDocument);
                         if (composerText) {
                             composerText.placeholder = isBuzz
-                                ? 'Send an urgent Buzz to this request customer...'
-                                : (isDocument ? 'Reason and instructions for the customer...' : 'Type a message...');
+                                ? (isArabic ? 'أرسل تنبيهاً عاجلاً إلى العميل...' : 'Send an urgent Buzz to this request customer...')
+                                : (isDocument
+                                    ? (isArabic ? 'السبب والتعليمات الموجهة إلى العميل...' : 'Reason and instructions for the customer...')
+                                    : (isArabic ? 'اكتب رسالة...' : 'Type a message...'));
                         }
                         if (documentName) {
                             var isCustom = !documentPreset || documentPreset.value === 'custom';
@@ -807,11 +913,13 @@
                     function syncAiComposerLock() {
                         if (!composer || !composerText) return;
                         var deliveryMode = modeSelect ? modeSelect.value : 'message';
-                        var lockMessage = composer.dataset.directMessageLockMessage || 'Disable AI first responder to send a direct message.';
+                        var lockMessage = composer.dataset.directMessageLockMessage || (isArabic ? 'عطّل المستجيب الآلي الأول لإرسال رسالة مباشرة.' : 'Disable AI first responder to send a direct message.');
                         var shouldLock = composer.dataset.isCustomer !== '1' && composer.dataset.directMessageLocked === '1' && deliveryMode === 'message';
                         var normalPlaceholder = deliveryMode === 'buzz'
-                            ? 'Send an urgent Buzz to this request customer...'
-                            : (deliveryMode === 'document' ? 'Reason and instructions for the customer...' : 'Type a message...');
+                            ? (isArabic ? 'أرسل تنبيهاً عاجلاً إلى العميل...' : 'Send an urgent Buzz to this request customer...')
+                            : (deliveryMode === 'document'
+                                ? (isArabic ? 'السبب والتعليمات الموجهة إلى العميل...' : 'Reason and instructions for the customer...')
+                                : (isArabic ? 'اكتب رسالة...' : 'Type a message...'));
                         composerText.disabled = shouldLock;
                         composerText.readOnly = shouldLock;
                         composerText.placeholder = shouldLock ? lockMessage : normalPlaceholder;
@@ -833,7 +941,7 @@
                             documentName.value = '';
                             var customField = documentName.closest('.document-custom-field');
                             if (customField) customField.style.setProperty('display', 'flex', 'important');
-                            documentName.placeholder = 'Document name';
+                            documentName.placeholder = isArabic ? 'اسم المستند' : 'Document name';
                             documentName.required = composer.classList.contains('is-document');
                         }
                     }
@@ -883,7 +991,7 @@
                         (documents || []).forEach(function (doc) {
                             optionsHtml += '<option value="' + escapeHtml(doc.key) + '" data-key="' + escapeHtml(doc.key) + '" data-name="' + escapeHtml(doc.name) + '">' + escapeHtml(doc.name) + '</option>';
                         });
-                        optionsHtml += '<option value="custom" data-key="" data-name="">Custom document</option>';
+                        optionsHtml += '<option value="custom" data-key="" data-name="">' + (isArabic ? 'مستند مخصص' : 'Custom document') + '</option>';
                         documentPreset.innerHTML = optionsHtml;
                         var hasSelected = Array.prototype.some.call(documentPreset.options, function (option) {
                             return option.value === selected;
@@ -908,19 +1016,19 @@
 
                             if (avatar) avatar.textContent = request.avatar || 'C';
                             if (title) title.textContent = request.customer || 'Customer';
-                            if (subtitle) subtitle.textContent = (request.reference || ('#' + request.id)) + ' · ' + (request.service || 'No service');
-                            if (status) status.textContent = request.stage || '-';
+                            if (subtitle) subtitle.textContent = (request.reference || ('#' + request.id)) + ' · ' + (request.service || (isArabic ? 'لا توجد خدمة' : 'No service'));
+                            if (status) status.textContent = localizedStage(request.stage);
                             if (requestLink && request.request_url) requestLink.href = request.request_url;
                         }
 
                         if (contextList) {
                             contextList.innerHTML =
-                                '<span>Stage <strong>' + escapeHtml(request.stage || '-') + '</strong></span>' +
-                                '<span>Priority <strong>' + escapeHtml(request.priority || 'Normal') + '</strong></span>' +
-                                '<span>SLA <strong>' + escapeHtml(request.sla || '-') + '</strong></span>' +
-                                '<span>Partner <strong>' + escapeHtml(request.partner || '-') + '</strong></span>' +
-                                '<span>AI <strong data-ai-state-label>' + escapeHtml(request.ai_first_responder_enabled === false ? 'Manual Takeover' : 'AI First Responder On') + '</strong></span>' +
-                                '<span>Assignment <strong data-chat-assignment-label>' + escapeHtml(request.chat_assignment_label || 'AI First Responder') + '</strong></span>';
+                                '<span>' + (isArabic ? 'المرحلة' : 'Stage') + ' <strong>' + escapeHtml(localizedStage(request.stage)) + '</strong></span>' +
+                                '<span>' + (isArabic ? 'الأولوية' : 'Priority') + ' <strong>' + escapeHtml(localizedPriority(request.priority)) + '</strong></span>' +
+                                '<span>' + (isArabic ? 'مهلة الخدمة' : 'SLA') + ' <strong>' + escapeHtml(request.sla || '-') + '</strong></span>' +
+                                '<span>' + (isArabic ? 'الشريك' : 'Partner') + ' <strong>' + escapeHtml(request.partner || '-') + '</strong></span>' +
+                                '<span>' + (isArabic ? 'الذكاء الاصطناعي' : 'AI') + ' <strong data-ai-state-label>' + escapeHtml(request.ai_first_responder_enabled === false ? (isArabic ? 'استلام يدوي' : 'Manual Takeover') : (isArabic ? 'المستجيب الآلي الأول مفعّل' : 'AI First Responder On')) + '</strong></span>' +
+                                '<span>' + (isArabic ? 'الإسناد' : 'Assignment') + ' <strong data-chat-assignment-label>' + escapeHtml(localizedAssignment(request.chat_assignment_label)) + '</strong></span>';
                         }
 
                         if (composer && snapshot.composer) {
@@ -931,7 +1039,9 @@
                             composer.classList.toggle('ai-blocks-message', composer.dataset.isCustomer !== '1' && composer.dataset.directMessageLocked === '1');
                             var composerWarning = composer.querySelector('.composer-ai-warning');
                             if (composerWarning) {
-                                composerWarning.textContent = (snapshot.composer.direct_message_lock_message || 'Disable AI first responder to send a direct message.') + ' Buzz and document requests remain available.';
+                                composerWarning.textContent = isArabic
+                                    ? 'عطّل المستجيب الآلي الأول لإرسال رسالة مباشرة. تظل التنبيهات وطلبات المستندات متاحة.'
+                                    : (snapshot.composer.direct_message_lock_message || 'Disable AI first responder to send a direct message.') + ' Buzz and document requests remain available.';
                             }
                             syncAiComposerLock();
                             if (bookingChanged) {
@@ -961,7 +1071,9 @@
                                     if (enabledInput) enabledInput.value = aiOn ? '0' : '1';
                                     if (toggleBtn) {
                                         toggleBtn.className = 'btn btn-sm ' + (aiOn ? 'btn-outline-danger' : 'btn-outline-success') + ' w-100';
-                                        toggleBtn.innerHTML = '<i class="fas ' + (aiOn ? 'fa-user-shield' : 'fa-robot') + ' mr-1"></i>' + (aiOn ? 'Disable AI / Manual Takeover' : 'Re-enable AI First Responder');
+                                        toggleBtn.innerHTML = '<i class="fas ' + (aiOn ? 'fa-user-shield' : 'fa-robot') + ' mr-1"></i>' + (aiOn
+                                            ? (isArabic ? 'تعطيل الذكاء الاصطناعي / استلام يدوي' : 'Disable AI / Manual Takeover')
+                                            : (isArabic ? 'إعادة تفعيل المستجيب الآلي الأول' : 'Re-enable AI First Responder'));
                                     }
                                 }
                                 var typeSelect = controlPanel.querySelector('.chat-assignment-form select[name="target_type"]');
@@ -976,11 +1088,11 @@
                                 var targetSelect = controlPanel.querySelector('.chat-target-select');
                                 if (targetSelect) {
                                     var selectedUserId = String(request.chat_owner_user_id || '');
-                                    targetSelect.innerHTML = '<option value="">Select team member</option>';
+                                    targetSelect.innerHTML = '<option value="">' + (isArabic ? 'اختر عضو الفريق' : 'Select team member') + '</option>';
                                     (snapshot.composer.assignable_chat_targets || []).forEach(function (target) {
                                     var option = document.createElement('option');
                                     option.value = String(target.id || '');
-                                    option.textContent = (target.name || 'Team member') + ' · ' + (target.role || 'Staff');
+                                    option.textContent = (target.name || (isArabic ? 'عضو الفريق' : 'Team member')) + ' · ' + localizedTargetRole(target.role);
                                     option.dataset.team = target.team || '';
                                     option.selected = selectedUserId && selectedUserId === option.value;
                                     targetSelect.appendChild(option);
@@ -996,15 +1108,15 @@
                     function handoverPromptHtml(item) {
                         var status = item.handover_status || 'handover_required';
                         var html = '<article class="event-card ai-handover" data-event-type="ai-handover" data-message-id="' + escapeHtml(item.id || '') + '">' +
-                            '<div class="event-head"><strong><i class="fas fa-robot text-primary mr-1"></i> Sanad AI</strong><span>' + escapeHtml(status.replace(/_/g, ' ')) + '</span></div>' +
-                            '<p>' + escapeHtml(item.message || "I don't have enough information on this. I can connect you with a Sanad agent if you want.") + '</p>';
+                            '<div class="event-head"><strong><i class="fas fa-robot text-primary mr-1"></i> Quick AI</strong><span>' + escapeHtml(status.replace(/_/g, ' ')) + '</span></div>' +
+                            '<p>' + escapeHtml(item.message || "I don't have enough information on this. I can connect you with a Quick agent if you want.") + '</p>';
                         if (composer && composer.dataset.isCustomer === '1' && status === 'handover_required' && item.ai_interaction_id) {
                             html += '<div class="action-row d-flex gap-2">' +
                                 '<form class="ai-handover-form" data-interaction-id="' + item.ai_interaction_id + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="decision" value="yes"><button type="submit" class="btn btn-sm btn-primary">Yes</button></form>' +
                                 '<form class="ai-handover-form" data-interaction-id="' + item.ai_interaction_id + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="decision" value="no"><button type="submit" class="btn btn-sm btn-outline-secondary">No</button></form>' +
                                 '</div>';
                         } else if (status === 'handover_accepted') {
-                            html += '<small class="text-muted">Sanad team has been notified.</small>';
+                            html += '<small class="text-muted">Quick team has been notified.</small>';
                         } else if (status === 'handover_declined') {
                             html += '<small class="text-muted">No handover requested.</small>';
                         }
@@ -1160,7 +1272,7 @@
                             html += '<div class="message-links"><span><i class="fas fa-paperclip mr-1"></i>' + escapeHtml(message.attachment_name) + '</span></div>';
                         }
                         if (message.ai_response_pending) {
-                            html += '<div class="message-links"><span>Waiting for Sanad AI...</span></div>';
+                            html += '<div class="message-links"><span>Waiting for Quick AI...</span></div>';
                         }
                         html += '</div>';
 

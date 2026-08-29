@@ -23,7 +23,7 @@ class StoreController extends Controller
      */
     public function index(Request $request)
     {
-        $pageTitle = 'Store Management';
+        $pageTitle = __('messages.store');
         $auth_user = authSession();
 
         // Get the main store (there should only be one)
@@ -155,7 +155,7 @@ class StoreController extends Controller
             return redirect()->route('store.edit', $store->id);
         }
 
-        $pageTitle = 'Create Store';
+        $pageTitle = __('messages.add_button_form', ['form' => __('messages.store')]);
 
         return view('store.create', compact('pageTitle', 'auth_user'));
     }
@@ -258,7 +258,7 @@ class StoreController extends Controller
         $auth_user = authSession();
         $store = Store::where('store_type', 'main')->findOrFail($id);
 
-        $pageTitle = 'Edit Store';
+        $pageTitle = __('messages.update_form_title', ['form' => __('messages.store')]);
 
         return view('store.edit', compact('pageTitle', 'store', 'auth_user'));
     }

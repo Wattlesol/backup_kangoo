@@ -82,7 +82,7 @@
    <div class="mt-3">
       <div class="d-flex align-items-center gap-2">
          <span class="badge bg-primary-subtle text-primary">{{ __('messages.service') }}</span>
-         <span class="font-size-14 service-user-name">Sanad Operations</span>
+         <span class="font-size-14 service-user-name">Quick Operations</span>
       </div>
       <div class="d-flex align-items-center gap-1 f-none mt-2">
          @if($totalRating > 0)

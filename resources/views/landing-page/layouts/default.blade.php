@@ -22,7 +22,7 @@
 
     @yield('after_head')
 </head>
-<body class="body-bg {{ $themeMode === 'dark' ? 'dark' : '' }} theme-{{ $userRole }} {{ $themeMode }}-theme">
+<body class="body-bg quick-public-page {{ $themeMode === 'dark' ? 'dark' : '' }} theme-{{ $userRole }} {{ $themeMode }}-theme {{ request()->routeIs('frontend.index') ? 'quick-landing-page' : '' }}">
 
 
     <span class="screen-darken"></span>

@@ -20,8 +20,14 @@
                             {{ Form::hidden('id') }}
                             <div class="row">
                                 <div class="form-group col-md-12">
-                                    {{ Form::label('name',trans('messages.name').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
-                                    {{ Form::text('name',old('name'),['placeholder' => trans('messages.name'),'class' =>'form-control','required']) }}
+                                    {{ Form::label('name',trans('messages.english_name').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
+                                    {{ Form::text('name',old('name'),['placeholder' => trans('messages.english_name'),'class' =>'form-control','required','maxlength' => 100]) }}
+                                    <small class="help-block with-errors text-danger"></small>
+                                </div>
+
+                                <div class="form-group col-md-12">
+                                    {{ Form::label('name_ar',trans('messages.arabic_name').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
+                                    {{ Form::text('name_ar',old('name_ar'),['placeholder' => trans('messages.arabic_name'),'class' =>'form-control','required','maxlength' => 100,'dir' => 'rtl']) }}
                                     <small class="help-block with-errors text-danger"></small>
                                 </div>
 

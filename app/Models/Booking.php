@@ -9,6 +9,7 @@ class Booking extends Model
 {
     use HasFactory,SoftDeletes;
     protected $table = 'bookings';
+    protected $appends = ['quick_reference'];
     protected $fillable = [
         'customer_id', 
         'service_id',
@@ -89,6 +90,13 @@ class Booking extends Model
         'chat_assigned_by' => 'integer',
         'chat_assigned_at' => 'datetime',
     ];
+
+    public function getQuickReferenceAttribute(): string
+    {
+        $reference = (string) ($this->sanad_reference ?: 'QUICK-' . str_pad((string) $this->id, 6, '0', STR_PAD_LEFT));
+
+        return preg_replace('/^SANAD-/i', 'QUICK-', $reference);
+    }
     public function customer(){
         return $this->belongsTo(User::class,'customer_id', 'id')->withTrashed();
     }
@@ -159,11 +167,15 @@ class Booking extends Model
 
     public function scopeMyBooking($query){
         $user = auth()->user();
-        if($user->hasRole('admin') || $user->hasRole('demo_admin')) {
+        if (!$user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if($user->hasAnyRole(['admin', 'demo_admin']) || in_array($user->user_type, ['admin', 'demo_admin'], true)) {
             return $query;
         }
 
-        if($user->hasRole('provider')) {
+        if($user->hasAnyRole(['provider', 'partner']) || in_array($user->user_type, ['provider', 'partner'], true)) {
             return $query->where(function ($assignmentQuery) use ($user) {
                 $assignmentQuery->where('provider_id', $user->id)
                     ->orWhere('chat_owner_user_id', $user->id)
@@ -174,11 +186,11 @@ class Booking extends Model
             });
         }
 
-        if($user->hasRole('user')) {
+        if($user->hasAnyRole(['user', 'customer']) || in_array($user->user_type, ['user', 'customer'], true)) {
             return $query->where('customer_id', $user->id);
         }
 
-        if($user->hasRole('handyman')) {
+        if($user->hasAnyRole(['handyman', 'employee']) || in_array($user->user_type, ['handyman', 'employee'], true)) {
             if (!empty($user->provider_id)) {
                 return $query->where(function ($assignmentQuery) use ($user) {
                     $assignmentQuery->where('chat_owner_user_id', $user->id)
@@ -206,7 +218,7 @@ class Booking extends Model
             });
         }
 
-        return $query;
+        return $query->whereRaw('1 = 0');
     }
 
     public function categoryService(){

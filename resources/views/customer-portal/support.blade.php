@@ -1,42 +1,40 @@
 <x-master-layout>
-@include('customer-portal.partials.styles')
-<div class="container-fluid sanad-page">
+@php $isAr = app()->getLocale() === 'ar'; @endphp<div class="container-fluid sanad-page">
     <div class="sanad-header">
         <div>
-            <h1 class="sanad-title">Complaints & Support</h1>
-            <div class="sanad-muted">Create complaints linked to a specific active or closed request.</div>
+            <h1 class="sanad-title">{{ app()->getLocale() === "ar" ? "الشكاوى والدعم الفني" : "Complaints & Support" }}</h1>
+            <div class="sanad-muted">{{ app()->getLocale() === "ar" ? "تقديم ومتابعة الشكاوى وطلبات الدعم المرتبطة بطلباتك." : "Create complaints linked to a specific active or closed request." }}</div>
         </div>
     </div>
 
     <div class="sanad-card mb-3">
-        <div class="sanad-card-header">Create Complaint</div>
+        <div class="sanad-card-header">{{ app()->getLocale() === "ar" ? "تقديم شكوى جديدة" : "Create Complaint" }}</div>
         <div class="sanad-card-body">
             @if($requests->isEmpty())
-                <div class="sanad-muted">No active or closed requests are available for complaints.</div>
+                <div class="sanad-muted">{{ $isAr ? 'لا توجد طلبات نشطة أو مغلقة متاحة لتقديم شكوى.' : 'No active or closed requests are available for complaints.' }}</div>
             @else
                 <form method="post" action="{{ route('customer-portal.support.store') }}" enctype="multipart/form-data">
                     @csrf
                     <div class="row">
                         <div class="col-md-4 form-group">
-                            <label>Request</label>
+                            <label>{{ $isAr ? "الطلب" : "Request" }}</label>
                             <select class="sanad-form-control" name="booking_id" required>
                                 @foreach($requests as $request)
                                     @php
-                                        $serviceName = optional($request->service)->name_en ?? optional($request->service)->name ?? 'Service';
-                                        $partnerName = optional($request->provider)->display_name ?? optional($request->provider)->first_name ?? 'Not assigned yet';
-                                        $requestStatus = \Illuminate\Support\Str::headline($request->sanad_stage ?? $request->status ?? 'Active');
+                                        $serviceName = localized_model_name($request->service, $isAr ? 'خدمة' : 'Service');
+                                        $requestStatus = quick_status_label($request->sanad_stage ?? $request->status ?? 'Active');
                                     @endphp
                                     <option value="{{ $request->id }}" {{ (string) old('booking_id') === (string) $request->id ? 'selected' : '' }}>
-                                        {{ $request->sanad_reference ?? '#'.$request->id }} - {{ $serviceName }} - Partner: {{ $partnerName }} - {{ $requestStatus }}
+                                        {{ $request->quick_reference }} - {{ $serviceName }} - {{ $requestStatus }}
                                     </option>
                                 @endforeach
                             </select>
                         </div>
 
                         <div class="col-md-3 form-group">
-                            <label>Complaint Type</label>
+                            <label>{{ app()->getLocale() === "ar" ? "نوع الشكوى" : "Complaint Type" }}</label>
                             <select class="sanad-form-control" name="complaint_type" required>
-                                <option value="">Select complaint type</option>
+                                <option value="">{{ $isAr ? "اختر نوع الشكوى / البلاغ" : "Select complaint type" }}</option>
                                 @foreach($complaintTypes as $value => $label)
                                     <option value="{{ $value }}" {{ old('complaint_type') === $value ? 'selected' : '' }}>{{ $label }}</option>
                                 @endforeach
@@ -44,26 +42,26 @@
                         </div>
 
                         <div class="col-md-2 form-group">
-                            <label>Priority</label>
+                            <label>{{ $isAr ? "الأولوية" : "Priority" }}</label>
                             <select class="sanad-form-control" name="priority" required>
-                                <option value="normal" {{ old('priority', 'normal') === 'normal' ? 'selected' : '' }}>Normal</option>
-                                <option value="high" {{ old('priority') === 'high' ? 'selected' : '' }}>High</option>
-                                <option value="urgent" {{ old('priority') === 'urgent' ? 'selected' : '' }}>Urgent</option>
+                                <option value="normal" {{ old('priority', 'normal') === 'normal' ? 'selected' : '' }}>{{ $isAr ? "عادية" : "Normal" }}</option>
+                                <option value="high" {{ old('priority') === 'high' ? 'selected' : '' }}>{{ $isAr ? "عالية" : "High" }}</option>
+                                <option value="urgent" {{ old('priority') === 'urgent' ? 'selected' : '' }}>{{ $isAr ? "عاجلة" : "Urgent" }}</option>
                             </select>
                         </div>
 
                         <div class="col-md-3 form-group">
-                            <label>Attachment</label>
+                            <label>{{ $isAr ? "المرفقات" : "Attachment" }}</label>
                             <input class="sanad-form-control" type="file" name="attachment">
                         </div>
 
                         <div class="col-md-12 form-group">
-                            <label>Description</label>
+                            <label>{{ app()->getLocale() === "ar" ? "التفاصيل والوصف" : "Description" }}</label>
                             <textarea class="sanad-form-control" name="description" rows="3" required>{{ old('description') }}</textarea>
                         </div>
 
                         <div class="col-md-12">
-                            <button class="sanad-btn">Submit Complaint</button>
+                            <button class="sanad-btn">{{ app()->getLocale() === "ar" ? "إرسال الشكوى" : "Submit Complaint" }}</button>
                         </div>
                     </div>
                 </form>
@@ -76,34 +74,32 @@
             <table class="sanad-table">
                 <thead>
                     <tr>
-                        <th>Request</th>
-                        <th>Type</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Resolution Timeline</th>
+                        <th>{{ $isAr ? "الطلب" : "Request" }}</th>
+                        <th>{{ $isAr ? "النوع" : "Type" }}</th>
+                        <th>{{ $isAr ? "الأولوية" : "Priority" }}</th>
+                        <th>{{ $isAr ? "الحالة" : "Status" }}</th>
+                        <th>{{ $isAr ? "الجدول الزمني للحل" : "Resolution Timeline" }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($complaints as $complaint)
                         @php
                             $booking = $complaint->booking;
-                            $serviceName = optional(optional($booking)->service)->name_en ?? optional(optional($booking)->service)->name ?? 'Service';
-                            $partnerName = optional(optional($booking)->provider)->display_name ?? optional(optional($booking)->provider)->first_name ?? 'Not assigned yet';
+                            $serviceName = localized_model_name(optional($booking)->service, $isAr ? 'خدمة' : 'Service');
                             $typeLabel = $complaintTypes[$complaint->complaint_type] ?? \Illuminate\Support\Str::headline($complaint->complaint_type);
                         @endphp
                         <tr>
                             <td>
-                                <strong>{{ optional($booking)->sanad_reference ?? '#'.$complaint->booking_id }}</strong>
+                                <strong>{{ optional($booking)->quick_reference ?? 'QUICK-'.str_pad($complaint->booking_id, 6, '0', STR_PAD_LEFT) }}</strong>
                                 <div class="sanad-muted">{{ $serviceName }}</div>
-                                <div class="sanad-muted">Partner: {{ $partnerName }}</div>
                             </td>
                             <td>{{ $typeLabel }}</td>
-                            <td>{{ \Illuminate\Support\Str::headline($complaint->priority) }}</td>
-                            <td><span class="sanad-badge">{{ \Illuminate\Support\Str::headline($complaint->status) }}</span></td>
-                            <td>{{ $complaint->resolution_notes ?? 'Open with Sanad support.' }}</td>
+                            <td>{{ quick_status_label($complaint->priority) }}</td>
+                            <td><span class="sanad-badge">{{ quick_status_label($complaint->status) }}</span></td>
+                            <td>{{ $complaint->resolution_notes ?? ($isAr ? 'مفتوحة لدى دعم كويك.' : 'Open with Quick support.') }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5">No complaints submitted.</td></tr>
+                        <tr><td colspan="5">{{ $isAr ? 'لم يتم تقديم أي شكاوى.' : 'No complaints submitted.' }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

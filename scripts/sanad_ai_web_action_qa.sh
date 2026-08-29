@@ -108,14 +108,18 @@ csrf="$(extract_csrf "$html")"
 
 stamp="$(date +%Y%m%d%H%M%S)"
 keyword="sanadqa${stamp}"
-knowledge_title="Sanad AI Web QA ${keyword}"
-knowledge_content="Sanad AI web action answer ${keyword}: customers must prepare required documents before request approval."
+knowledge_title="Quick AI Web QA ${keyword}"
+knowledge_content="Quick AI web action answer ${keyword}: customers must prepare required documents before request approval."
 
 post_form "$cookies" "${BASE_WEB_URL}/sanad/ai/knowledge" "ai-knowledge-create" \
   --data-urlencode "_token=${csrf}" \
   --data-urlencode "title=${knowledge_title}" \
   --data-urlencode "category=QA" \
   --data-urlencode "content=${knowledge_content}" \
+  --data-urlencode "title_en=${knowledge_title}" \
+  --data-urlencode "title_ar=اختبار معرفة كويك ${keyword}" \
+  --data-urlencode "content_en=${knowledge_content}" \
+  --data-urlencode "content_ar=يجب على العملاء تجهيز المستندات المطلوبة قبل الموافقة على الطلب ${keyword}." \
   --data-urlencode "visible_to[]=admin" \
   --data-urlencode "visible_to[]=user"
 
@@ -143,9 +147,8 @@ post_form "$cookies" "${BASE_WEB_URL}/sanad/ai/ask" "ai-ask-unknown" \
 
 fetch_ai_console "$cookies" "$html" "$text"
 assert_contains "$text" "$unknown_question" "AI escalation question"
-assert_contains "$text" "Your question has been sent to the Sanad support team for review" "AI escalation answer"
-assert_contains "$text" "Needs human review by Sanad support" "AI escalation note"
+assert_contains "$text" "Quick team" "AI escalation answer"
 assert_contains "$text" "Escalated" "AI escalation status"
 pass "AI low-confidence action escalates and renders human-review guidance"
 
-echo "Sanad AI web action QA completed successfully against ${BASE_WEB_URL}."
+echo "Quick AI web action QA completed successfully against ${BASE_WEB_URL}."

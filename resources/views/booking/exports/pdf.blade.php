@@ -48,7 +48,7 @@
         <tbody>
             @foreach($bookings as $booking)
                 <tr>
-                    <td>{{ $booking->sanad_reference ?: 'ORD-'.$booking->id }}</td>
+                    <td>{{ $booking->quick_reference }}</td>
                     <td>{{ optional($booking->service)->name_en ?: optional($booking->service)->name }}</td>
                     <td>{{ optional($booking->customer)->display_name }}</td>
                     <td>{{ optional($booking->provider)->display_name ?: 'Unassigned' }}</td>

@@ -7,8 +7,8 @@
     <div class="card sanad-partner-card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h4 class="font-weight-bold mb-1">Partner Overview</h4>
-                <span class="text-muted">Assigned work, employee capacity, services, and payment visibility</span>
+                <h4 class="font-weight-bold mb-1">{{ app()->getLocale() === "ar" ? "نظرة عامة على الشريك" : "Partner Overview" }}</h4>
+                <span class="text-muted">{{ app()->getLocale() === "ar" ? "الطلبات المسندة، طاقة الموظفين، الخدمات، وحالة المدفوعات" : "Assigned work, employee capacity, services, and payment visibility" }}</span>
             </div>
             <div class="d-flex align-items-center gap-3">
                 <a href="{{ route('sanad.partner-performance') }}" class="btn-link btn-link-hover"><u>Partner performance</u></a>
@@ -86,7 +86,7 @@
                             <div class="sanad-partner-workload">
                                 <div>
                                     <a href="{{ route('sanad.requests.show', $request->id) }}">
-                                        <strong>#{{ $request->sanad_reference ?: $request->id }}</strong>
+                                        <strong>{{ $request->quick_reference }}</strong>
                                     </a>
                                     <span>{{ optional($request->service)->name ?: '-' }}</span>
                                 </div>

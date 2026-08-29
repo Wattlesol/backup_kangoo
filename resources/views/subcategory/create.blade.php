@@ -20,21 +20,34 @@
                             {{ Form::hidden('id') }}
                             <div class="row">
                                 <div class="form-group col-md-4">
-                                    {{ Form::label('name',trans('messages.name').' <span class="text-danger">*</span>',['class'=>'form-control-label'], false ) }}
-                                    {{ Form::text('name',old('name'),['placeholder' => trans('messages.name'),'class' =>'form-control','required']) }}
+                                    {{ Form::label('name_en', __('messages.english_name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                    {{ Form::text('name_en', old('name_en', $subcategory->name_en ?: $subcategory->name), ['placeholder' => __('messages.english_name'), 'class' => 'form-control', 'required']) }}
                                     <small class="help-block with-errors text-danger"></small>
                                 </div>
 
                                 <div class="form-group col-md-4">
-                                    {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.category') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
+                                    {{ Form::label('name_ar', __('messages.arabic_name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                    {{ Form::text('name_ar', old('name_ar', $subcategory->name_ar), ['placeholder' => __('messages.arabic_name'), 'class' => 'form-control', 'required', 'dir' => 'rtl']) }}
+                                    <small class="help-block with-errors text-danger"></small>
+                                </div>
+
+                                <div class="form-group col-md-4">
+                                    @php
+                                        $catName = optional($subcategory->category)->name;
+                                        if (app()->getLocale() === 'ar' && !empty(optional($subcategory->category)->name_ar)) {
+                                            $catName = optional($subcategory->category)->name_ar;
+                                        } elseif (!empty(optional($subcategory->category)->name_en)) {
+                                            $catName = optional($subcategory->category)->name_en;
+                                        }
+                                    @endphp
+                                    {{ Form::label('category_id', __('messages.select_name',[ 'select' => __('messages.category') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
                                     <br />
-                                    {{ Form::select('category_id', [optional($subcategory->category)->id => optional($subcategory->category)->name], optional($subcategory->category)->id, [
+                                    {{ Form::select('category_id', [optional($subcategory->category)->id => $catName], optional($subcategory->category)->id, [
                                             'class' => 'select2js form-group category',
                                             'required',
                                             'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.category') ]),
                                             'data-ajax--url' => route('ajax-list', ['type' => 'category']),
                                         ]) }}
-                                    
                                 </div>
                                 
                                 <div class="form-group col-md-4">

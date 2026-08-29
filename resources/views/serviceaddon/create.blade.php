@@ -3,10 +3,11 @@
     <div class="row">
         <div class="col-lg-12">
             <div class="card card-block card-stretch">
-                <div class="card-body p-0">
-                    <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                        <h5 class="font-weight-bold">{{ !empty($serviceaddon->id) ? 'Update Additional Service' : 'Create Additional Service' }}</h5>
-                        <a href="{{ route('serviceaddon.index') }}" class="float-right btn btn-sm btn-primary"><i class="fa fa-angle-double-left"></i> {{ __('messages.back') }}</a>
+                   <div class="card-body p-0">
+                       <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
+                        @php $isAr = app()->getLocale() === 'ar'; @endphp
+                        <h5 class="font-weight-bold">{{ !empty($serviceaddon->id) ? ($isAr ? 'تحديث خدمة إضافية' : 'Update Additional Service') : ($isAr ? 'إنشاء خدمة إضافية' : 'Create Additional Service') }}</h5>
+                       <a href="{{ route('serviceaddon.index') }}" class="float-right btn btn-sm btn-primary"><i class="fa fa-angle-double-left"></i> {{ __('messages.back') }}</a>
                         @if($auth_user->can('service list'))
                        
                         @endif
@@ -20,16 +21,16 @@
                 {{ Form::model($serviceaddon,['method' => 'POST','route'=>'serviceaddon.store', 'enctype'=>'multipart/form-data','data-toggle'=>"validator" ,'id'=>'serviceaddon'] ) }}
                         {{ Form::hidden('id') }}
                         <div class="row">
-                            <div class="form-group col-md-4">
-                                {{ Form::label('name', __('messages.additional_service_name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name', old('name'), ['placeholder' => __('messages.name'), 'class' => 'form-control', 'title' => 'Please enter alphabetic characters and spaces only']) }}
-                                <small class="help-block with-errors text-danger"></small>
-                            </div>
-                            <div class="form-group col-md-4">
-                                {{ Form::label('name_ar', 'Arabic Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name_ar', old('name_ar'), ['placeholder' => 'اسم الخدمة الإضافية بالعربية', 'class' => 'form-control', 'dir' => 'rtl', 'required']) }}
-                                <small class="help-block with-errors text-danger"></small>
-                            </div>
+                           <div class="form-group col-md-4">
+                                {{ Form::label('name', __('messages.english_name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name', old('name'), ['placeholder' => __('messages.english_name'), 'class' => 'form-control', 'required']) }}
+                               <small class="help-block with-errors text-danger"></small>
+                           </div>
+                           <div class="form-group col-md-4">
+                                {{ Form::label('name_ar', __('messages.arabic_name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_ar', old('name_ar'), ['placeholder' => __('messages.arabic_name'), 'class' => 'form-control', 'dir' => 'rtl', 'required']) }}
+                               <small class="help-block with-errors text-danger"></small>
+                           </div>
 
                             <div class="form-group col-md-4">
                                 {{ Form::label('price', __('messages.price').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
@@ -37,25 +38,25 @@
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
-                            <div class="form-group col-md-6">
-                                {{ Form::label('category_ids', 'Show For Categories', ['class' => 'form-control-label']) }}
-                                {{ Form::select('category_ids[]', $categories, $selectedCategoryIds, [
-                                    'class' => 'form-control select2js',
-                                    'multiple' => 'multiple',
-                                    'data-placeholder' => 'Select one or more categories',
-                                ]) }}
-                                <small class="help-block text-muted">Leave empty to avoid category targeting.</small>
-                            </div>
+                           <div class="form-group col-md-6">
+                                {{ Form::label('category_ids', $isAr ? 'عرض حسب الفئات' : 'Show For Categories', ['class' => 'form-control-label']) }}
+                               {{ Form::select('category_ids[]', $categories, $selectedCategoryIds, [
+                                   'class' => 'form-control select2js',
+                                   'multiple' => 'multiple',
+                                    'data-placeholder' => $isAr ? 'اختر فئة واحدة أو أكثر' : 'Select one or more categories',
+                               ]) }}
+                                <small class="help-block text-muted">{{ $isAr ? 'اتركه فارغاً ليظهر لجميع الفئات.' : 'Leave empty to avoid category targeting.' }}</small>
+                           </div>
 
-                            <div class="form-group col-md-6">
-                                {{ Form::label('service_ids', 'Show For Services', ['class' => 'form-control-label']) }}
-                                {{ Form::select('service_ids[]', $services, $selectedServiceIds, [
-                                    'class' => 'form-control select2js',
-                                    'multiple' => 'multiple',
-                                    'data-placeholder' => 'Select one or more services',
-                                ]) }}
-                                <small class="help-block text-muted">If both fields are empty, this add-on appears for all services.</small>
-                            </div>
+                           <div class="form-group col-md-6">
+                                {{ Form::label('service_ids', $isAr ? 'عرض حسب الخدمات' : 'Show For Services', ['class' => 'form-control-label']) }}
+                               {{ Form::select('service_ids[]', $services, $selectedServiceIds, [
+                                   'class' => 'form-control select2js',
+                                   'multiple' => 'multiple',
+                                    'data-placeholder' => $isAr ? 'اختر خدمة واحدة أو أكثر' : 'Select one or more services',
+                               ]) }}
+                                <small class="help-block text-muted">{{ $isAr ? 'إذا كان كلا الحقلين فارغين، فستظهر هذه الخدمة الإضافية لجميع الخدمات.' : 'If both fields are empty, this add-on appears for all services.' }}</small>
+                           </div>
 
                             <div class="form-group col-md-4">
                                 <label class="form-control-label" for="serviceaddon_image">{{ __('messages.image') }}</label>

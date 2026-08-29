@@ -19,7 +19,7 @@ return [
     'about_provider' => 'about provider',
     'service_total_time' => 'service total time',
     'check_status' => 'check status',
-    'Add-ons' => 'Add-ons',
+    'Add-ons' => 'Additional Services',
     'about_handyman' => 'about handyman',
     'rate_handyman' => 'rate handyman',
     'price_detail' => 'Price detail',

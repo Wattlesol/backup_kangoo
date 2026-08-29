@@ -22,14 +22,23 @@
                         {{ Form::hidden('user_type','handyman') }}
                         {{ Form::hidden('employee_permission_context', $employeePermissionContext ?? 'admin', ['id' => 'employee_permission_context']) }}
                         @php
+                            $isAr = app()->getLocale() === 'ar';
                             $sanadSkillsText = old('skills', str_replace(',', "\n", (string) $handymandata->skills));
-                            $modulePermissionActions = ['read' => 'Read', 'write' => 'Write', 'delete' => 'Delete'];
+                            $modulePermissionActions = $isAr
+                                ? ['read' => 'قراءة', 'write' => 'تعديل', 'delete' => 'حذف']
+                                : ['read' => 'Read', 'write' => 'Write', 'delete' => 'Delete'];
                             $employeePermissionContext = $employeePermissionContext ?? 'admin';
                             $selectedModulePermissions = $selectedModulePermissions ?? [];
                             $visiblePermissionContexts = auth()->user()->user_type === 'provider'
                                 ? ['partner' => $partnerPermissionModules]
                                 : ['admin' => $adminPermissionModules];
-                            $employeeStatuses = [
+                            $employeeStatuses = $isAr ? [
+                                'available' => 'متاح',
+                                'busy' => 'مشغول',
+                                'offline' => 'غير متصل',
+                                'on_leave' => 'في إجازة',
+                                'training' => 'قيد التدريب',
+                            ] : [
                                 'available' => 'Available',
                                 'busy' => 'Busy',
                                 'offline' => 'Offline',
@@ -97,7 +106,7 @@
                                         'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.providers') ]),
                                         'data-ajax--url' => route('ajax-list', ['type' => 'provider']),
                                     ]) }}
-                                <small class="text-muted">Leave empty for a direct Sanad admin employee.</small>
+                                <small class="text-muted">Leave empty for a direct Quick admin employee.</small>
                             </div>
                             @endif
                             @if(auth()->user()->user_type !== 'provider')
@@ -154,43 +163,43 @@
                                 <div class="sanad-employee-operations">
                                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                                         <div>
-                                            <h5 class="font-weight-bold mb-1">Sanad Employee Operations</h5>
-                                            <span class="text-muted">Operational profile, permissions, working hours, capacity, and employee status</span>
+                                            <h5 class="font-weight-bold mb-1">{{ $isAr ? 'عمليات موظفي كويك' : 'Quick Employee Operations' }}</h5>
+                                            <span class="text-muted">{{ $isAr ? 'الملف التشغيلي والصلاحيات وساعات العمل والطاقة الاستيعابية وحالة الموظف' : 'Operational profile, permissions, working hours, capacity, and employee status' }}</span>
                                         </div>
                                     </div>
                                     <div class="row">
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('sanad_job_title', 'Job Title', ['class' => 'form-control-label']) }}
-                                            {{ Form::text('sanad_job_title', old('sanad_job_title', $handymandata->sanad_job_title), ['class' => 'form-control', 'placeholder' => 'Operations Specialist']) }}
+                                            {{ Form::label('sanad_job_title', $isAr ? 'المسمى الوظيفي' : 'Job Title', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('sanad_job_title', old('sanad_job_title', $handymandata->sanad_job_title), ['class' => 'form-control', 'placeholder' => $isAr ? 'أخصائي عمليات' : 'Operations Specialist']) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('sanad_department', 'Department', ['class' => 'form-control-label']) }}
-                                            {{ Form::text('sanad_department', old('sanad_department', $handymandata->sanad_department), ['class' => 'form-control', 'placeholder' => 'Legal, Accounting, Government Relations']) }}
+                                            {{ Form::label('sanad_department', $isAr ? 'القسم' : 'Department', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('sanad_department', old('sanad_department', $handymandata->sanad_department), ['class' => 'form-control', 'placeholder' => $isAr ? 'الشؤون القانونية، المحاسبة، العلاقات الحكومية' : 'Legal, Accounting, Government Relations']) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('sanad_employee_status', 'Employee Status', ['class' => 'form-control-label']) }}
+                                            {{ Form::label('sanad_employee_status', $isAr ? 'حالة الموظف' : 'Employee Status', ['class' => 'form-control-label']) }}
                                             {{ Form::select('sanad_employee_status', $employeeStatuses, old('sanad_employee_status', $handymandata->sanad_employee_status ?: 'available'), ['class' => 'form-control select2js']) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('sanad_working_hours', 'Working Hours', ['class' => 'form-control-label']) }}
-                                            {{ Form::text('sanad_working_hours', old('sanad_working_hours', $handymandata->sanad_working_hours), ['class' => 'form-control', 'placeholder' => 'Sun-Thu, 9:00-18:00']) }}
+                                            {{ Form::label('sanad_working_hours', $isAr ? 'ساعات العمل' : 'Working Hours', ['class' => 'form-control-label']) }}
+                                            {{ Form::text('sanad_working_hours', old('sanad_working_hours', $handymandata->sanad_working_hours), ['class' => 'form-control', 'placeholder' => $isAr ? 'الأحد - الخميس، 9:00 - 18:00' : 'Sun-Thu, 9:00-18:00']) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('sanad_daily_capacity', 'Daily Capacity', ['class' => 'form-control-label']) }}
-                                            {{ Form::number('sanad_daily_capacity', old('sanad_daily_capacity', $handymandata->sanad_daily_capacity), ['class' => 'form-control', 'min' => 0, 'max' => 100, 'placeholder' => 'Orders per day']) }}
+                                            {{ Form::label('sanad_daily_capacity', $isAr ? 'الطاقة الاستيعابية اليومية' : 'Daily Capacity', ['class' => 'form-control-label']) }}
+                                            {{ Form::number('sanad_daily_capacity', old('sanad_daily_capacity', $handymandata->sanad_daily_capacity), ['class' => 'form-control', 'min' => 0, 'max' => 100, 'placeholder' => $isAr ? 'عدد الطلبات يومياً' : 'Orders per day']) }}
                                         </div>
                                         <div class="form-group col-md-4">
-                                            {{ Form::label('skills', 'Skills', ['class' => 'form-control-label']) }}
-                                            {{ Form::textarea('skills', $sanadSkillsText, ['class' => 'form-control', 'rows' => 3, 'placeholder' => "One skill per line"]) }}
+                                            {{ Form::label('skills', $isAr ? 'المهارات' : 'Skills', ['class' => 'form-control-label']) }}
+                                            {{ Form::textarea('skills', $sanadSkillsText, ['class' => 'form-control', 'rows' => 3, 'placeholder' => $isAr ? 'مهارة واحدة في كل سطر' : 'One skill per line']) }}
                                         </div>
                                         <div class="form-group col-md-12">
                                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                                                 <div>
-                                                    <label class="form-control-label mb-1">Permission Matrix</label>
+                                                    <label class="form-control-label mb-1">{{ $isAr ? 'مصفوفة الصلاحيات' : 'Permission Matrix' }}</label>
                                                     @if(auth()->user()->user_type === 'provider')
-                                                        <div class="text-muted small">Partner employees receive partner/task modules and remain scoped to their partner work.</div>
+                                                        <div class="text-muted small">{{ $isAr ? 'يحصل موظفو الشريك على وحدات الشريك والمهام، وتبقى صلاحياتهم محصورة في أعمال شريكهم.' : 'Partner employees receive partner/task modules and remain scoped to their partner work.' }}</div>
                                                     @else
-                                                        <div class="text-muted small">Direct Sanad employees receive admin-panel modules limited by the permissions selected here.</div>
+                                                        <div class="text-muted small">{{ $isAr ? 'يحصل موظفو كويك المباشرون على وحدات لوحة الإدارة وفق الصلاحيات المحددة هنا فقط.' : 'Direct Quick employees receive admin-panel modules limited by the permissions selected here.' }}</div>
                                                     @endif
                                                 </div>
                                             </div>
@@ -200,8 +209,8 @@
                                                         <table class="table table-sm table-bordered mb-0">
                                                             <thead>
                                                                 <tr>
-                                                                    <th>Module</th>
-                                                                    <th>Description</th>
+                                                                    <th>{{ $isAr ? 'الوحدة' : 'Module' }}</th>
+                                                                    <th>{{ $isAr ? 'الوصف' : 'Description' }}</th>
                                                                     @foreach($modulePermissionActions as $actionLabel)
                                                                         <th class="text-center">{{ $actionLabel }}</th>
                                                                     @endforeach
@@ -210,8 +219,8 @@
                                                             <tbody>
                                                                 @foreach($permissionModules as $moduleKey => $module)
                                                                     <tr>
-                                                                        <td class="font-weight-bold">{{ $module['label'] }}</td>
-                                                                        <td class="text-muted">{{ $module['description'] }}</td>
+                                                                        <td class="font-weight-bold">{{ $isAr ? ($module['label_ar'] ?? $module['label']) : $module['label'] }}</td>
+                                                                        <td class="text-muted">{{ $isAr ? ($module['description_ar'] ?? $module['description']) : $module['description'] }}</td>
                                                                         @foreach($modulePermissionActions as $actionKey => $actionLabel)
                                                                             @php
                                                                                 $isAvailable = !empty($module['permissions'][$actionKey] ?? []) || !empty($module['flags'][$actionKey] ?? []);

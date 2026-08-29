@@ -74,8 +74,10 @@ class UserRequest extends FormRequest
                 'sanad_working_hours' => 'nullable|string|max:255',
                 'sanad_daily_capacity' => 'nullable|integer|min:0|max:100',
                 'skills' => 'nullable|string',
-                'partner_verification_document_ids' => 'required_if:user_type,provider|array|min:1',
+                'partner_verification_document_ids' => 'nullable|array',
                 'partner_verification_document_ids.*' => 'integer|exists:documents,id',
+                'custom_partner_verification_documents' => 'nullable|array',
+                'custom_partner_verification_documents.*.text' => 'nullable|string|max:100',
         ];
     }
 
@@ -90,6 +92,21 @@ class UserRequest extends FormRequest
     protected function withValidator(Validator $validator)
     {
         $validator->after(function (Validator $validator) {
+            if (request()->input('user_type') === 'provider') {
+                $selectedDocuments = collect(request()->input('partner_verification_document_ids', []))->filter();
+                $customDocuments = collect(request()->input('custom_partner_verification_documents', []))
+                    ->filter(fn ($document) => filled($document['text'] ?? null));
+
+                if ($selectedDocuments->isEmpty() && $customDocuments->isEmpty()) {
+                    $validator->errors()->add(
+                        'partner_verification_document_ids',
+                        app()->getLocale() === 'ar'
+                            ? 'اختر مستند تحقق واحداً على الأقل أو أضف مستنداً مخصصاً.'
+                            : 'Select at least one verification document or add a custom document.'
+                    );
+                }
+            }
+
             if (request()->input('user_type') !== 'handyman' || !request()->filled('country_id')) {
                 return;
             }

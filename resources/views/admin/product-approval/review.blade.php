@@ -7,20 +7,20 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4 class="mb-1">Review Product: {{ $product->name ?? 'Product' }}</h4>
+                            @php $isAr = app()->getLocale() === 'ar'; @endphp<h4 class="mb-1">{{ $isAr ? 'مراجعة المنتج:' : 'Review Product:' }} {{ $product->name ?? 'Product' }}</h4>
                             <p class="text-muted mb-0">
-                                Submitted by:
+                                {{ $isAr ? 'مقدم من:' : 'Submitted by:' }}
                                 @if($product->provider)
                                     <strong>{{ $product->provider->display_name }}</strong>
                                 @else
-                                    <strong>Admin</strong>
+                                    <strong>{{ $isAr ? 'الإدارة' : 'Admin' }}</strong>
                                 @endif
                                 on {{ $product->created_at->format('M d, Y') }}
                             </p>
                         </div>
                         <div>
                             <a href="{{ route('product-approval.pending') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Back to Pending
+                                <i class="fas fa-arrow-left"></i> {{ $isAr ? 'العودة للمنتجات المعلقة' : 'Back to Pending' }}
                             </a>
                         </div>
                     </div>
@@ -34,20 +34,20 @@
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Product Information</h5>
+                    <h5 class="mb-0">{{ $isAr ? 'معلومات المنتج' : 'Product Information' }}</h5>
                 </div>
                 <div class="card-body">
                     <!-- Product Images -->
                     @if($product->featured_image || $product->gallery_images)
                     <div class="mb-4">
-                        <h6>Product Images</h6>
+                        <h6>{{ $isAr ? 'صور المنتج' : 'Product Images' }}</h6>
                         <div class="row">
                             @if($product->featured_image)
                             <div class="col-md-6 mb-3">
                                 <div class="border rounded p-2">
                                     <img src="{{ $product->featured_image }}" alt="Featured Image"
                                          class="img-fluid rounded" style="max-height: 200px; width: 100%; object-fit: cover;">
-                                    <small class="text-muted d-block mt-1">Featured Image</small>
+                                    <small class="text-muted d-block mt-1">{{ $isAr ? 'الصورة الرئيسية' : 'Featured Image' }}</small>
                                 </div>
                             </div>
                             @endif
@@ -58,7 +58,7 @@
                                     <div class="border rounded p-2">
                                         <img src="{{ $image }}" alt="Gallery Image"
                                              class="img-fluid rounded" style="max-height: 200px; width: 100%; object-fit: cover;">
-                                        <small class="text-muted d-block mt-1">Gallery Image</small>
+                                        <small class="text-muted d-block mt-1">{{ $isAr ? 'صورة المعرض' : 'Gallery Image' }}</small>
                                     </div>
                                 </div>
                                 @endforeach
@@ -70,28 +70,28 @@
                     <!-- Basic Information -->
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <h6>Basic Information</h6>
+                            <h6>{{ $isAr ? 'المعلومات الأساسية' : 'Basic Information' }}</h6>
                             <table class="table table-sm">
                                 <tr>
-                                    <td><strong>Name:</strong></td>
+                                    <td><strong>{{ $isAr ? 'الاسم' : 'Name' }}:</strong></td>
                                     <td>{{ $product->name }}</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>SKU:</strong></td>
+                                    <td><strong>{{ $isAr ? 'رمز المنتج (SKU)' : 'SKU' }}:</strong></td>
                                     <td>{{ $product->sku }}</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Category:</strong></td>
+                                    <td><strong>{{ $isAr ? 'التصنيف' : 'Category' }}:</strong></td>
                                     <td>
                                         @if($product->category)
                                             <span class="badge badge-info">{{ $product->category->name }}</span>
                                         @else
-                                            <span class="text-muted">No Category</span>
+                                            <span class="text-muted">{{ $isAr ? 'بدون تصنيف' : 'No Category' }}</span>
                                         @endif
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Price:</strong></td>
+                                    <td><strong>{{ $isAr ? 'السعر' : 'Price' }}:</strong></td>
                                     <td><strong class="text-success">${{ number_format($product->price, 2) }}</strong></td>
                                 </tr>
                             </table>
@@ -104,7 +104,7 @@
                                     <td>{{ $product->stock_quantity ?? 'N/A' }}</td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Status:</strong></td>
+                                    <td><strong>{{ $isAr ? 'الحالة' : 'Status' }}:</strong></td>
                                     <td>
                                         @if($product->status)
                                             <span class="badge badge-success">Active</span>
@@ -159,7 +159,7 @@
         <div class="col-lg-4">
             <div class="card">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Approval Actions</h5>
+                    <h5 class="mb-0">{{ $isAr ? 'إجراءات الاعتماد' : 'Approval Actions' }}</h5>
                 </div>
                 <div class="card-body">
                     @if(($product->approval_status ?? 'pending') === 'pending')
@@ -226,7 +226,7 @@
                     </div>
                     <table class="table table-sm">
                         <tr>
-                            <td><strong>Name:</strong></td>
+                            <td><strong>{{ $isAr ? 'الاسم' : 'Name' }}:</strong></td>
                             <td>{{ $product->provider->display_name }}</td>
                         </tr>
                         <tr>

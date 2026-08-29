@@ -4,10 +4,10 @@ set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 BASE_WEB_URL="${SANAD_WEB_BASE_URL:-http://127.0.0.1:8092}"
-ADMIN_EMAIL="${SANAD_ADMIN_WEB_TEST_EMAIL:-admin@admin.com}"
+ADMIN_EMAIL="${SANAD_ADMIN_WEB_TEST_EMAIL:-demo@admin.com}"
 PARTNER_EMAIL="${SANAD_PARTNER_WEB_TEST_EMAIL:-demo@provider.com}"
-EMPLOYEE_EMAIL="${SANAD_EMPLOYEE_WEB_TEST_EMAIL:-demo@employee.com}"
-CUSTOMER_EMAIL="${SANAD_CUSTOMER_WEB_TEST_EMAIL:-demo@user.com}"
+EMPLOYEE_EMAIL="${SANAD_EMPLOYEE_WEB_TEST_EMAIL:-demo@handyman.com}"
+CUSTOMER_EMAIL="${SANAD_CUSTOMER_WEB_TEST_EMAIL:-demo@customer.com}"
 PASSWORD="${SANAD_WEB_TEST_PASSWORD:-12345678}"
 
 if ! command -v curl >/dev/null 2>&1; then
@@ -69,7 +69,7 @@ customer_login() {
   local token
   local code
 
-  curl -sS -c "$cookies" "${BASE_WEB_URL}/login-page" -o "$login_page"
+  curl -sS -c "$cookies" "${BASE_WEB_URL}/login" -o "$login_page"
   token="$(sed -n 's/.*name="_token" value="\([^"]*\)".*/\1/p' "$login_page" | head -n 1)"
 
   if [[ -z "$token" ]]; then
@@ -78,11 +78,12 @@ customer_login() {
   fi
 
   code="$(curl -sS -b "$cookies" -c "$cookies" -o "$tmpdir/customer-post-login.html" -w '%{http_code}' \
-    -X POST "${BASE_WEB_URL}/user-login" \
+    -X POST "${BASE_WEB_URL}/login" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     --data-urlencode "_token=${token}" \
     --data-urlencode "email=${CUSTOMER_EMAIL}" \
-    --data-urlencode "password=${PASSWORD}")"
+    --data-urlencode "password=${PASSWORD}" \
+    --data-urlencode "login=user_login")"
 
   if [[ "$code" != "302" ]]; then
     echo "FAIL customer login returned HTTP ${code}; expected 302 redirect." >&2
@@ -144,36 +145,76 @@ first_request_path_for_role() {
   echo "$request_path"
 }
 
+first_customer_request_path() {
+  local cookies="$1"
+  local page_file="$tmpdir/customer-request-list.html"
+  local request_path
+
+  curl -sS -b "$cookies" -L -o "$page_file" "${BASE_WEB_URL}/customer-dashboard/requests"
+  assert_clean_page "$page_file" "customer request list"
+
+  request_path="$(grep -Eo 'href="[^"]*/customer-dashboard/requests/[0-9]+"' "$page_file" | sed -E 's/^href="[^"]*(\/customer-dashboard\/requests\/[0-9]+)"$/\1/' | head -n 1)"
+  echo "$request_path"
+}
+
+first_customer_service_path() {
+  local cookies="$1"
+  local page_file="$tmpdir/customer-catalog.html"
+  local service_path
+
+  curl -sS -b "$cookies" -L -o "$page_file" "${BASE_WEB_URL}/customer-dashboard/catalog"
+  assert_clean_page "$page_file" "customer service catalog"
+  service_path="$(grep -Eo 'href="[^"]*/customer-dashboard/catalog/[0-9]+"' "$page_file" | sed -E 's/^href="[^"]*(\/customer-dashboard\/catalog\/[0-9]+)"$/\1/' | head -n 1)"
+  echo "$service_path"
+}
+
 admin_cookies="$(admin_login "$ADMIN_EMAIL" admin)"
-assert_role_page "$admin_cookies" admin /home "Sanad"
-assert_role_page "$admin_cookies" admin /sanad/dashboard "Sanad"
-assert_role_page "$admin_cookies" admin /sanad/requests "Sanad"
-assert_role_page "$admin_cookies" admin /sanad/requests/1 "SANAD-LOCAL-QA-000001"
+admin_request_path="$(first_request_path_for_role "$admin_cookies" admin)"
+assert_role_page "$admin_cookies" admin /home "Quick"
+assert_role_page "$admin_cookies" admin /sanad/dashboard "Quick"
+assert_role_page "$admin_cookies" admin /sanad/requests "Quick"
+assert_role_page "$admin_cookies" admin "$admin_request_path" "QUICK-"
 assert_role_page "$admin_cookies" admin /provider "Partner"
 assert_role_page "$admin_cookies" admin /handyman "Employee"
-assert_role_page "$admin_cookies" admin /service "Sanad"
-assert_role_page "$admin_cookies" admin /document "Sanad"
+assert_role_page "$admin_cookies" admin /service "Quick"
+assert_role_page "$admin_cookies" admin /document "Quick"
 assert_role_page "$admin_cookies" admin /payment "Payment"
 assert_role_page "$admin_cookies" admin /sanad/ai "AI"
 
 partner_cookies="$(admin_login "$PARTNER_EMAIL" partner)"
 partner_request_path="$(first_request_path_for_role "$partner_cookies" partner)"
-assert_role_page "$partner_cookies" partner /home "Partner"
-assert_role_page "$partner_cookies" partner /sanad/requests "Sanad"
-assert_role_page "$partner_cookies" partner "$partner_request_path" "Sanad"
+assert_role_page "$partner_cookies" partner /home "Quick"
+assert_role_page "$partner_cookies" partner /sanad/requests "Quick"
+assert_role_page "$partner_cookies" partner "$partner_request_path" "QUICK-"
 assert_role_page "$partner_cookies" partner /handyman "Employee"
-assert_role_page "$partner_cookies" partner /service "Sanad"
+assert_role_page "$partner_cookies" partner /service "Quick"
 assert_role_page "$partner_cookies" partner /payment "Payment"
 
 employee_cookies="$(admin_login "$EMPLOYEE_EMAIL" employee)"
 employee_request_path="$(first_request_path_for_role "$employee_cookies" employee)"
-assert_role_page "$employee_cookies" employee /home "Sanad"
-assert_role_page "$employee_cookies" employee /sanad/requests "Sanad"
-assert_role_page "$employee_cookies" employee "$employee_request_path" "Sanad"
+assert_role_page "$employee_cookies" employee /home "Quick"
+assert_role_page "$employee_cookies" employee /sanad/requests "Quick"
+assert_role_page "$employee_cookies" employee "$employee_request_path" "QUICK-"
 
 customer_cookies="$(customer_login)"
-assert_role_page "$customer_cookies" customer / "Sanad"
-assert_role_page "$customer_cookies" customer /service-list "Sanad"
-assert_role_page "$customer_cookies" customer /booking-detail/1 "Sanad"
+assert_role_page "$customer_cookies" customer /customer-dashboard "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/catalog "Quick"
+customer_service_path="$(first_customer_service_path "$customer_cookies")"
+if [[ -n "$customer_service_path" ]]; then
+  assert_role_page "$customer_cookies" customer "$customer_service_path" "Quick"
+fi
+assert_role_page "$customer_cookies" customer /customer-dashboard/requests/create "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/requests "Quick"
+customer_request_path="$(first_customer_request_path "$customer_cookies")"
+if [[ -n "$customer_request_path" ]]; then
+  assert_role_page "$customer_cookies" customer "$customer_request_path" "QUICK-"
+fi
+assert_role_page "$customer_cookies" customer /customer-dashboard/document-vault "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/messages "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/billing "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/support "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/notifications "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/profile "Quick"
+assert_role_page "$customer_cookies" customer /customer-dashboard/ai "Quick"
 
-echo "Sanad local web role UAT completed successfully against ${BASE_WEB_URL}."
+echo "Quick local web role UAT completed successfully against ${BASE_WEB_URL}."

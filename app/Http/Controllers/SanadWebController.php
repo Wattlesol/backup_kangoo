@@ -23,6 +23,7 @@ use App\Models\SanadRequestAction;
 use App\Models\SanadPartnerServicePerformance;
 use App\Models\User;
 use App\Models\ProviderDocument;
+use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,7 @@ use App\Models\SanadAssignmentDecision;
 use App\Services\SanadAssignmentService;
 use App\Models\Notification;
 use App\Models\SanadDocumentRequest;
+use App\Services\SanadKnowledgeArabicTranslationService;
 
 class SanadWebController extends Controller
 {
@@ -214,10 +216,10 @@ class SanadWebController extends Controller
         $directMessageLock = $this->directMessageLock($booking, $user);
         $requiredDocuments = $booking->service
             ? collect($booking->service->required_documents ?: [])->map(function ($doc) {
-                $name = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
+                $storedName = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
                 return [
-                    'key' => is_array($doc) ? ($doc['key'] ?? Str::slug($name, '_')) : Str::slug($name, '_'),
-                    'name' => $name,
+                    'key' => is_array($doc) ? ($doc['key'] ?? Str::slug($storedName, '_')) : Str::slug($storedName, '_'),
+                    'name' => localized_service_document_name($doc),
                 ];
             })->values()
             : collect();
@@ -283,7 +285,7 @@ class SanadWebController extends Controller
                 'id' => 'msg-' . $message->id,
                 'timestamp' => optional($message->created_at)->timestamp ?: 0,
                 'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
-                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender' => $message->sender_role === 'system' ? 'Quick AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
                 'sender_role' => $message->sender_role,
                 'message' => $message->message,
                 'message_type' => $message->message_type ?: 'text',
@@ -299,10 +301,12 @@ class SanadWebController extends Controller
             'status' => true,
             'request' => [
                 'id' => $booking->id,
-                'reference' => $booking->sanad_reference ?: '#' . $booking->id,
+                'reference' => $booking->quick_reference,
                 'customer' => optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'Customer',
                 'avatar' => Str::upper(Str::substr(optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'C', 0, 1)),
-                'service' => optional($booking->service)->name ?: 'No service',
+                'service' => app()->getLocale() === 'ar'
+                    ? (optional($booking->service)->name_ar ?: optional($booking->service)->name_en ?: optional($booking->service)->name ?: 'لا توجد خدمة')
+                    : (optional($booking->service)->name_en ?: optional($booking->service)->name ?: 'No service'),
                 'stage' => Str::headline($booking->sanad_stage ?: $booking->status),
                 'priority' => Str::headline($booking->sanad_priority ?: 'normal'),
                 'sla' => optional($booking->sla_due_at)->format('Y-m-d H:i') ?: '-',
@@ -330,7 +334,7 @@ class SanadWebController extends Controller
             'timeline' => $timelineData,
             'messages' => $visibleMessages->map(fn ($message) => [
                 'id' => $message->id,
-                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender' => $message->sender_role === 'system' ? 'Quick AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
                 'sender_role' => $message->sender_role,
                 'message' => $message->message,
                 'message_type' => $message->message_type ?: 'text',
@@ -419,7 +423,7 @@ class SanadWebController extends Controller
         $auth_user = authSession();
         $user = auth()->user();
         $role = $this->sanadRole($user);
-        $pageTitle = 'Sanad ' . Str::headline($role) . ' Dashboard';
+        $pageTitle = app()->getLocale() === 'ar' ? 'لوحة تحكم عمليات كويك' : ('Quick ' . Str::headline($role) . ' Dashboard');
         $dashboard = $this->roleDashboardData($role);
 
         return view('sanad.dashboard', compact('pageTitle', 'auth_user', 'role', 'dashboard'));
@@ -435,10 +439,17 @@ class SanadWebController extends Controller
             ->paginate(25)
             ->withQueryString();
 
+        $performanceProviderIds = SanadPartnerServicePerformance::query()->whereNotNull('provider_id')->distinct()->pluck('provider_id');
+        $performanceServiceIds = SanadPartnerServicePerformance::query()->whereNotNull('service_id')->distinct()->pluck('service_id');
+        $performancePartners = User::query()->whereIn('id', $performanceProviderIds)->orderBy('display_name')->get(['id', 'display_name', 'first_name', 'last_name']);
+        $performanceServices = Service::query()->whereIn('id', $performanceServiceIds)->orderBy('name')->get(['id', 'name']);
+
         return view('sanad.partner-performance', [
             'pageTitle' => 'Partner Performance',
             'auth_user' => authSession(),
             'performances' => $performances,
+            'performancePartners' => $performancePartners,
+            'performanceServices' => $performanceServices,
         ]);
     }
 
@@ -467,7 +478,7 @@ class SanadWebController extends Controller
             ->get();
 
         return view('sanad.ai-console', [
-            'pageTitle' => 'Sanad AI Assistant',
+            'pageTitle' => 'Quick AI Assistant',
             'auth_user' => authSession(),
             'knowledgeItems' => $knowledgeItems,
             'interactions' => $interactions,
@@ -490,19 +501,23 @@ class SanadWebController extends Controller
         ]);
     }
 
-    public function storeAiKnowledge(Request $request, SanadAiRagService $rag, SanadKnowledgeIngestionService $ingestion, SanadCrawlerIngestionService $crawler)
+    public function storeAiKnowledge(Request $request, SanadAiRagService $rag, SanadKnowledgeIngestionService $ingestion, SanadCrawlerIngestionService $crawler, SanadKnowledgeArabicTranslationService $translator)
     {
         if (!auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
             if ($request->wantsJson() || $request->ajax()) {
-                return response()->json(['status' => false, 'message' => 'Only admins can manage Sanad AI knowledge.'], 403);
+                return response()->json(['status' => false, 'message' => 'Only admins can manage Quick AI knowledge.'], 403);
             }
-            return redirect()->back()->withErrors('Only admins can manage Sanad AI knowledge.');
+            return redirect()->back()->withErrors('Only admins can manage Quick AI knowledge.');
         }
 
         try {
             $request->validate([
                 'title' => 'required_without:website_url|nullable|string|max:255',
                 'content' => 'nullable|string',
+                'title_en' => 'nullable|string|max:255|required_with:title_ar,content_en,content_ar',
+                'title_ar' => 'nullable|string|max:255|required_with:title_en,content_en,content_ar',
+                'content_en' => 'nullable|string|required_with:title_en,title_ar,content_ar',
+                'content_ar' => 'nullable|string|required_with:title_en,title_ar,content_en',
                 'knowledge_pdfs' => 'nullable|array',
                 'knowledge_pdfs.*' => 'file|mimes:pdf|max:20480',
                 'google_doc_url' => 'nullable|url|max:1000',
@@ -516,6 +531,17 @@ class SanadWebController extends Controller
                 return response()->json(['status' => false, 'message' => implode(' ', Arr::flatten($ve->errors()))], 422);
             }
             throw $ve;
+        }
+
+        $manualPair = $request->filled('title_en')
+            && $request->filled('title_ar')
+            && $request->filled('content_en')
+            && $request->filled('content_ar');
+        if ($manualPair) {
+            $request->merge([
+                'title' => $request->input('title_en'),
+                'content' => $request->input('content_en'),
+            ]);
         }
 
         try {
@@ -543,28 +569,51 @@ class SanadWebController extends Controller
         }
 
         $title = $request->title ?: ($isScrape ? parse_url($request->input('website_url'), PHP_URL_HOST) : null);
-        $classification = $this->classifyKnowledge($title, $ingested['content']);
+        try {
+            $pair = $manualPair ? [
+                'source_language' => 'bilingual_manual',
+                'title_en' => trim((string) $request->input('title_en')),
+                'title_ar' => trim((string) $request->input('title_ar')),
+                'content_en' => trim((string) $request->input('content_en')),
+                'content_ar' => trim((string) $request->input('content_ar')),
+            ] : $translator->bilingualPair($title, $ingested['content']);
+        } catch (\Throwable $e) {
+            $message = app()->getLocale() === 'ar'
+                ? 'فشلت الترجمة، لذلك لم يتم حفظ أي نسخة. ' . $e->getMessage()
+                : 'Translation failed, so neither version was saved. ' . $e->getMessage();
+            return $request->wantsJson() || $request->ajax()
+                ? response()->json(['status' => false, 'message' => $message], 422)
+                : redirect()->back()->withErrors($message)->withInput();
+        }
 
-        $item = SanadAiKnowledgeItem::create([
-            'title' => $title,
+        $classification = $this->classifyKnowledge($pair['title_en'], $pair['content_en']);
+        $metadata = $translator->translationMetadata([
+            'tags' => $classification['tags'],
+            'ingestion' => $ingested['metadata'],
+            'agent_confidence' => $classification['confidence'],
+            'source_url' => data_get($ingested, 'metadata.source_url'),
+        ], $pair, $ingested['content']);
+
+        $item = DB::transaction(fn () => SanadAiKnowledgeItem::create([
+            'title' => $pair['title_en'],
+            'title_ar' => $pair['title_ar'],
             'category' => $classification['category'],
-            'content' => $ingested['content'],
+            'category_ar' => $translator->arabicCategory($classification['category']),
+            'content' => $pair['content_en'],
+            'content_ar' => $pair['content_ar'],
             'visible_to' => $request->visible_to ?: config('sanad.document_visibility'),
-            'metadata' => [
-                'tags' => $classification['tags'],
-                'ingestion' => $ingested['metadata'],
-                'agent_confidence' => $classification['confidence'],
-                'source_url' => data_get($ingested, 'metadata.source_url'),
-            ],
+            'metadata' => $metadata,
             'is_active' => true,
             'created_by' => optional(auth()->user())->id,
-        ]);
+        ]));
 
         $rag->indexKnowledgeItem($item);
 
         $this->audit($request, $isScrape ? 'sanad.ai.knowledge_scraped' : 'sanad.ai.knowledge_created', $item);
 
-        $msg = $isScrape ? 'Website scraped and indexed.' : 'Sanad AI knowledge item added.';
+        $msg = app()->getLocale() === 'ar'
+            ? 'تم حفظ النسختين الإنجليزية والعربية وفهرستهما بنجاح.'
+            : 'Both English and Arabic versions were saved and indexed successfully.';
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -572,9 +621,9 @@ class SanadWebController extends Controller
                 'message' => $msg,
                 'item' => [
                     'id' => $item->id,
-                    'title' => $item->title,
-                    'content' => Str::limit($item->content, 130),
-                    'category' => $item->category ?: 'General',
+                    'title' => app()->getLocale() === 'ar' ? $item->title_ar : $item->title,
+                    'content' => Str::limit(app()->getLocale() === 'ar' ? $item->content_ar : $item->content, 130),
+                    'category' => app()->getLocale() === 'ar' ? $item->category_ar : ($item->category ?: 'General'),
                     'chunks_count' => $item->chunks_count ?? 1,
                     'visible_to' => $item->visible_to,
                     'is_active' => $item->is_active,
@@ -635,7 +684,7 @@ class SanadWebController extends Controller
         ]);
     }
 
-    public function runKnowledgeScrape(Request $request, $id, SanadAiRagService $rag, SanadCrawlerIngestionService $crawler)
+    public function runKnowledgeScrape(Request $request, $id, SanadAiRagService $rag, SanadCrawlerIngestionService $crawler, SanadKnowledgeArabicTranslationService $translator)
     {
         abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
 
@@ -651,13 +700,7 @@ class SanadWebController extends Controller
         try {
             $ingested = $crawler->scrape($url, $mode, $limit);
         } catch (\Throwable $e) {
-            $metadata['status'] = 'failed';
-            $metadata['error'] = $e->getMessage();
-            $metadata['progress_step'] = 'Failed: ' . $e->getMessage();
-            $item->update([
-                'metadata' => $metadata,
-                'content' => 'Scrape failed: ' . $e->getMessage(),
-            ]);
+            $item->forceDelete();
 
             return response()->json([
                 'status' => false,
@@ -666,7 +709,23 @@ class SanadWebController extends Controller
             ], 422);
         }
 
-        $classification = $this->classifyKnowledge($item->title, $ingested['content']);
+        try {
+            $metadata['progress_step'] = app()->getLocale() === 'ar'
+                ? 'جارٍ ترجمة المحتوى كاملاً والتحقق من النسختين...'
+                : 'Translating the complete content and validating both versions...';
+            $item->update(['metadata' => $metadata]);
+            $pair = $translator->bilingualPair($item->title, $ingested['content']);
+        } catch (\Throwable $e) {
+            $message = app()->getLocale() === 'ar' ? 'فشلت الترجمة ولم يتم الحفظ.' : 'Translation failed; nothing was saved.';
+            $item->forceDelete();
+            return response()->json([
+                'status' => false,
+                'message' => $message . ' ' . $e->getMessage(),
+                'item_id' => $item->id,
+            ], 422);
+        }
+
+        $classification = $this->classifyKnowledge($pair['title_en'], $pair['content_en']);
 
         $metadata['status'] = 'completed';
         $metadata['progress_step'] = 'Indexed';
@@ -674,25 +733,32 @@ class SanadWebController extends Controller
         $metadata['ingestion'] = $ingested['metadata'];
         $metadata['agent_confidence'] = $classification['confidence'];
         $metadata['scraped_at'] = now()->toIso8601String();
+        $metadata = $translator->translationMetadata($metadata, $pair, $ingested['content']);
 
-        $item->update([
+        DB::transaction(fn () => $item->update([
+            'title' => $pair['title_en'],
+            'title_ar' => $pair['title_ar'],
             'category' => $classification['category'],
-            'content' => $ingested['content'],
+            'category_ar' => $translator->arabicCategory($classification['category']),
+            'content' => $pair['content_en'],
+            'content_ar' => $pair['content_ar'],
             'metadata' => $metadata,
             'is_active' => true,
-        ]);
+        ]));
 
         $rag->indexKnowledgeItem($item);
         $this->audit($request, 'sanad.ai.knowledge_scraped', $item);
 
         return response()->json([
             'status' => true,
-            'message' => 'Website scraped and indexed.',
+            'message' => app()->getLocale() === 'ar'
+                ? 'تم حفظ النسختين الإنجليزية والعربية وفهرستهما بنجاح.'
+                : 'Both English and Arabic versions were saved and indexed successfully.',
             'item' => [
                 'id' => $item->id,
-                'title' => $item->title,
-                'content' => Str::limit($item->content, 130),
-                'category' => $item->category ?: 'General',
+                'title' => app()->getLocale() === 'ar' ? $item->title_ar : $item->title,
+                'content' => Str::limit(app()->getLocale() === 'ar' ? $item->content_ar : $item->content, 130),
+                'category' => app()->getLocale() === 'ar' ? $item->category_ar : ($item->category ?: 'General'),
                 'chunks_count' => $item->chunks_count ?? 1,
                 'visible_to' => $item->visible_to,
                 'is_active' => $item->is_active,
@@ -720,7 +786,7 @@ class SanadWebController extends Controller
         ]);
     }
 
-    public function updateAiKnowledge(Request $request, $id, SanadAiRagService $rag)
+    public function updateAiKnowledge(Request $request, $id, SanadAiRagService $rag, SanadKnowledgeArabicTranslationService $translator)
     {
         abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
 
@@ -732,20 +798,35 @@ class SanadWebController extends Controller
         ]);
 
         $item = SanadAiKnowledgeItem::findOrFail($id);
-        $classification = $this->classifyKnowledge($request->title, $request->content);
+        try {
+            $pair = $translator->bilingualPair($request->title, $request->content);
+        } catch (\Throwable $e) {
+            $message = app()->getLocale() === 'ar'
+                ? 'فشلت الترجمة، لذلك لم يتم تحديث أي نسخة. ' . $e->getMessage()
+                : 'Translation failed, so neither version was updated. ' . $e->getMessage();
+            return $request->wantsJson() || $request->ajax()
+                ? response()->json(['status' => false, 'message' => $message], 422)
+                : redirect()->back()->withErrors($message)->withInput();
+        }
+
+        $classification = $this->classifyKnowledge($pair['title_en'], $pair['content_en']);
         $metadata = $item->metadata ?: [];
         $metadata['tags'] = $classification['tags'];
         $metadata['agent_confidence'] = $classification['confidence'];
         $metadata['fine_tuned_at'] = now()->toIso8601String();
+        $metadata = $translator->translationMetadata($metadata, $pair, $request->content);
 
-        $item->update([
-            'title' => $request->title,
+        DB::transaction(fn () => $item->update([
+            'title' => $pair['title_en'],
+            'title_ar' => $pair['title_ar'],
             'category' => $classification['category'],
-            'content' => $request->content,
+            'category_ar' => $translator->arabicCategory($classification['category']),
+            'content' => $pair['content_en'],
+            'content_ar' => $pair['content_ar'],
             'visible_to' => $request->visible_to ?: config('sanad.document_visibility'),
             'metadata' => $metadata,
             'is_active' => $request->boolean('is_active', true),
-        ]);
+        ]));
 
         $rag->indexKnowledgeItem($item);
         $this->audit($request, 'sanad.ai.knowledge_updated', $item);
@@ -753,7 +834,9 @@ class SanadWebController extends Controller
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'status' => true,
-                'message' => 'Sanad AI knowledge item updated.',
+                'message' => app()->getLocale() === 'ar'
+                    ? 'تم تحديث النسختين الإنجليزية والعربية وفهرستهما بنجاح.'
+                    : 'Both English and Arabic versions were updated and indexed successfully.',
                 'item' => [
                     'id' => $item->id,
                     'title' => $item->title,
@@ -766,7 +849,9 @@ class SanadWebController extends Controller
             ]);
         }
 
-        return redirect()->back()->withSuccess('Sanad AI knowledge item updated.');
+        return redirect()->back()->withSuccess(app()->getLocale() === 'ar'
+            ? 'تم تحديث النسختين الإنجليزية والعربية وفهرستهما بنجاح.'
+            : 'Both English and Arabic versions were updated and indexed successfully.');
     }
 
     public function deleteAiKnowledge(Request $request, $id, SanadVectorStoreService $vectorStore)
@@ -854,7 +939,7 @@ class SanadWebController extends Controller
             ]);
         }
 
-        return redirect()->back()->withSuccess('Sanad AI response recorded.');
+        return redirect()->back()->withSuccess('Quick AI response recorded.');
     }
 
     public function aiEscalations(Request $request)
@@ -1035,7 +1120,7 @@ class SanadWebController extends Controller
             'knowledge_item_id' => $item->id,
         ]);
 
-        return back()->withSuccess('Reviewed answer promoted into Sanad AI knowledge.');
+        return back()->withSuccess('Reviewed answer promoted into Quick AI knowledge.');
     }
 
     private function recordAiReviewExample(SanadAiInteraction $interaction, array $previous, string $action, ?string $reviewNote): SanadAiReviewExample
@@ -1074,7 +1159,7 @@ class SanadWebController extends Controller
         }
 
         return [
-            'request_reference' => $booking->sanad_reference ?: '#' . $booking->id,
+            'request_reference' => $booking->quick_reference,
             'stage' => $booking->sanad_stage ?: $booking->status,
             'priority' => $booking->sanad_priority,
             'service' => optional($booking->service)->name,
@@ -1230,7 +1315,7 @@ class SanadWebController extends Controller
 
         $summary = $this->requestQueueSummary();
         $requests = $query->paginate(15)->appends($request->query());
-        $pageTitle = 'Sanad Requests';
+        $pageTitle = app()->getLocale() === 'ar' ? 'طلبات وعمليات كويك' : 'Quick Requests';
         $auth_user = authSession();
 
         return view('sanad.requests-index', compact('requests', 'pageTitle', 'auth_user', 'summary'));
@@ -1243,7 +1328,7 @@ class SanadWebController extends Controller
             ->myBooking()
             ->findOrFail($id);
 
-        $pageTitle = 'Sanad Request #' . ($bookingdata->sanad_reference ?: $bookingdata->id);
+        $pageTitle = (app()->getLocale() === 'ar' ? 'طلب كويك #' : 'Quick Request #') . $bookingdata->quick_reference;
         $auth_user = authSession();
         $documents = $this->visibleDocumentsQuery($bookingdata)->latest()->get();
         $buzzAlerts = $this->visibleBuzzQuery($bookingdata)->latest()->get();
@@ -1395,7 +1480,7 @@ class SanadWebController extends Controller
             'current_stage' => $booking->sanad_stage,
         ]);
 
-        return redirect()->back()->withSuccess('Sanad request action recorded.');
+        return redirect()->back()->withSuccess('Quick request action recorded.');
     }
 
     public function updatePaymentStatus(Request $request, $id)
@@ -1424,7 +1509,7 @@ class SanadWebController extends Controller
             'current_payment_status' => $payment->payment_status,
         ]);
 
-        return redirect()->back()->withSuccess('Sanad payment status updated.');
+        return redirect()->back()->withSuccess('Quick payment status updated.');
     }
 
     public function assignEmployees(Request $request, $id)
@@ -1570,7 +1655,7 @@ class SanadWebController extends Controller
 
         $allowedStages = config('sanad.request_lifecycle', []);
         if (!in_array($request->sanad_stage, $allowedStages, true)) {
-            return redirect()->back()->withErrors('Invalid Sanad request lifecycle stage.');
+            return redirect()->back()->withErrors('Invalid Quick request lifecycle stage.');
         }
 
         $booking = Booking::myBooking()->findOrFail($id);
@@ -1578,7 +1663,7 @@ class SanadWebController extends Controller
 
         $booking->fill($request->only(['sanad_stage', 'sanad_priority', 'sla_due_at']));
         if (empty($booking->sanad_reference)) {
-            $booking->sanad_reference = 'SANAD-' . str_pad($booking->id, 6, '0', STR_PAD_LEFT);
+            $booking->sanad_reference = 'QUICK-' . str_pad($booking->id, 6, '0', STR_PAD_LEFT);
         }
         if ($request->sanad_stage === 'escalated' && empty($booking->escalated_at)) {
             $booking->escalated_at = now();
@@ -1603,7 +1688,7 @@ class SanadWebController extends Controller
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
         ]);
 
-        return redirect()->back()->withSuccess('Sanad request lifecycle updated.');
+        return redirect()->back()->withSuccess('Quick request lifecycle updated.');
     }
 
     public function storeDocument(Request $request, $id)
@@ -1657,7 +1742,7 @@ class SanadWebController extends Controller
 
         $this->audit($request, 'sanad.document.created', $document);
 
-        return redirect()->back()->withSuccess('Sanad document added.');
+        return redirect()->back()->withSuccess('Quick document added.');
     }
 
     private function serviceDocumentOptions($service)
@@ -1665,8 +1750,9 @@ class SanadWebController extends Controller
         return collect(optional($service)->required_documents ?: [])
             ->map(function ($document, $index) {
                 if (is_array($document)) {
-                    $name = trim((string) ($document['name'] ?? $document['label'] ?? $document['title'] ?? $document['key'] ?? ''));
-                    $key = trim((string) ($document['key'] ?? Str::slug($name ?: 'document-'.$index, '_')));
+                    $storedName = trim((string) ($document['name'] ?? $document['label'] ?? $document['title'] ?? $document['key'] ?? ''));
+                    $name = localized_service_document_name($document, '');
+                    $key = trim((string) ($document['key'] ?? Str::slug($storedName ?: 'document-'.$index, '_')));
 
                     return $name ? ['key' => $key, 'name' => $name] : null;
                 }
@@ -1930,7 +2016,7 @@ class SanadWebController extends Controller
         $this->audit($request, 'sanad.buzz.created', $alert);
         $this->broadcastConversationUpdate($booking->id, 'buzz.created', ['buzz_alert_id' => $alert->id]);
 
-        return redirect()->to(route('sanad.chat.workspace', ['booking_id' => $booking->id, 'buzz_id' => $alert->id]))->withSuccess('Sanad Buzz alert sent.');
+        return redirect()->to(route('sanad.chat.workspace', ['booking_id' => $booking->id, 'buzz_id' => $alert->id]))->withSuccess('Quick Buzz alert sent.');
     }
 
     public function acknowledgeBuzz(Request $request, $id, $alertId)
@@ -1957,7 +2043,7 @@ class SanadWebController extends Controller
             return response()->json(['status' => true, 'buzz_id' => $alert->id, 'action_status' => $alert->action_status]);
         }
 
-        return redirect()->back()->withSuccess('Sanad Buzz alert acknowledged.');
+        return redirect()->back()->withSuccess('Quick Buzz alert acknowledged.');
     }
 
     public function storeChatMessage(Request $request, $id)
@@ -2723,7 +2809,7 @@ class SanadWebController extends Controller
         }
 
         if ($booking->chat_owner_type === 'sanad_team') {
-            return 'Sanad Team';
+            return 'Quick Team';
         }
 
         if ($booking->chat_owner_type === 'partner_team') {

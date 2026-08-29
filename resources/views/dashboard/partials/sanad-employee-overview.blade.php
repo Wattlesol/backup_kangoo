@@ -7,8 +7,8 @@
     <div class="card sanad-employee-card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h4 class="font-weight-bold mb-1">Employee Task Overview</h4>
-                <span class="text-muted">Assigned work, status progress, evidence, communication, and payment visibility</span>
+                <h4 class="font-weight-bold mb-1">{{ app()->getLocale() === "ar" ? "نظرة عامة على مهام الموظف" : "Employee Task Overview" }}</h4>
+                <span class="text-muted">{{ app()->getLocale() === "ar" ? "المهام المسندة، تقدم الحالة، إثباتات الإنجاز، التواصل، والمدفوعات" : "Assigned work, status progress, evidence, communication, and payment visibility" }}</span>
             </div>
             <a href="{{ route('sanad.requests.index') }}" class="btn-link btn-link-hover"><u>{{ __('messages.view_all') }}</u></a>
         </div>
@@ -16,25 +16,25 @@
             <div class="row">
                 <div class="col-xl-3 col-md-6 mb-3">
                     <a class="sanad-employee-kpi" href="{{ route('sanad.requests.index') }}">
-                        <span>Assigned Tasks</span>
+                        @php $isAr = app()->getLocale() === 'ar'; @endphp<span>{{ $isAr ? 'المهام المسندة' : 'Assigned Tasks' }}</span>
                         <strong>{{ $employee['assigned_tasks'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <a class="sanad-employee-kpi" href="{{ route('sanad.requests.index', ['sanad_stage' => 'in_progress']) }}">
-                        <span>In Progress</span>
+                        <span>{{ $isAr ? 'قيد التنفيذ' : 'In Progress' }}</span>
                         <strong>{{ $employee['in_progress_tasks'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <a class="sanad-employee-kpi" href="{{ route('sanad.requests.index', ['sanad_stage' => 'awaiting_quality_review']) }}">
-                        <span>Awaiting Review</span>
+                        <span>{{ $isAr ? 'بانتظار المراجعة' : 'Awaiting Review' }}</span>
                         <strong>{{ $employee['awaiting_review_tasks'] ?? 0 }}</strong>
                     </a>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <a class="sanad-employee-kpi" href="{{ route('sanad.requests.index', ['payment_state' => 'paid']) }}">
-                        <span>Paid Tasks</span>
+                        <span>{{ $isAr ? 'مهام مدفوعة' : 'Paid Tasks' }}</span>
                         <strong>{{ $employee['paid_tasks'] ?? 0 }}</strong>
                     </a>
                 </div>
@@ -43,57 +43,57 @@
             <div class="row align-items-stretch">
                 <div class="col-lg-4 mb-3 mb-lg-0">
                     <div class="sanad-employee-box">
-                        <h5 class="font-weight-bold mb-3">Task Signals</h5>
+                        <h5 class="font-weight-bold mb-3">{{ $isAr ? 'مؤشرات المهام' : 'Task Signals' }}</h5>
                         <div class="sanad-employee-line">
-                            <span>Today</span>
+                            <span>{{ $isAr ? 'اليوم' : 'Today' }}</span>
                             <strong>{{ $employee['today_tasks'] ?? 0 }}</strong>
                         </div>
                         <div class="sanad-employee-line">
-                            <span>Active</span>
+                            <span>{{ $isAr ? 'نشطة' : 'Active' }}</span>
                             <strong>{{ $employee['active_tasks'] ?? 0 }}</strong>
                         </div>
                         <div class="sanad-employee-line">
-                            <span>Completed</span>
+                            <span>{{ $isAr ? 'مكتملة' : 'Completed' }}</span>
                             <strong>{{ $employee['completed_tasks'] ?? 0 }}</strong>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-4 mb-3 mb-lg-0">
                     <div class="sanad-employee-box">
-                        <h5 class="font-weight-bold mb-3">Action Items</h5>
+                        <h5 class="font-weight-bold mb-3">{{ $isAr ? 'إجراءات مطلوبة' : 'Action Items' }}</h5>
                         <div class="sanad-employee-line">
-                            <span>Pending Evidence</span>
+                            <span>{{ $isAr ? 'أدلة معلقة' : 'Pending Evidence' }}</span>
                             <strong>{{ $employee['pending_evidence'] ?? 0 }}</strong>
                         </div>
                         <div class="sanad-employee-line">
-                            <span>Unread Buzz</span>
+                            <span>{{ $isAr ? 'تنبيهات غير مقروءة' : 'Unread Alerts' }}</span>
                             <strong>{{ $employee['unread_buzz'] ?? 0 }}</strong>
                         </div>
                         <div class="sanad-employee-line">
-                            <span>Open Chats</span>
+                            <span>{{ $isAr ? 'محادثات مفتوحة' : 'Open Chats' }}</span>
                             <strong>{{ $employee['open_chats'] ?? 0 }}</strong>
                         </div>
                         <div class="sanad-employee-line">
-                            <span>Pending Payment</span>
+                            <span>{{ $isAr ? 'دفع معلق' : 'Pending Payment' }}</span>
                             <strong>{{ $employee['pending_payment_tasks'] ?? 0 }}</strong>
                         </div>
                     </div>
                 </div>
                 <div class="col-lg-4">
                     <div class="sanad-employee-box">
-                        <h5 class="font-weight-bold mb-3">Next Tasks</h5>
+                        <h5 class="font-weight-bold mb-3">{{ $isAr ? 'المهام التالية' : 'Next Tasks' }}</h5>
                         @forelse($nextTasks as $task)
                             <div class="sanad-employee-task">
                                 <div>
                                     <a href="{{ route('sanad.requests.show', $task->id) }}">
-                                        <strong>#{{ $task->sanad_reference ?: $task->id }}</strong>
+                                        <strong>{{ $task->quick_reference }}</strong>
                                     </a>
-                                    <span>{{ optional($task->service)->name ?: '-' }}</span>
+                                    <span>{{ localized_model_name($task->service) }}</span>
                                 </div>
                                 <span>{{ Str::headline($task->sanad_stage ?: 'submitted') }}</span>
                             </div>
                         @empty
-                            <div class="sanad-employee-empty">No active assigned tasks</div>
+                            <div class="sanad-employee-empty">{{ $isAr ? 'لا توجد مهام نشطة مسندة إليك.' : 'No active assigned tasks.' }}</div>
                         @endforelse
                     </div>
                 </div>
@@ -111,8 +111,8 @@
         .sanad-employee-kpi,
         .sanad-employee-box {
             border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
-            background: #fff;
+            border-radius: 14px;
+            background: var(--quick-card, #fff);
         }
 
         .sanad-employee-kpi {
@@ -128,7 +128,7 @@
 
         .sanad-employee-kpi:hover {
             color: inherit;
-            border-color: rgba(255, 111, 0, 0.35);
+            border-color: rgba(31, 107, 255, 0.38);
             box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
             text-decoration: none;
         }

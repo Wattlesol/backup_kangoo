@@ -67,7 +67,7 @@
                         </div>
                         <div class="col-lg-6">
                             <div class="sanad-employee-detail-card">
-                                <h4>Sanad Employee Operations</h4>
+                                <h4>Quick Employee Operations</h4>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <span>Job Title</span>

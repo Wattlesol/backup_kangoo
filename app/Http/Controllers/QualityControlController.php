@@ -13,6 +13,7 @@ use App\Models\SanadCustomerComplaint;
 use App\Models\Time;
 use App\Models\TimeData;
 use App\Traits\FileHandler;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class QualityControlController extends Controller
@@ -62,7 +63,8 @@ class QualityControlController extends Controller
 
         $title = "مراقبه الجوده";
         $route = route('time.create');
-        return view('QualityControl.index',compact('data','title','route', 'sanadComplaints', 'sanadComplaintStats'));
+        $providers = User::where('user_type', 'provider')->orderBy('display_name')->get();
+        return view('QualityControl.index',compact('data','title','route', 'sanadComplaints', 'sanadComplaintStats', 'providers'));
     }
 
     /**
@@ -97,6 +99,15 @@ class QualityControlController extends Controller
             'provider_id' => $request->provider_id,
             'issue_type' => $request->issue_type ?: 'customer_complaint',
         ]);
+
+        if ($request->filled('details') || $request->hasFile('file')) {
+            $comment = new QualitycontrolComment();
+            $comment->quality_control_id = $Time->id;
+            $comment->comment = $request->details ?: $request->title;
+            $comment->file = $request->hasFile('file') ? $this->UploadFile($request->file, 'files/') : '';
+            $comment->created_by = auth()->user()->id;
+            $comment->save();
+        }
 
 
         session()->flash('success', trans('record added'));

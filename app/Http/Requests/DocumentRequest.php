@@ -25,7 +25,8 @@ class DocumentRequest extends FormRequest
     {
         $id = request()->id;
         return [
-            'name'              => 'required|unique:documents,name,'.$id,
+            'name'              => 'required|string|max:100|unique:documents,name,'.$id,
+            'name_ar'           => 'required|string|max:100|unique:documents,name_ar,'.$id,
             'status'            => 'required',
         ];
     }

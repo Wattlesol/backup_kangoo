@@ -17,7 +17,7 @@ class ProductApprovalController extends Controller
      */
     public function pending(Request $request)
     {
-        $pageTitle = 'Pending Product Approvals';
+        $pageTitle = __('messages.product_approvals');
 
         // Get list of providers who have pending products for filter
         $providers = User::where('user_type', 'provider')
@@ -100,7 +100,7 @@ class ProductApprovalController extends Controller
      */
     public function rejected(Request $request)
     {
-        $pageTitle = 'Rejected Products';
+        $pageTitle = app()->getLocale() === 'ar' ? 'المنتجات المرفوضة' : 'Rejected Products';
 
         if ($request->ajax()) {
             return $this->getRejectedData($request);

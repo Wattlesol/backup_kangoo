@@ -19,11 +19,17 @@ class SanadAiRagService
 
     public function answer(string $question, ?Booking $booking = null, string $audience = 'customer'): array
     {
+        $language = $this->preferredLanguage($question);
+
         if ($this->isGreeting($question)) {
-            $liveContext = $booking ? $this->liveRequestContext($booking) : null;
-            $answer = $booking
-                ? "Hello! I'm here to help with your Sanad request. You can ask me about your request status, required documents, next steps, or anything else you need."
-                : "Hello! I'm Sanad AI. How can I help you today?";
+            $liveContext = $booking ? $this->liveRequestContext($booking, $language) : null;
+            $answer = $language === 'ar'
+                ? ($booking
+                    ? 'مرحباً! أنا هنا لمساعدتك في طلبك لدى سند. يمكنك سؤالي عن حالة الطلب، أو المستندات المطلوبة، أو الخطوات التالية.'
+                    : 'مرحباً! أنا مساعد سند الذكي. كيف يمكنني مساعدتك اليوم؟')
+                : ($booking
+                    ? "Hello! I'm here to help with your Quick request. You can ask me about your request status, required documents, next steps, or anything else you need."
+                    : "Hello! I'm Quick AI. How can I help you today?");
             $providerMetadata = [
                 'provider' => 'sanad_first_responder',
                 'intent' => 'greeting',
@@ -51,14 +57,14 @@ class SanadAiRagService
         }
 
         $matches = $this->retrieve($question, $audience, 5);
-        $liveContext = $booking ? $this->liveRequestContext($booking) : null;
-        $serviceCatalog = $this->serviceCatalogContext($question, $booking);
+        $liveContext = $booking ? $this->liveRequestContext($booking, $language) : null;
+        $serviceCatalog = $this->serviceCatalogContext($question, $booking, $language);
         $confidence = $this->confidence($matches, $booking, $serviceCatalog);
         $requiresEscalation = $confidence < (float) config('sanad.ai.requires_escalation_when_confidence_below', 0.65)
             || Str::contains(Str::lower($question), ['human', 'complaint', 'urgent', 'wrong', 'rejected', 'delay']);
         $aiDecision = $this->decideBehavior($question, $serviceCatalog, $requiresEscalation);
 
-        $draftAnswer = $this->composeAnswer($question, $matches, $liveContext, $serviceCatalog, $requiresEscalation);
+        $draftAnswer = $this->composeAnswer($question, $matches, $liveContext, $serviceCatalog, $requiresEscalation, $language);
         $answer = $draftAnswer;
         $providerMetadata = [
             'provider' => config('sanad.ai.provider'),
@@ -68,7 +74,7 @@ class SanadAiRagService
 
         if (config('sanad.ai.enabled') && config('sanad.ai.api_key')) {
             try {
-                $messages = $this->messages($question, $matches, $liveContext, $serviceCatalog, $requiresEscalation);
+                $messages = $this->messages($question, $matches, $liveContext, $serviceCatalog, $requiresEscalation, $language);
                 $completion = $this->ai->chat($messages);
                 if (trim($completion['content']) !== '') {
                     $answer = trim($completion['content']);
@@ -85,7 +91,7 @@ class SanadAiRagService
         }
 
         if (($aiDecision['action'] ?? null) === 'unsupported_notice') {
-            $answer = $this->unsupportedServiceAnswer($serviceCatalog, $booking);
+            $answer = $this->unsupportedServiceAnswer($serviceCatalog, $booking, $language);
             $requiresEscalation = false;
             $confidence = max($confidence, 0.74);
         }
@@ -95,14 +101,17 @@ class SanadAiRagService
             'does not specify', 'do not specify', 'apologize', 'recommend checking',
             'contact the relevant', 'not mentioned', 'not available', 'do not have',
             'cannot confirm', 'unable to provide', 'do not have access', 'cannot provide',
-            'exact duration', 'how many days', 'processing time', 'flagged for review'
+            'exact duration', 'how many days', 'processing time', 'flagged for review',
+            'غير محدد', 'لا تتوفر', 'لا يمكنني التأكيد', 'تواصل مع الجهة', 'قيد المراجعة'
         ];
 
         $lowerAnswer = Str::lower($answer);
         if (($aiDecision['action'] ?? null) !== 'unsupported_notice' && Str::contains($lowerAnswer, $uncertaintyKeywords)) {
             $requiresEscalation = true;
-            if (!Str::contains($answer, 'escalated to the Sanad operations team')) {
-                $answer .= "\n\n*(This inquiry has been automatically escalated to the Sanad operations team for review and approval.)*";
+            if (!Str::contains($answer, 'escalated to the Quick operations team')) {
+                $answer .= $language === 'ar'
+                    ? "\n\n*(تم تحويل هذا الاستفسار تلقائياً إلى فريق عمليات كويك للمراجعة والاعتماد.)*"
+                    : "\n\n*(This inquiry has been automatically escalated to the Quick operations team for review and approval.)*";
             }
         }
 
@@ -112,6 +121,8 @@ class SanadAiRagService
                 'reason' => $aiDecision['reason'] ?? 'low_confidence_or_sensitive_request',
             ];
         }
+
+        $answer = $this->publicBrandText($answer);
 
         $traceId = $this->tracer->trace('sanad-rag-answer', [
             'question' => $question,
@@ -129,8 +140,8 @@ class SanadAiRagService
             'requires_escalation' => $requiresEscalation,
             'sources' => $matches->map(fn ($match) => [
                 'id' => $match['item']->id,
-                'title' => $match['item']->title,
-                'category' => $match['item']->category ?: 'General',
+                'title' => $this->publicBrandText($language === 'ar' && $match['item']->title_ar ? $match['item']->title_ar : $match['item']->title),
+                'category' => $language === 'ar' && $match['item']->category_ar ? $match['item']->category_ar : ($match['item']->category ?: 'General'),
                 'score' => $match['score'],
                 'chunk' => isset($match['chunk']) ? $match['chunk']->id : null,
             ])->values()->all(),
@@ -188,12 +199,48 @@ class SanadAiRagService
         return trim($text);
     }
 
-    private function composeAnswer(string $question, Collection $matches, ?array $liveContext, array $serviceCatalog, bool $requiresEscalation): string
+    private function composeAnswer(string $question, Collection $matches, ?array $liveContext, array $serviceCatalog, bool $requiresEscalation, string $language): string
     {
         $parts = [];
         $unsupportedServiceQuestion = $this->isServiceScopeQuestion($question)
+            && !$this->isServiceListQuestion($question)
             && empty($serviceCatalog['matched_services'])
             && !empty($serviceCatalog['active_services']);
+
+        if ($language === 'ar') {
+            if ($liveContext) {
+                $parts[] = "الطلب {$liveContext['reference']} في مرحلة: {$liveContext['stage']}. الخدمة: {$liveContext['service']}.";
+                $parts[] = !empty($liveContext['pending_customer_actions'])
+                    ? 'الإجراء المطلوب من العميل: ' . implode('؛ ', $liveContext['pending_customer_actions']) . '.'
+                    : 'لا توجد إجراءات مطلوبة من العميل حالياً.';
+                $parts[] = "حالة الدفع: {$liveContext['payment_status']}. الخطوة التالية: {$liveContext['next_step']}.";
+            }
+
+            if (!empty($serviceCatalog['matched_services'])) {
+                $parts[] = "تقدم كويك حالياً الخدمات التالية:\n" . $this->serviceBulletList($serviceCatalog['matched_services']);
+            } elseif ($unsupportedServiceQuestion) {
+                $parts[] = "راجعت قائمة خدمات كويك النشطة، ولا توجد حالياً خدمة مطابقة لطلبك. تشمل الخدمات المتاحة:\n" . $this->serviceBulletList($serviceCatalog['active_services']) . "\n\nيمكن لفريق كويك مراجعة احتياجك وإرشادك إلى أقرب خدمة مناسبة.";
+            } elseif (!empty($serviceCatalog['active_services'])) {
+                $parts[] = "تشمل قائمة خدمات كويك النشطة:\n" . $this->serviceBulletList($serviceCatalog['active_services']);
+            }
+
+            if ($this->isServiceListQuestion($question)) {
+                $parts[] = 'لاختيار الخدمة الأنسب، حدّد نوع المعاملة المطلوبة والمدة المناسبة، ثم راجع المتطلبات والمستندات الخاصة بالخدمة. ويمكنك إخباري باحتياجك لأرشح لك الخيار المناسب.';
+            }
+
+            if ($matches->isNotEmpty() && !$unsupportedServiceQuestion) {
+                $matchedTopics = $matches->take(3)->map(fn ($match) => $match['item']->title_ar ?: $match['item']->title)->unique()->implode('، ');
+                $parts[] = "وفقاً لإرشادات سند بشأن {$matchedTopics}، تعتمد الخطوات والمدة على مراجعة الجهة الحكومية والتحقق من المستندات.";
+            } elseif (!$liveContext && !$unsupportedServiceQuestion) {
+                $parts[] = 'تعتمد المدة والمتطلبات على إجراءات الجهة الحكومية المختصة، ويمكن لفريق كويك تأكيد تفاصيل طلبك.';
+            }
+
+            if ($requiresEscalation) {
+                $parts[] = "\n*(تم تحويل الاستفسار إلى فريق عمليات كويك لضمان دقة الإجابة.)*";
+            }
+
+            return implode("\n\n", $parts);
+        }
 
         if ($liveContext) {
             $parts[] = "Request {$liveContext['reference']} is currently at stage: {$liveContext['stage']}. Service: {$liveContext['service']}.";
@@ -206,42 +253,53 @@ class SanadAiRagService
         }
 
         if (!empty($serviceCatalog['matched_services'])) {
-            $parts[] = "Sanad currently offers support for:\n" . $this->serviceBulletList($serviceCatalog['matched_services']);
+            $parts[] = "Quick currently offers support for:\n" . $this->serviceBulletList($serviceCatalog['matched_services']);
         } elseif ($unsupportedServiceQuestion) {
-            $parts[] = "I checked Sanad's active service catalog, and Sanad does not currently list a service matching your request. Current supported services include:\n" . $this->serviceBulletList($serviceCatalog['active_services']) . "\n\nIf you would like, the Sanad team can still review your requirement and advise whether there is a related supported process.";
+            $parts[] = "I checked Quick's active service catalog, and Quick does not currently list a service matching your request. Current supported services include:\n" . $this->serviceBulletList($serviceCatalog['active_services']) . "\n\nIf you would like, the Quick team can still review your requirement and advise whether there is a related supported process.";
         } elseif (!empty($serviceCatalog['active_services'])) {
-            $parts[] = "Sanad's active service catalog includes:\n" . $this->serviceBulletList($serviceCatalog['active_services']);
+            $parts[] = "Quick's active service catalog includes:\n" . $this->serviceBulletList($serviceCatalog['active_services']);
+        }
+
+        if ($this->isServiceListQuestion($question)) {
+            $parts[] = 'To choose the best option, match the service to the transaction you need and the required validity period, then review its requirements and documents. Tell me your need and I can recommend the closest option.';
         }
 
         if ($matches->isNotEmpty() && !$unsupportedServiceQuestion) {
             $matchedTopics = $matches->take(3)->pluck('item.title')->unique()->implode(', ');
-            $parts[] = "Based on official Sanad guidance regarding {$matchedTopics}, processing steps and estimated completion timelines depend on official government authority review and document verification. Our operations team can assist you with exact progress tracking.";
+            $parts[] = "Based on official Quick guidance regarding {$matchedTopics}, processing steps and estimated completion timelines depend on official government authority review and document verification. Our operations team can assist you with exact progress tracking.";
         } elseif (!$liveContext && !$unsupportedServiceQuestion) {
             $parts[] = 'Processing times and requirements depend on official government department review steps. Our operations team is available to confirm exact details for your request.';
         }
 
         if ($requiresEscalation) {
-            $parts[] = "\n*(This inquiry has been flagged for review by the Sanad operations team to ensure accuracy.)*";
+            $parts[] = "\n*(This inquiry has been flagged for review by the Quick operations team to ensure accuracy.)*";
         }
 
         return implode("\n\n", $parts);
     }
 
-    private function messages(string $question, Collection $matches, ?array $liveContext, array $serviceCatalog, bool $requiresEscalation): array
+    private function messages(string $question, Collection $matches, ?array $liveContext, array $serviceCatalog, bool $requiresEscalation, string $language): array
     {
-        $context = $matches->map(function ($match) {
+        $context = $matches->map(function ($match) use ($language) {
             $item = $match['item'];
-            $rawContent = isset($match['chunk']) ? $match['chunk']->content : $item->content;
+            $rawContent = $language === 'ar' && $item->content_ar
+                ? $item->content_ar
+                : (isset($match['chunk']) ? $match['chunk']->content : $item->content);
             $cleanContent = $this->sanitizeKnowledgeContent($rawContent);
+            $title = $language === 'ar' && $item->title_ar ? $item->title_ar : $item->title;
+            $category = $language === 'ar' && $item->category_ar ? $item->category_ar : ($item->category ?: 'General');
 
-            return "Knowledge Item: {$item->title}\nCategory: " . ($item->category ?: 'General') . "\nContent: " . Str::limit($cleanContent, 3500, '');
+            return "Knowledge Item: {$title}\nCategory: {$category}\nContent: " . Str::limit($cleanContent, 3500, '');
         })->implode("\n\n---\n\n");
 
-        $prompt = "You are Sanad AI, an expert operations assistant for the Sanad platform. Answer the user question directly, politely, and comprehensively using the provided Knowledge Base, Live Request Context, and Active Service Catalog. Use the Active Service Catalog as the source of truth for what Sanad currently offers. Whenever you mention available Sanad services, format the services as a bullet list, one service per line. If the customer asks about a service that is not in the catalog, say that Sanad does not currently list that service, then list available supported services as bullet points and offer to connect them with the Sanad team. Do NOT invent unsupported services. Do NOT write any draft outlines, mental refinement notes, or system prompt echoes. Output ONLY your final customer-facing response.\n\n" .
+        $languageInstruction = $language === 'ar'
+            ? 'Respond entirely in Arabic. Use the exact Arabic service names supplied in the Active Service Catalog; never translate them back to English and never include an English service name when an Arabic name is available.'
+            : 'Respond entirely in English and use the English catalog names.';
+        $prompt = "You are Quick AI, an expert operations assistant for the Quick platform. Never call the product Sanad; Quick is the final public brand. {$languageInstruction} Answer the user question directly, politely, and comprehensively using the provided Knowledge Base, Live Request Context, and Active Service Catalog. Use the Active Service Catalog as the source of truth for what Quick currently offers. Whenever you mention available Quick services, format the services as a bullet list, one service per line. If the customer asks about a service that is not in the catalog, say that Quick does not currently list that service, then list available supported services as bullet points and offer to connect them with the Quick team. Do NOT invent unsupported services. Do NOT write any draft outlines, mental refinement notes, or system prompt echoes. Output ONLY your final customer-facing response.\n\n" .
             "User Question:\n{$question}\n\n" .
-            "Live Request Context:\n" . json_encode($liveContext ?: [], JSON_PRETTY_PRINT) . "\n\n" .
-            "Active Service Catalog:\n" . json_encode($serviceCatalog, JSON_PRETTY_PRINT) . "\n\n" .
-            "Retrieved Sanad Knowledge Base:\n{$context}";
+            "Live Request Context:\n" . json_encode($liveContext ?: [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n\n" .
+            "Active Service Catalog:\n" . json_encode($serviceCatalog, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n\n" .
+            "Retrieved Quick Knowledge Base:\n{$context}";
 
         return [
             [
@@ -251,7 +309,7 @@ class SanadAiRagService
         ];
     }
 
-    private function liveRequestContext(Booking $booking): array
+    private function liveRequestContext(Booking $booking, string $language = 'en'): array
     {
         $booking->loadMissing([
             'service',
@@ -271,13 +329,13 @@ class SanadAiRagService
             $pendingActions[] = $buzz->message;
         }
 
-        $assignedMapping = $booking->handymanAdded->first();
-
         return [
-            'reference' => $booking->sanad_reference ?: '#' . $booking->id,
+            'reference' => $booking->quick_reference,
             'stage' => Str::headline($booking->sanad_stage ?: $booking->status ?: 'submitted'),
-            'service' => optional($booking->service)->name_en ?: optional($booking->service)->name ?: '-',
-            'assigned_employee' => optional(optional($assignedMapping)->handyman)->display_name ?: '-',
+            'service' => $this->publicBrandText($language === 'ar'
+                ? (optional($booking->service)->name_ar ?: optional($booking->service)->name_en ?: optional($booking->service)->name ?: '-')
+                : (optional($booking->service)->name_en ?: optional($booking->service)->name ?: '-')),
+            'assigned_employee' => $language === 'ar' ? 'فريق كويك' : 'Quick team',
             'sla_due_at' => optional($booking->sla_due_at)->format('Y-m-d H:i'),
             'expected_completion_at' => optional($booking->expected_completion_at)->format('Y-m-d H:i'),
             'payment_status' => optional($booking->payment)->payment_status ?: 'pending',
@@ -287,11 +345,11 @@ class SanadAiRagService
         ];
     }
 
-    private function serviceCatalogContext(string $question, ?Booking $booking = null): array
+    private function serviceCatalogContext(string $question, ?Booking $booking = null, string $language = 'en'): array
     {
         $terms = $this->terms($question);
         $services = Service::query()
-            ->with('category:id,name')
+            ->with('category:id,name,name_ar,name_en')
             ->where('status', 1)
             ->where('service_type', 'service')
             ->orderBy('updated_at', 'desc')
@@ -300,16 +358,18 @@ class SanadAiRagService
 
         if ($booking && $booking->service) {
             $services = $services
-                ->prepend($booking->service->loadMissing('category:id,name'))
+                ->prepend($booking->service->loadMissing('category:id,name,name_ar,name_en'))
                 ->unique('id')
                 ->values();
         }
 
-        $normalized = $services->map(fn (Service $service) => $this->serviceCatalogItem($service))->values();
+        $normalized = $services->map(fn (Service $service) => $this->serviceCatalogItem($service, $language))->values();
         $matched = $normalized
             ->map(function (array $service) use ($terms) {
                 $haystack = Str::lower(implode(' ', array_filter([
                     $service['name'],
+                    $service['name_en'],
+                    $service['name_ar'],
                     $service['category'],
                     $service['government_entity'],
                     $service['description'],
@@ -326,13 +386,14 @@ class SanadAiRagService
 
         return [
             'question' => $question,
+            'language' => $language,
             'matched_services' => $matched->all(),
             'active_services' => $normalized->take(20)->all(),
             'service_count' => $normalized->count(),
         ];
     }
 
-    private function serviceCatalogItem(Service $service): array
+    private function serviceCatalogItem(Service $service, string $language): array
     {
         $documents = collect($service->required_documents ?: [])
             ->map(function ($document) {
@@ -348,20 +409,33 @@ class SanadAiRagService
 
         return [
             'id' => $service->id,
-            'name' => $service->name_en ?: $service->name,
-            'category' => optional($service->category)->name,
+            'name' => $this->publicBrandText($language === 'ar'
+                ? ($service->name_ar ?: $service->name_en ?: $service->name)
+                : ($service->name_en ?: $service->name)),
+            'name_en' => $this->publicBrandText($service->name_en ?: $service->name),
+            'name_ar' => $this->publicBrandText($service->name_ar),
+            'category' => $this->publicBrandText($language === 'ar'
+                ? (optional($service->category)->name_ar ?: optional($service->category)->name_en ?: optional($service->category)->name)
+                : (optional($service->category)->name_en ?: optional($service->category)->name)),
             'government_entity' => $service->government_entity,
             'estimated_completion_time' => $service->estimated_completion_time,
             'government_fee' => $service->government_fee,
             'service_fee' => $service->service_fee,
-            'required_documents' => $documents,
-            'description' => Str::limit(strip_tags((string) $service->description), 500, ''),
-            'instructions' => Str::limit(strip_tags((string) $service->service_instructions), 500, ''),
+            'required_documents' => collect($documents)->map(fn ($document) => $this->publicBrandText($document))->all(),
+            'description' => $this->publicBrandText(Str::limit(strip_tags((string) $service->description), 500, '')),
+            'instructions' => $this->publicBrandText(Str::limit(strip_tags((string) $service->service_instructions), 500, '')),
         ];
     }
 
     private function decideBehavior(string $question, array $serviceCatalog, bool $requiresEscalation): array
     {
+        if ($this->isServiceListQuestion($question) && !empty($serviceCatalog['active_services'])) {
+            return [
+                'action' => 'answer',
+                'reason' => 'active_service_catalog_requested',
+            ];
+        }
+
         if ($this->isServiceScopeQuestion($question)) {
             if (!empty($serviceCatalog['matched_services'])) {
                 return [
@@ -391,21 +465,33 @@ class SanadAiRagService
         ];
     }
 
-    private function unsupportedServiceAnswer(array $serviceCatalog, ?Booking $booking = null): string
+    private function unsupportedServiceAnswer(array $serviceCatalog, ?Booking $booking = null, string $language = 'en'): string
     {
-        $answer = "Thank you for checking with Sanad. I reviewed our active service catalog, and we do not currently offer that service.";
+        if ($language === 'ar') {
+            $answer = 'شكراً لتواصلك مع كويك. راجعت قائمة خدماتنا النشطة، ولا نقدم هذه الخدمة حالياً.';
+            $serviceList = $this->serviceBulletList($serviceCatalog['active_services'] ?? []);
+            if ($serviceList !== '') {
+                $answer .= "\n\nتشمل خدماتنا المتاحة حالياً:\n{$serviceList}";
+            }
+            $answer .= $booking
+                ? "\n\nيمكنني مساعدتك في متابعة طلبك الحالي، والمستندات المطلوبة، والخطوات التالية."
+                : "\n\nيمكنني مساعدتك في اختيار الخدمة الأنسب من خدمات كويك المتاحة.";
+            return $answer;
+        }
+
+        $answer = "Thank you for checking with Quick. I reviewed our active service catalog, and we do not currently offer that service.";
         $serviceList = $this->serviceBulletList($serviceCatalog['active_services'] ?? []);
 
         if ($serviceList !== '') {
             $answer .= "\n\nAt the moment, our available services include:\n{$serviceList}";
         }
 
-        $answer .= "\n\nWe will let customers know when Sanad begins offering additional service categories.";
+        $answer .= "\n\nWe will let customers know when Quick begins offering additional service categories.";
 
         if ($booking) {
             $answer .= " For your current request, I can still help with status updates, required documents, uploads, and next steps.";
         } else {
-            $answer .= " If you need help choosing from the available Sanad services, I can guide you.";
+            $answer .= " If you need help choosing from the available Quick services, I can guide you.";
         }
 
         return $answer;
@@ -417,8 +503,17 @@ class SanadAiRagService
             ->take($limit)
             ->pluck('name')
             ->filter()
-            ->map(fn ($name) => '- ' . $name)
+            ->map(fn ($name) => '- ' . $this->publicBrandText($name))
             ->implode("\n");
+    }
+
+    private function publicBrandText(?string $text): string
+    {
+        $text = (string) $text;
+        $text = preg_replace('/\bSanad\b/u', 'Quick', $text);
+        $text = preg_replace('/\bSANAD-/u', 'QUICK-', $text);
+
+        return preg_replace('/(?<!\p{L})سند(?!\p{L})/u', 'كويك', $text);
     }
 
     private function nextStep(Booking $booking, array $pendingActions): string
@@ -428,11 +523,11 @@ class SanadAiRagService
         }
 
         return match ($booking->sanad_stage) {
-            'submitted', 'pending_review' => 'Sanad will review the request and documents.',
-            'assigned_to_partner', 'assigned_to_employee', 'in_progress' => 'The assigned Sanad team is processing the request.',
-            'awaiting_quality_review' => 'Sanad quality review is in progress.',
+            'submitted', 'pending_review' => 'Quick will review the request and documents.',
+            'assigned_to_partner', 'assigned_to_employee', 'in_progress' => 'The assigned Quick team is processing the request.',
+            'awaiting_quality_review' => 'Quick quality review is in progress.',
             'completed', 'closed' => 'The request is complete. You can review documents, invoice, and rating options.',
-            default => 'Sanad will update the request timeline when the next action is available.',
+            default => 'Quick will update the request timeline when the next action is available.',
         };
     }
 
@@ -457,6 +552,11 @@ class SanadAiRagService
             'good morning',
             'good afternoon',
             'good evening',
+            'مرحبا',
+            'مرحباً',
+            'السلام عليكم',
+            'صباح الخير',
+            'مساء الخير',
         ], true);
     }
 
@@ -509,6 +609,42 @@ class SanadAiRagService
             'passport',
             'visa',
             'iqama',
+            'خدمة',
+            'خدمات',
+            'تقدمون',
+            'تقدم',
+            'توفرون',
+            'رخصة',
+            'تجديد',
+            'تحقق',
+            'جواز',
         ]);
+    }
+
+    private function isServiceListQuestion(string $question): bool
+    {
+        $normalized = Str::lower($question);
+
+        return Str::contains($normalized, [
+            'what services',
+            'which services',
+            'list services',
+            'services do you provide',
+            'services do you offer',
+            'ما الخدمات',
+            'ما هي الخدمات',
+            'الخدمات التي تقدم',
+            'الخدمات المتاحة',
+            'قائمة الخدمات',
+        ]);
+    }
+
+    private function preferredLanguage(string $question): string
+    {
+        if (app()->getLocale() === 'ar' || preg_match('/\p{Arabic}/u', $question)) {
+            return 'ar';
+        }
+
+        return 'en';
     }
 }

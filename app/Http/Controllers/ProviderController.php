@@ -13,6 +13,7 @@ use App\Models\ProviderSubscription;
 use App\Models\PaymentGateway;
 use App\Models\ProviderDocument;
 use App\Models\Documents;
+use App\Services\SanadKnowledgeArabicTranslationService;
 use Carbon\Carbon;
 use Yajra\DataTables\DataTables;
 use Hash;
@@ -30,9 +31,9 @@ class ProviderController extends Controller
         $filter = [
             'status' => $request->status,
         ];
-        $pageTitle = 'Partners';
+        $pageTitle = __('messages.provider');
         if($request->status === 'pending'){
-            $pageTitle = 'Pending Partners';
+            $pageTitle = __('messages.pending_provider');
         }
         if($request->status === 'subscribe'){
             $pageTitle = __('messages.list_form_title',['form' => __('messages.subscribe')] );
@@ -210,13 +211,20 @@ class ProviderController extends Controller
         $pageTitle = __('messages.update_form_title',['form'=> __('messages.provider')]);
         $partnerVerificationDocuments = Documents::where('status', 1)->orderBy('name')->get();
         $selectedVerificationDocumentIds = $providerdata ? $providerdata->providerDocument->pluck('document_id')->all() : $partnerVerificationDocuments->where('is_required', 1)->pluck('id')->all();
+        $customVerificationDocumentRows = collect(old('custom_partner_verification_documents', []))
+            ->map(function ($document) {
+                return [
+                    'text' => $document['text'] ?? (app()->getLocale() === 'ar' ? ($document['name_ar'] ?? '') : ($document['name'] ?? '')),
+                ];
+            })
+            ->values();
 
         if($providerdata == null){
             $pageTitle = __('messages.add_button_form',['form' => __('messages.provider')]);
             $providerdata = new User;
         }
 
-        return view('provider.create', compact('pageTitle' ,'providerdata' ,'auth_user', 'partnerVerificationDocuments', 'selectedVerificationDocumentIds' ));
+        return view('provider.create', compact('pageTitle' ,'providerdata' ,'auth_user', 'partnerVerificationDocuments', 'selectedVerificationDocumentIds', 'customVerificationDocumentRows' ));
     }
 
     /**
@@ -225,13 +233,31 @@ class ProviderController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(UserRequest $request)
+    public function store(UserRequest $request, SanadKnowledgeArabicTranslationService $translator)
     {
         $loginuser = \Auth::user();
 
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
+
+        try {
+            $translatedCustomVerificationDocuments = collect($request->input('custom_partner_verification_documents', []))
+                ->pluck('text')
+                ->map(fn ($text) => trim((string) $text))
+                ->filter()
+                ->map(fn ($text) => $translator->bilingualText($text))
+                ->values();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->back()->withInput()->withErrors([
+                'custom_partner_verification_documents' => app()->getLocale() === 'ar'
+                    ? 'تعذرت ترجمة اسم المستند إلى الإنجليزية والعربية. لم يتم حفظ أي بيانات. يرجى المحاولة مرة أخرى.'
+                    : 'The document name could not be translated into both English and Arabic. Nothing was saved. Please try again.',
+            ]);
+        }
+
         $data = $request->all();
         $id = $data['id'];
         $data['user_type'] = $data['user_type'] ?? 'provider';
@@ -292,11 +318,67 @@ class ProviderController extends Controller
                 ]);
             }
         }
-        foreach ($request->partner_verification_document_ids ?: [] as $documentId) {
-            ProviderDocument::withTrashed()->updateOrCreate(
-                ['provider_id' => $user->id, 'document_id' => $documentId],
-                ['is_verified' => 0, 'deleted_at' => null]
-            );
+        $verificationDocumentIds = collect($request->input('partner_verification_document_ids', []))
+            ->map(fn ($documentId) => (int) $documentId)
+            ->filter()
+            ->unique();
+
+        foreach ($translatedCustomVerificationDocuments as $customDocument) {
+            $name = $customDocument['text_en'];
+            $nameAr = $customDocument['text_ar'];
+
+            $document = Documents::withTrashed()->where('name', $name)->first();
+
+            if ($document) {
+                if ($document->trashed()) {
+                    $document->restore();
+                }
+                $document->update(['name_ar' => $nameAr, 'status' => 1]);
+            } else {
+                $document = Documents::create([
+                    'name' => $name,
+                    'name_ar' => $nameAr,
+                    'status' => 1,
+                    'is_required' => 0,
+                ]);
+            }
+
+            $verificationDocumentIds->push((int) $document->id);
+        }
+
+        $verificationDocumentIds = $verificationDocumentIds->unique()->values();
+        $assignedDocuments = ProviderDocument::withTrashed()->where('provider_id', $user->id)->get()->keyBy('document_id');
+
+        foreach ($verificationDocumentIds as $documentId) {
+            $providerDocument = $assignedDocuments->get($documentId);
+
+            if (!$providerDocument) {
+                ProviderDocument::create([
+                    'provider_id' => $user->id,
+                    'document_id' => $documentId,
+                    'is_verified' => 0,
+                    'verification_status' => 'pending',
+                ]);
+                continue;
+            }
+
+            if ($providerDocument->trashed()) {
+                $providerDocument->restore();
+                $providerDocument->update([
+                    'is_verified' => 0,
+                    'verification_status' => 'pending',
+                    'review_reason' => null,
+                    'reviewed_by' => null,
+                    'reviewed_at' => null,
+                ]);
+            }
+        }
+
+        $documentsToRemove = $assignedDocuments->keys()->diff($verificationDocumentIds);
+        if ($documentsToRemove->isNotEmpty()) {
+            ProviderDocument::where('provider_id', $user->id)
+                ->whereIn('document_id', $documentsToRemove->all())
+                ->delete();
         }
         if($request->is('api/*')) {
             return comman_message_response($message);

@@ -1,7 +1,7 @@
 @php
     $summary = $sanadPaymentSummary ?? [];
     $roleScope = $summary['role_scope'] ?? [
-        'label' => 'Sanad finance scope',
+        'label' => 'Quick finance scope',
         'description' => 'Financial information is scoped by the signed-in user role.',
         'can_bulk_manage' => false,
     ];
@@ -9,18 +9,18 @@
 
 <div class="col-lg-12">
     <div class="card sanad-payment-summary">
-        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="card-header quick-finance-hero d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div>
-                <h4 class="font-weight-bold mb-1">Sanad Financial Center</h4>
-                <span class="text-muted">Customer payments, settlements, commission, VAT, refunds, invoices, transactions, and wallet balances</span>
+                @php $isAr = app()->getLocale() === 'ar'; @endphp<div class="quick-finance-kicker"><x-quick-icon name="shield" /> {{ $isAr ? 'المدفوعات والتسويات الآمنة' : 'Secure payments & settlements' }}</div><h4 class="font-weight-bold mb-1">{{ $isAr ? 'المركز المالي لمنصة كويك' : 'Quick Financial Center' }}</h4>
+                <span class="text-muted">{{ $isAr ? 'مدفوعات العملاء، التسويات، العمولة، ضريبة القيمة المضافة، المرتجعات، الفواتير، والمعاملات' : 'Customer payments, settlements, commission, VAT, refunds, invoices, transactions, and wallet balances' }}</span>
             </div>
             <div class="d-flex align-items-center gap-3 flex-wrap">
-                <a href="{{ route('sanad.requests.index', ['payment_state' => 'pending']) }}" class="btn-link btn-link-hover"><u>Pending payments</u></a>
+                <a href="{{ route('sanad.requests.index', ['payment_state' => 'pending']) }}" class="btn-link btn-link-hover"><u>{{ $isAr ? 'مدفوعات معلقة' : 'Pending payments' }}</u></a>
                 @if(Route::has('providerpayout.index'))
-                    <a href="{{ route('providerpayout.index') }}" class="btn-link btn-link-hover"><u>Settlements</u></a>
+                    <a href="{{ route('providerpayout.index') }}" class="btn-link btn-link-hover"><u>{{ $isAr ? 'التسويات' : 'Settlements' }}</u></a>
                 @endif
                 @if(Route::has('wallet.index'))
-                    <a href="{{ route('wallet.index') }}" class="btn-link btn-link-hover"><u>Wallet</u></a>
+                    <a href="{{ route('wallet.index') }}" class="btn-link btn-link-hover"><u>{{ $isAr ? 'المحفظة' : 'Wallet' }}</u></a>
                 @endif
             </div>
         </div>
@@ -31,56 +31,56 @@
                     <span>{{ $roleScope['description'] }}</span>
                 </div>
                 <span class="badge {{ ($roleScope['can_bulk_manage'] ?? false) ? 'badge-success' : 'badge-light' }}">
-                    {{ ($roleScope['can_bulk_manage'] ?? false) ? 'Bulk management enabled' : 'Scoped view only' }}
+                    {{ ($roleScope['can_bulk_manage'] ?? false) ? ($isAr ? 'الإدارة الجماعية مفعّلة' : 'Bulk management enabled') : ($isAr ? 'عرض مقيّد حسب الدور' : 'Scoped view only') }}
                 </span>
             </div>
 
             <div class="row">
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>Customer Payments</span>
+                        <span>{{ $isAr ? 'مدفوعات العملاء' : 'Customer Payments' }}</span>
                         <strong>{{ $summary['customer_payments'] ?? 0 }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>Pending Payments</span>
+                        <span>{{ $isAr ? 'مدفوعات معلقة' : 'Pending Payments' }}</span>
                         <strong>{{ getPriceFormat($summary['pending_amount'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>Settlements</span>
+                        <span>{{ $isAr ? 'التسويات' : 'Settlements' }}</span>
                         <strong>{{ getPriceFormat($summary['settled_amount'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>Platform Commission</span>
+                        <span>{{ $isAr ? 'عمولة المنصة' : 'Platform Commission' }}</span>
                         <strong>{{ getPriceFormat($summary['platform_commission'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>Invoices</span>
+                        <span>{{ $isAr ? 'الفواتير' : 'Invoices' }}</span>
                         <strong>{{ $summary['paid_payments'] ?? 0 }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>VAT</span>
+                        <span>{{ $isAr ? 'ضريبة القيمة المضافة' : 'VAT' }}</span>
                         <strong>{{ getPriceFormat($summary['vat_amount'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>Refunds</span>
+                        <span>{{ $isAr ? 'المبالغ المستردة' : 'Refunds' }}</span>
                         <strong>{{ getPriceFormat($summary['refund_amount'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-payment-kpi">
-                        <span>Transaction History</span>
+                        <span>{{ $isAr ? 'إجمالي المعاملات' : 'Transaction Total' }}</span>
                         <strong>{{ getPriceFormat($summary['total_amount'] ?? 0) }}</strong>
                     </div>
                 </div>
@@ -89,25 +89,25 @@
             <div class="row">
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-wallet-kpi">
-                        <span>Current Balance</span>
+                        <span>{{ $isAr ? 'الرصيد الحالي' : 'Current Balance' }}</span>
                         <strong>{{ getPriceFormat($summary['wallet_current_balance'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-wallet-kpi">
-                        <span>Pending Balance</span>
+                        <span>{{ $isAr ? 'الرصيد المعلّق' : 'Pending Balance' }}</span>
                         <strong>{{ getPriceFormat($summary['wallet_pending_balance'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-wallet-kpi">
-                        <span>Released Balance</span>
+                        <span>{{ $isAr ? 'الرصيد المحرر' : 'Released Balance' }}</span>
                         <strong>{{ getPriceFormat($summary['wallet_released_balance'] ?? 0) }}</strong>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="sanad-wallet-kpi">
-                        <span>Upcoming Settlement</span>
+                        <span>{{ $isAr ? 'التسوية القادمة' : 'Upcoming Settlement' }}</span>
                         <strong>{{ getPriceFormat($summary['upcoming_settlement'] ?? 0) }}</strong>
                     </div>
                 </div>
@@ -117,8 +117,8 @@
                 <div class="col-xl-6 mb-3 mb-xl-0">
                     <div class="sanad-finance-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Settlement History</h5>
-                            <span class="text-muted">{{ $summary['settlements_count'] ?? 0 }} records</span>
+                            <h5 class="mb-0">{{ $isAr ? 'سجل التسويات' : 'Settlement History' }}</h5>
+                            <span class="text-muted">{{ $summary['settlements_count'] ?? 0 }} {{ $isAr ? 'سجل' : 'records' }}</span>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm mb-0 sanad-finance-table">
@@ -153,8 +153,8 @@
                 <div class="col-xl-6">
                     <div class="sanad-finance-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Transaction History</h5>
-                            <span class="text-muted">{{ $summary['total_payments'] ?? 0 }} payments</span>
+                            <h5 class="mb-0">{{ $isAr ? 'سجل المعاملات' : 'Transaction History' }}</h5>
+                            <span class="text-muted">{{ $summary['total_payments'] ?? 0 }} {{ $isAr ? 'دفعة' : 'payments' }}</span>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm mb-0 sanad-finance-table">
@@ -269,9 +269,39 @@
             color: #6c757d;
         }
 
-        .sanad-finance-table td {
-            vertical-align: middle;
-            white-space: nowrap;
-        }
-    </style>
-@endonce
+	        .sanad-finance-table td {
+	            vertical-align: middle;
+	            white-space: nowrap;
+	        }
+
+	        @media (max-width: 899px) {
+	            .sanad-payment-summary .card-body {
+	                padding: 16px;
+	            }
+
+	            .sanad-payment-summary .row {
+	                margin-left: -6px;
+	                margin-right: -6px;
+	            }
+
+	            .sanad-payment-summary [class*="col-"] {
+	                padding-left: 6px;
+	                padding-right: 6px;
+	            }
+
+	            .sanad-payment-summary .col-xl-6 {
+	                flex: 0 0 100%;
+	                max-width: 100%;
+	            }
+
+	            .sanad-finance-panel .table-responsive {
+	                overflow-x: auto;
+	                -webkit-overflow-scrolling: touch;
+	            }
+
+	            .sanad-finance-table {
+	                min-width: 560px;
+	            }
+	        }
+	    </style>
+	@endonce

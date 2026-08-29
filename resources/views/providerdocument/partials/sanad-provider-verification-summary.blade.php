@@ -7,8 +7,8 @@
         <div class="card sanad-provider-verification-summary">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
-                    <h4 class="font-weight-bold mb-1">Sanad Verification Review</h4>
-                    <span class="text-muted">Provider government document completion and approval status</span>
+                    @php $isAr = app()->getLocale() === 'ar'; @endphp<h4 class="font-weight-bold mb-1">{{ $isAr ? 'مراجعة التحقق من وثائق الشريك' : 'Quick Verification Review' }}</h4>
+                    <span class="text-muted">{{ $isAr ? 'اكتمال الوثائق الرسمية للشريك وحالة اعتمادها' : 'Provider government document completion and approval status' }}</span>
                 </div>
                 <span class="badge badge-light">{{ $summary['verification_status'] ?? 'Pending Review' }}</span>
             </div>
@@ -16,25 +16,25 @@
                 <div class="row">
                     <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
                         <div class="sanad-provider-verification-kpi">
-                            <span>Submitted Documents</span>
+                            <span>{{ $isAr ? 'الوثائق المقدمة' : 'Submitted Documents' }}</span>
                             <strong>{{ $summary['total_documents'] ?? 0 }}</strong>
                         </div>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
                         <div class="sanad-provider-verification-kpi">
-                            <span>Verified</span>
+                            <span>{{ $isAr ? 'معتمدة' : 'Verified' }}</span>
                             <strong>{{ $summary['verified_documents'] ?? 0 }}</strong>
                         </div>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
                         <div class="sanad-provider-verification-kpi">
-                            <span>Pending</span>
+                            <span>{{ $isAr ? 'معلقة' : 'Pending' }}</span>
                             <strong>{{ $summary['pending_documents'] ?? 0 }}</strong>
                         </div>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-0">
                         <div class="sanad-provider-verification-kpi">
-                            <span>Required Types</span>
+                            <span>{{ $isAr ? 'المستندات الإلزامية' : 'Required Types' }}</span>
                             <strong>{{ $summary['required_document_types'] ?? 0 }}</strong>
                         </div>
                     </div>

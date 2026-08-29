@@ -36,11 +36,11 @@
                 <table id="datatable" class="table table-striped border">
                     <thead>
                         <tr>
-                            <th>Comment</th>
-                            <th>Date</th>
-                            <th>file</th>
+                            @php $isAr = app()->getLocale() === 'ar'; @endphp<th>{{ $isAr ? 'التعليق' : 'Comment' }}</th>
+                            <th>{{ $isAr ? 'التاريخ' : 'Date' }}</th>
+                            <th>{{ $isAr ? 'الملف' : 'file' }}</th>
 
-                            <th>Added by</th>
+                            <th>{{ $isAr ? 'أضيف بواسطة' : 'Added by' }}</th>
 
                         </tr>
                         @foreach ($data->complaints_comment as $package)
@@ -50,7 +50,7 @@
                             <td>{{ $package->created_at }}</td>
                             <td>
                                 @if($package->file != "")
-                                <a class="btn btn-warning" href="{{asset($package->file)}}">File</a>
+                                <a class="btn btn-warning" href="{{asset($package->file)}}">{{ $isAr ? 'الملف' : 'File' }}</a>
                                 @endif
 
                             </td>
@@ -63,19 +63,19 @@
                     </thead>
                 </table>
 <hr>
-                  <h3>Reply</h3>
+                  <h3>{{ $isAr ? 'رد' : 'Reply' }}</h3>
                   <br>
                   <form action="{{ route('complaint.reply_submitComplaint', $data->id) }}" method="POST" enctype="multipart/form-data">
                       @csrf
                       <div class="form-group">
-                          <textarea placeholder="Reply" name="reply" class="form-control" rows="2" required></textarea>
+                          <textarea placeholder="{{ $isAr ? 'رد' : 'Reply' }}" name="reply" class="form-control" rows="2" required></textarea>
                       </div>
                       <br>
                       <div class="form-group">
                           <input type="file" name="file" class="form-control">
                       </div>
                       <br>
-                      <button type="submit" class="btn btn-primary mt-2">Send Reply</button>
+                      <button type="submit" class="btn btn-primary mt-2">Send {{ $isAr ? 'رد' : 'Reply' }}</button>
                   </form>
               </div>
             </div>

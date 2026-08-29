@@ -2,8 +2,86 @@
 
 @section('content')
 @php
-
+    $isArabic = app()->getLocale() === 'ar';
+    $service = $serviceData['service_detail'];
+    $serviceName = $isArabic ? ($service['name_ar'] ?? $service['name']) : ($service['name_en'] ?? $service['name']);
+    $serviceDescription = $isArabic ? ($service['description_ar'] ?? $service['description'] ?? '') : ($service['description_en'] ?? $service['description'] ?? '');
+    $requirements = collect($service['required_documents'] ?? [])->map(function ($document) use ($isArabic) {
+        if (is_string($document)) {
+            return $document;
+        }
+        return $isArabic ? ($document['name_ar'] ?? $document['name'] ?? $document['key'] ?? '') : ($document['name'] ?? $document['name_ar'] ?? $document['key'] ?? '');
+    })->filter()->values();
+    $governmentFee = (float) ($service['government_fee'] ?? 0);
+    $serviceFee = (float) ($service['service_fee'] ?? $subtotal ?? $service['price'] ?? 0);
+    $taxAmount = 0;
+    foreach (($serviceData['taxes'] ?? []) as $tax) {
+        $taxAmount += ($tax['type'] ?? null) === 'percent'
+            ? ($serviceFee * (float) ($tax['value'] ?? 0)) / 100
+            : (float) ($tax['value'] ?? 0);
+    }
+    $total = $governmentFee + $serviceFee + $taxAmount;
+    $categoryName = data_get($service, $isArabic ? 'category_name_ar' : 'category_name')
+        ?: data_get($service, 'category_name')
+        ?: ($isArabic ? 'الخدمات الحكومية' : 'Government services');
 @endphp
+
+<main class="quick-service-detail-page">
+    <div class="quick-service-detail-shell">
+        <div class="quick-service-detail-main">
+            <article class="quick-service-overview">
+                <div class="quick-service-kicker"><span>{{ $categoryName }}</span><small>{{ $service['government_entity'] ?? ($isArabic ? 'جهة حكومية معتمدة' : 'Verified government entity') }}</small></div>
+                <h1>{{ $serviceName }}</h1>
+                <p>{{ $serviceDescription ?: ($isArabic ? 'خدمة إلكترونية متكاملة تتيح تقديم الطلب ومتابعته بوضوح حتى الإنجاز.' : 'An end-to-end digital service with clear submission and tracking through completion.') }}</p>
+
+                <section class="quick-requirements" aria-labelledby="quick-requirements-title">
+                    <h2 id="quick-requirements-title"><x-quick-icon name="file" :size="19" /> {{ $isArabic ? 'المستندات والمتطلبات اللازمة للبدء' : 'Documents and requirements needed to start' }}</h2>
+                    <ul>
+                        @forelse($requirements as $requirement)
+                            <li><span><x-quick-icon name="check" :size="13" /></span>{{ $requirement }}</li>
+                        @empty
+                            <li><span><x-quick-icon name="check" :size="13" /></span>{{ $isArabic ? 'بيانات الهوية الوطنية ومعلومات مقدم الطلب' : 'National ID and applicant information' }}</li>
+                            <li><span><x-quick-icon name="check" :size="13" /></span>{{ $isArabic ? 'المستندات الداعمة حسب حالة الطلب' : 'Supporting documents based on the request type' }}</li>
+                        @endforelse
+                    </ul>
+                </section>
+            </article>
+
+            @if(!empty($serviceData['serviceaddon']))
+                <section class="quick-service-addons" aria-labelledby="quick-addons-title">
+                    <div><span>{{ $isArabic ? 'اختياري' : 'Optional' }}</span><h2 id="quick-addons-title">{{ $isArabic ? 'خدمات إضافية' : 'Additional services' }}</h2></div>
+                    <div class="quick-addon-grid">
+                        @foreach($serviceData['serviceaddon'] as $serviceaddon)
+                            <label class="quick-addon-card" for="serviceaddon-{{ $serviceaddon['id'] }}">
+                                <span><strong>{{ $serviceaddon['name'] }}</strong><small>{{ getPriceFormat($serviceaddon['price']) }}</small></span>
+                                <input class="form-check-input service-addon-checkbox" type="checkbox" id="serviceaddon-{{ $serviceaddon['id'] }}" data-addon-id="{{ $serviceaddon['id'] }}">
+                            </label>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+        </div>
+
+        <aside class="quick-fee-card" aria-labelledby="quick-fees-title">
+            <h2 id="quick-fees-title">{{ $isArabic ? 'تفاصيل الرسوم والإنجاز' : 'Fees and completion details' }}</h2>
+            <dl>
+                <div><dt>{{ $isArabic ? 'الرسوم الحكومية' : 'Government fees' }}</dt><dd>{{ getPriceFormat($governmentFee) }}</dd></div>
+                <div><dt>{{ $isArabic ? 'أتعاب التنفيذ والإنجاز' : 'Processing fee' }}</dt><dd>{{ getPriceFormat($serviceFee) }}</dd></div>
+                <div><dt>{{ $isArabic ? 'ضريبة القيمة المضافة' : 'VAT' }}</dt><dd>{{ getPriceFormat($taxAmount) }}</dd></div>
+                <div class="quick-fee-total"><dt>{{ $isArabic ? 'المجموع الكلي' : 'Total' }}</dt><dd>{{ getPriceFormat($total) }}</dd></div>
+            </dl>
+            @if(auth()->check() && in_array(auth()->user()->user_type, ['user', 'customer'], true))
+                <a class="quick-service-cta continue-button" href="{{ route('book.service', ['id' => $service['id']]) }}">{{ $isArabic ? 'طلب الخدمة الآن' : 'Request service now' }} <span>+</span></a>
+            @else
+                <a class="quick-service-cta" href="{{ route('login', ['service_id' => $service['id']]) }}">{{ $isArabic ? 'سجل الدخول لطلب الخدمة' : 'Sign in to request service' }} <span>+</span></a>
+            @endif
+            <p class="quick-completion-note"><x-quick-icon name="check" :size="15" /> {{ $isArabic ? 'متوسط مدة الإنجاز:' : 'Average completion:' }} {{ $service['estimated_completion_time'] ?? ($isArabic ? '4 ساعات عمل' : '4 business hours') }}</p>
+        </aside>
+    </div>
+</main>
+
+{{-- Legacy marketplace detail retained for data-reference during the remaining migration. --}}
+@if(false)
 
 <div class="section-padding service-detail">
     <div class="container">
@@ -73,7 +151,7 @@
 
                 @if($serviceData['serviceaddon'])
                     <div class="mt-5 pt-lg-5 pt-3">
-                    <h5 class="mb-3">{{__('landingpage.Add-ons')}}</h5>
+                    <h5 class="mb-3">{{ app()->getLocale() === 'ar' ? 'الخدمات الإضافية' : 'Additional Services' }}</h5>
                         @foreach($serviceData['serviceaddon'] as $serviceaddon)
                             <div class="mb-4 pb-4 border-bottom d-flex align-items-sm-center aling-items-center justify-content-between flex-sm-row flex-column gap-2">
                                 <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-3">
@@ -518,6 +596,7 @@
     </div>
 </div>
 
+@endif
 @endsection
 
 @section('after_script')

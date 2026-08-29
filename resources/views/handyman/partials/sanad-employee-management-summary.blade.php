@@ -7,60 +7,60 @@
         <div class="card sanad-employee-management-summary">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
-                    <h4 class="font-weight-bold mb-1">Sanad Employee Management</h4>
-                    <span class="text-muted">Employee capacity, workload, evidence, communication, and payment readiness</span>
+                    @php $isAr = app()->getLocale() === 'ar'; @endphp<h4 class="font-weight-bold mb-1">{{ $isAr ? 'إدارة موظفي كويك' : 'Quick Employee Management' }}</h4>
+                    <span class="text-muted">{{ $isAr ? 'طاقة الموظفين التشغيلية، أعباء العمل، الأدلة، التواصل، وجاهزية الصرف' : 'Employee capacity, workload, evidence, communication, and payment readiness' }}</span>
                 </div>
                 @if($auth_user->can('handyman add') && $list_status != 'unassigned' && $list_status != 'request')
-                    <a href="{{ route('handyman.create') }}" class="btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> Add Employee</a>
+                    <a href="{{ route('handyman.create') }}" class="btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> {{ $isAr ? 'إضافة موظف' : 'Add Employee' }}</a>
                 @endif
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-employee-admin-kpi" href="{{ route('handyman.index') }}">
-                            <span>Total Employees</span>
+                            <span>{{ $isAr ? 'إجمالي الموظفين' : 'Total Employees' }}</span>
                             <strong>{{ $summary['total_employees'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-employee-admin-kpi" href="{{ route('handyman.index', ['status' => 1]) }}">
-                            <span>Active Employees</span>
+                            <span>{{ $isAr ? 'الموظفون النشطون' : 'Active Employees' }}</span>
                             <strong>{{ $summary['active_employees'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-employee-admin-kpi" href="{{ route('handyman.pending', ['status' => 'pending']) }}">
-                            <span>Pending Employees</span>
+                            <span>{{ $isAr ? 'موظفون معلقون' : 'Pending Employees' }}</span>
                             <strong>{{ $summary['pending_employees'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-employee-admin-kpi" href="{{ route('sanad.requests.index', ['assignment_state' => 'assigned']) }}">
-                            <span>Assigned Tasks</span>
+                            <span>{{ $isAr ? 'المهام المسندة' : 'Assigned Tasks' }}</span>
                             <strong>{{ $summary['assigned_tasks'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
                         <a class="sanad-employee-admin-kpi" href="{{ route('sanad.requests.index', ['assignment_state' => 'unassigned']) }}">
-                            <span>Needs Employee</span>
+                            <span>{{ $isAr ? 'بحاجة إلى موظف' : 'Needs Employee' }}</span>
                             <strong>{{ $summary['unassigned_tasks'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
                         <a class="sanad-employee-admin-kpi" href="{{ route('sanad.requests.index', ['sanad_stage' => 'awaiting_quality_review']) }}">
-                            <span>Review Queue</span>
+                            <span>{{ $isAr ? 'قائمة المراجعة' : 'Review Queue' }}</span>
                             <strong>{{ $summary['review_tasks'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3 mb-xl-0">
                         <a class="sanad-employee-admin-kpi" href="{{ route('sanad.requests.index', ['action_state' => 'pending_documents']) }}">
-                            <span>Pending Evidence</span>
+                            <span>{{ $isAr ? 'أدلة معلقة' : 'Pending Evidence' }}</span>
                             <strong>{{ $summary['pending_evidence'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-0">
                         <a class="sanad-employee-admin-kpi" href="{{ route('sanad.requests.index', ['payment_state' => 'pending']) }}">
-                            <span>Pending Payment</span>
+                            <span>{{ $isAr ? 'مستحقات معلقة' : 'Pending Payment' }}</span>
                             <strong>{{ $summary['pending_payment_tasks'] ?? 0 }}</strong>
                         </a>
                     </div>

@@ -53,17 +53,27 @@ class SubCategoryController extends Controller
             })
 
 
-            ->editColumn('name', function($query){                
+            ->editColumn('name', function($query){
+                $nameEn = $query->name_en ?: $query->name;
                 if (auth()->user()->can('subcategory edit')) {
-                    $link = '<a class="btn-link btn-link-hover" href='.route('subcategory.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                    $link = '<a class="btn-link btn-link-hover" href='.route('subcategory.create', ['id' => $query->id]).'>'.$nameEn.'</a>';
                 } else {
-                    $link = $query->name; 
+                    $link = $nameEn;
                 }
                 return $link;
             })
+            ->editColumn('name_ar', function($query){
+                if (auth()->user()->can('subcategory edit') && !empty($query->name_ar)) {
+                    return '<a class="btn-link btn-link-hover" href='.route('subcategory.create', ['id' => $query->id]).' dir="rtl">'.$query->name_ar.'</a>';
+                }
+                return $query->name_ar ? '<span dir="rtl">'.$query->name_ar.'</span>' : '-';
+            })
 
             ->editColumn('category_id' , function ($query){
-                return ($query->category_id != null && isset($query->category)) ? $query->category->name : '-';
+                if ($query->category_id != null && isset($query->category)) {
+                    return app()->getLocale() === 'ar' && !empty($query->category->name_ar) ? $query->category->name_ar : ($query->category->name_en ?: $query->category->name);
+                }
+                return '-';
             })
             ->filterColumn('category_id',function($query,$keyword){
                 $query->whereHas('category',function ($q) use($keyword){
@@ -93,7 +103,7 @@ class SubCategoryController extends Controller
                 </div>';
             })
 
-            ->rawColumns(['action', 'status', 'check','is_featured','name'])
+            ->rawColumns(['action', 'status', 'check','is_featured','name','name_ar'])
             ->toJson();
     }
 
@@ -174,6 +184,7 @@ class SubCategoryController extends Controller
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $data['name'] = $request->name_en;
        
         $data['is_featured'] = 0;
         if($request->has('is_featured')){

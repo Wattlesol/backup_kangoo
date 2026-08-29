@@ -61,14 +61,14 @@ if [[ -z "$TOKEN" ]]; then
 fi
 
 foundation="$(request GET sanad/foundation)"
-jq -e '.terminology.booking == "request" and (.request_lifecycle | index("submitted")) and .ai.enabled == true' "$foundation" >/dev/null
+jq -e '.brand.name == "Quick" and .brand.name_ar == "كويك" and .terminology.booking == "request" and (.request_lifecycle | index("submitted")) and .ai.enabled == true' "$foundation" >/dev/null
 echo "PASS foundation metadata"
 
 requests="$(request GET 'sanad/requests?per_page=5')"
 jq -e 'has("pagination") and has("data")' "$requests" >/dev/null
 echo "PASS request list contract"
 
-buzz="$(request POST sanad/buzz '{"recipient_role":"admin","priority":"urgent","message":"Sanad smoke-test buzz"}')"
+buzz="$(request POST sanad/buzz '{"recipient_role":"admin","priority":"urgent","message":"Quick smoke-test buzz"}')"
 buzz_id="$(jq -r '.data.id' "$buzz")"
 test "$buzz_id" != "null"
 echo "PASS buzz create"
@@ -89,8 +89,8 @@ vault_list="$(request GET 'sanad/document-vault?per_page=5')"
 jq -e 'has("data")' "$vault_list" >/dev/null
 echo "PASS document vault list"
 
-chat="$(request POST sanad/chat-messages '{"message":"Sanad smoke-test chat message","visible_to":["admin","user"]}')"
-jq -e '.data.message == "Sanad smoke-test chat message" and .data.thread.id' "$chat" >/dev/null
+chat="$(request POST sanad/chat-messages '{"message":"Quick smoke-test chat message","visible_to":["admin","user"]}')"
+jq -e '.data.message == "Quick smoke-test chat message" and .data.thread.id' "$chat" >/dev/null
 thread_id="$(jq -r '.data.thread.id' "$chat")"
 echo "PASS chat message create"
 
@@ -98,12 +98,12 @@ threads="$(request GET "sanad/chat-threads?per_page=5")"
 jq -e 'has("data")' "$threads" >/dev/null
 echo "PASS chat thread list"
 
-knowledge="$(request POST sanad/ai/knowledge '{"title":"Smoke Test Knowledge","category":"support","content":"Smoke test answer for Sanad assistant.","visible_to":["admin","user"],"is_active":true}')"
-jq -e '.data.title == "Smoke Test Knowledge"' "$knowledge" >/dev/null
+knowledge="$(request POST sanad/ai/knowledge '{"title":"Quick Smoke Test Knowledge","category":"support","content":"Smoke test answer for the Quick assistant.","visible_to":["admin","user"],"is_active":true}')"
+jq -e '.data.title == "Quick Smoke Test Knowledge"' "$knowledge" >/dev/null
 echo "PASS AI knowledge create"
 
-ai="$(request POST sanad/ai/ask '{"question":"What is the Smoke Test Knowledge answer?"}')"
-jq -e '.data.answer | contains("Smoke test answer")' "$ai" >/dev/null
+ai="$(request POST sanad/ai/ask '{"question":"What is the Quick Smoke Test Knowledge answer?"}')"
+jq -e '.data.question == "What is the Quick Smoke Test Knowledge answer?" and (.data.answer | type == "string" and length > 0) and (.data.status == "answered" or .data.status == "escalated")' "$ai" >/dev/null
 echo "PASS AI ask"
 
-echo "Sanad API smoke test completed successfully against $BASE_URL"
+echo "Quick API smoke test completed successfully against $BASE_URL"

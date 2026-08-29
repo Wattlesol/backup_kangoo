@@ -19,24 +19,34 @@ class SanadVectorStoreService
         $this->deleteKnowledgeItemVectors($item);
         $item->chunks()->delete();
 
-        foreach ($this->chunk($item->content) as $index => $content) {
-            $embedding = $this->ai->embed($content, 'passage') ?: $this->localEmbedding($content);
-            $chunk = SanadAiKnowledgeChunk::create([
-                'knowledge_item_id' => $item->id,
-                'chunk_index' => $index,
-                'content' => $content,
-                'embedding' => $embedding,
-                'embedding_model' => config('sanad.ai.embedding_model') ?: 'local-hash',
-                'vector_id' => 'sanad-knowledge-' . $item->id . '-' . $index,
-                'metadata' => [
-                    'title' => $item->title,
-                    'category' => $item->category,
-                    'visible_to' => $item->visible_to,
-                    'source_url' => data_get($item->metadata, 'source_url'),
-                ],
-            ]);
+        $localizedContent = ['en' => $item->content];
+        if (trim((string) $item->content_ar) !== '') {
+            $localizedContent['ar'] = $item->content_ar;
+        }
 
-            $this->upsertChroma($chunk, $item);
+        $chunkIndex = 0;
+        foreach ($localizedContent as $language => $documentContent) {
+            foreach ($this->chunk($documentContent) as $content) {
+                $embedding = $this->ai->embed($content, 'passage') ?: $this->localEmbedding($content);
+                $chunk = SanadAiKnowledgeChunk::create([
+                    'knowledge_item_id' => $item->id,
+                    'chunk_index' => $chunkIndex,
+                    'content' => $content,
+                    'embedding' => $embedding,
+                    'embedding_model' => config('sanad.ai.embedding_model') ?: 'local-hash',
+                    'vector_id' => 'sanad-knowledge-' . $item->id . '-' . $language . '-' . $chunkIndex,
+                    'metadata' => [
+                        'language' => $language,
+                        'title' => $language === 'ar' ? ($item->title_ar ?: $item->title) : $item->title,
+                        'category' => $language === 'ar' ? ($item->category_ar ?: $item->category) : $item->category,
+                        'visible_to' => $item->visible_to,
+                        'source_url' => data_get($item->metadata, 'source_url'),
+                    ],
+                ]);
+
+                $this->upsertChroma($chunk, $item);
+                $chunkIndex++;
+            }
         }
     }
 
@@ -122,8 +132,8 @@ class SanadVectorStoreService
             return ['content' => 0.0, 'title' => 0.0];
         }
 
-        $titleHaystack = Str::lower($item->title . ' ' . $item->category);
-        $contentHaystack = Str::lower($item->title . ' ' . $item->content . ' ' . ($chunk->content ?? ''));
+        $titleHaystack = Str::lower(implode(' ', array_filter([$item->title, $item->title_ar, $item->category, $item->category_ar])));
+        $contentHaystack = Str::lower(implode(' ', array_filter([$item->title, $item->title_ar, $item->content, $item->content_ar, $chunk->content])));
 
         $titleMatches = 0;
         $contentMatches = 0;
@@ -278,6 +288,7 @@ class SanadVectorStoreService
                     'chunk_id' => $chunk->id,
                     'title' => $item->title,
                     'category' => $item->category ?: 'General',
+                    'language' => data_get($chunk->metadata, 'language', 'en'),
                     'visible_to' => implode(',', $item->visible_to ?: []),
                 ]],
             ]);

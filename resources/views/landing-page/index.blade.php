@@ -3,14 +3,14 @@
 @php
     $isArabic = app()->getLocale() === 'ar';
     $landingText = [
-        'section_1.title' => 'منصتك الفورية لإنجاز خدمات سند',
-        'section_1.description' => 'أنجز معاملاتك وخدماتك الحكومية والتجارية بثقة. سند يربطك بشركاء وموظفين مختصين لمتابعة الطلبات وتنفيذها بكفاءة.',
+        'section_1.title' => 'منصتك الفورية لإنجاز خدمات كويك',
+        'section_1.description' => 'أنجز معاملاتك وخدماتك الحكومية والتجارية بثقة. كويك يربطك بشركاء وموظفين مختصين لمتابعة الطلبات وتنفيذها بكفاءة.',
         'section_2.title' => 'التصنيفات الأكثر طلبًا',
         'section_3.title' => 'الخدمات الأعلى تقييمًا',
         'section_4.title' => 'الخدمات المميزة',
-        'section_5.title' => 'انضم إلى شبكة شركاء سند',
-        'section_5.description' => 'وسع أعمالك مع سند وقدم خدمات موثوقة للعملاء من خلال منصة منظمة وآمنة لإدارة الطلبات والتنفيذ.',
-        'section_6.title' => 'تابع خدماتك عبر تطبيق سند',
+        'section_5.title' => 'انضم إلى شبكة شركاء كويك',
+        'section_5.description' => 'وسع أعمالك مع كويك وقدم خدمات موثوقة للعملاء من خلال منصة منظمة وآمنة لإدارة الطلبات والتنفيذ.',
+        'section_6.title' => 'تابع خدماتك عبر تطبيق كويك',
         'section_6.description' => 'استعرض الخدمات، تابع حالة الطلبات، واستقبل التحديثات المهمة مباشرة من التطبيق.',
         'section_7.title' => 'تشغيل منظم وتجربة تنفيذ احترافية',
         'section_7.description' => 'تدفق عمل واضح يجمع التخطيط، الإسناد، المتابعة، والتحديثات الفورية لضمان تنفيذ الطلبات بجودة عالية.',
@@ -42,7 +42,67 @@
 @endphp
 
 <!-- Banner -->
-<div class="padding-top-bottom-90 bg-light">
+<section class="quick-landing-hero" id="home" aria-labelledby="quick-hero-title">
+    <div class="quick-hero-orbit" aria-hidden="true"></div>
+    <div class="quick-hero-copy">
+        <div class="quick-hero-badge">
+            <x-quick-icon name="bot" :size="18" />
+            {{ $isArabic ? 'مساعد كويك • خدمات تفهمك' : 'Quick Assistant • Services that understand' }}
+        </div>
+        <h1 id="quick-hero-title">
+            {{ $isArabic ? 'المعاملة الأذكى.' : 'The smarter service.' }}
+            <span>{{ $isArabic ? 'تبدأ بسؤال.' : 'Starts with a question.' }}</span>
+        </h1>
+        <form class="quick-hero-search" action="{{ route('service.list') }}" method="get">
+            <x-quick-icon name="search" :size="18" />
+            <input type="search" name="search" aria-label="{{ $isArabic ? 'ابحث عن خدمة' : 'Search services' }}" placeholder="{{ $isArabic ? 'ما الخدمة التي تريد إنجازها؟' : 'What service do you need?' }}">
+            <button type="submit">{{ $isArabic ? 'بحث' : 'Search' }}</button>
+        </form>
+        <p>{{ $isArabic ? 'مساعد ذكي يفهم احتياجك، يجهّز خطواتك، ويتابع معاملتك حتى الإنجاز — بسرعة ووضوح.' : 'An intelligent assistant that understands your need, prepares the steps, and follows the request through to completion.' }}</p>
+        <div class="quick-store-buttons" dir="ltr">
+            <a href="#app" aria-label="Download on the App Store"><x-quick-icon name="apple" :size="25" /><span><small>Download on the</small><strong>App Store</strong></span></a>
+            <a href="#app" aria-label="Get it on Google Play"><x-quick-icon name="play" :size="24" /><span><small>GET IT ON</small><strong>Google Play</strong></span></a>
+        </div>
+        <div class="quick-app-proof">
+            <span><strong>4.9</strong> {{ $isArabic ? 'تقييم التطبيق' : 'app rating' }}</span><i></i>
+            <span><strong>+12K</strong> {{ $isArabic ? 'معاملة منجزة' : 'completed' }}</span><i></i>
+            <span><strong>24/7</strong> {{ $isArabic ? 'متابعة فورية' : 'live updates' }}</span>
+        </div>
+    </div>
+    <div class="quick-device-stage" aria-label="{{ $isArabic ? 'تطبيق كويك على ثلاث شاشات' : 'Quick app shown on three devices' }}">
+        <div class="quick-phone quick-phone-side quick-phone-service">
+            <div class="quick-phone-island"></div><small>9:41</small>
+            <div class="quick-phone-card"><x-quick-icon name="car" :size="44" /></div>
+            <span>{{ $isArabic ? 'خدمة موثّقة' : 'Verified service' }}</span>
+            <h3>{{ $isArabic ? 'تجديد رخصة القيادة' : 'Driving licence renewal' }}</h3>
+            <p>{{ $isArabic ? 'ننجز إجراءات التجديد ونتابع الطلب.' : 'We manage renewal through issuance.' }}</p>
+            <button type="button">{{ $isArabic ? 'ابدأ الخدمة' : 'Start service' }}</button>
+        </div>
+        <div class="quick-phone quick-phone-main">
+            <div class="quick-phone-island"></div><small>9:41</small>
+            <div class="quick-phone-greeting">{{ $isArabic ? 'مرحباً، فيصل' : 'Hello, Faisal' }} <x-quick-icon name="check" :size="15" /></div>
+            <div class="quick-phone-feature"><span>{{ $isArabic ? 'أنجزها مع كويك' : 'Get it done with Quick' }}</span><strong>{{ $isArabic ? 'كل خدماتك في مكان واحد' : 'All your services in one place' }}</strong><x-quick-icon name="bot" :size="31" /></div>
+            <div class="quick-phone-search">{{ $isArabic ? 'ابحث عن خدمة…' : 'Find a service…' }} <x-quick-icon name="search" :size="14" /></div>
+            <h3>{{ $isArabic ? 'خدمات كويك' : 'Quick services' }}</h3>
+            <div class="quick-phone-tiles"><span><x-quick-icon name="car" :size="18" /></span><span><x-quick-icon name="file" :size="18" /></span><span><x-quick-icon name="shield" :size="18" /></span></div>
+        </div>
+        <div class="quick-phone quick-phone-side quick-phone-track">
+            <div class="quick-phone-island"></div><small>9:41</small>
+            <div class="quick-track-icon"><x-quick-icon name="bot" :size="25" /></div>
+            <span>{{ $isArabic ? 'مساعد كويك يتابع طلبك' : 'Quick Assistant is following up' }}</span>
+            <h3>{{ $isArabic ? 'متوقع الإنجاز غداً' : 'Expected tomorrow' }}</h3>
+            <p>#QK-2841</p>
+            <ol><li>{{ $isArabic ? 'تم استلام الطلب' : 'Request received' }}</li><li>{{ $isArabic ? 'مراجعة المستندات' : 'Document review' }}</li><li>{{ $isArabic ? 'الإصدار والتسليم' : 'Issuance and delivery' }}</li></ol>
+        </div>
+    </div>
+</section>
+
+@include('landing-page.partials._quick_sections')
+
+{{-- Retained temporarily for administrative content migration; superseded by the approved Quick composition. --}}
+@if(false)
+
+<div class="padding-top-bottom-90 bg-light d-none legacy-landing-banner" aria-hidden="true">
     <div class="container-fluid">
        <div class="row align-items-center">
           <div class="col-xl-6">
@@ -144,7 +204,7 @@
                 </h3>
             </div>
             <a href="{{ route('category.list') }}"
-                class="btn btn-link p-0 text-capitalize flex-shrink-0 font-size-14">{{__('messages.view_all')}}</a>
+                class="btn btn-link p-0 text-capitalize flex-shrink-0 font-size-14">{{ $isArabic ? 'عرض الكل' : 'View All' }}</a>
         </div>
         <category-section></category-section>
     </div>
@@ -171,7 +231,7 @@
                     </div>
                     </h3>
                 </div>
-                <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{__('messages.view_all')}}</a>
+                <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{ $isArabic ? 'عرض الكل' : 'View All' }}</a>
             </div>
 
             {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'ac'"/> --}}
@@ -184,7 +244,7 @@
                         <div>
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                 <div class="iq-title-box mb-0">
-                                    <h3 class="text-capitalize line-count-1">{{ $isArabic ? $landingText['package_list'] : 'Package List' }}
+                                    <h3 class="text-capitalize line-count-1">{{ $isArabic ? 'باقات الخدمات' : 'Service Bundles' }}
                                         <div class="highlighted-text">
                                             <span class="highlighted-text-swipe"></span>
                                             <span class="highlighted-image">
@@ -213,7 +273,7 @@
                                         <span class="badge bg-danger position-absolute top-0 start-0 m-2">{{ $isArabic ? $landingText['special_offer'] : 'Special Offer' }}</span>
 
                                         <!-- Card Content -->
-                                        <h5 class="card-title">{{ $vaule->name }}</h5>
+                                        <h5 class="card-title">{{ $isArabic && $vaule->name_ar ? $vaule->name_ar : $vaule->name }}</h5>
                                         <p class="card-text">{{ $vaule->description }}</p>
                                         <div class="mb-3">
                                             @if($vaule->original_price > $vaule->price)
@@ -251,7 +311,7 @@
                         </div>
                     </h3>
                     </div>
-                    <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{__('messages.view_all')}}</a>
+                    <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{ $isArabic ? 'عرض الكل' : 'View All' }}</a>
                 </div>
                 {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'cleaning'"/> --}}
                 <div class="text-center p-4">{{ $isArabic ? $landingText['featured_services_section'] : 'Featured Services Section' }}</div>
@@ -538,6 +598,7 @@
 @endif
 
 
+@endif
 @endsection
 @section('bottom_script')
 <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>

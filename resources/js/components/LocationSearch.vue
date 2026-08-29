@@ -291,7 +291,10 @@ return categoryIds.map(categoryId => getCategoryName(categoryId)).join(', ');
 const getCategoryName = (categoryId) => {
 const categoryValues = Object.values(categories.value);
 const category = categoryValues.find(cat => String(cat.id) === String(categoryId));
-return category ? category.name : '';
+if (!category) return '';
+const isAr = (document.documentElement.lang === 'ar' || window.currentLocale === 'ar' || document.documentElement.dir === 'rtl');
+if (isAr && category.name_ar) return category.name_ar;
+return category.name;
 };
 const getServices = async () => {
 try {
@@ -441,6 +444,13 @@ console.error('Error fetching landing page settings:', error);
 function getJsonValue(jsonString, key) {
 try {
 const parsedJson = JSON.parse(jsonString);
+const isAr = (document.documentElement.lang === 'ar' || window.currentLocale === 'ar' || document.documentElement.dir === 'rtl');
+if (isAr && key === 'title' && parsedJson['title_ar']) {
+    return parsedJson['title_ar'];
+}
+if (isAr && key === 'description' && parsedJson['description_ar']) {
+    return parsedJson['description_ar'];
+}
 return parsedJson[key];
 } catch (error) {
 console.error('Error parsing JSON:', error);

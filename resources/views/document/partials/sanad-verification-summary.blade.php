@@ -7,49 +7,49 @@
         <div class="card sanad-verification-summary">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
-                    <h4 class="font-weight-bold mb-1">Sanad Government Verification</h4>
-                    <span class="text-muted">Required document rules, provider submissions, and verification readiness</span>
+                    @php $isAr = app()->getLocale() === 'ar'; @endphp<h4 class="font-weight-bold mb-1">{{ $isAr ? 'التحقق الحكومي لمنصة كويك' : 'Quick Government Verification' }}</h4>
+                    <span class="text-muted">{{ $isAr ? 'شروط المستندات المطلوبة، ملفات الشركاء، وجاهزية التحقق' : 'Required document rules, provider submissions, and verification readiness' }}</span>
                 </div>
                 @if($auth_user->can('document add'))
-                    <a href="{{ route('document.create') }}" class="btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> Add Document Type</a>
+                    <a href="{{ route('document.create') }}" class="btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> {{ $isAr ? 'إضافة نوع مستند' : 'Add Document Type' }}</a>
                 @endif
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-verification-kpi" href="{{ route('document.index') }}">
-                            <span>Document Types</span>
+                            <span>{{ $isAr ? 'أنواع المستندات' : 'Document Types' }}</span>
                             <strong>{{ $summary['active_document_types'] ?? 0 }}/{{ $summary['document_types'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-verification-kpi" href="{{ route('document.index') }}">
-                            <span>Required Types</span>
+                            <span>{{ $isAr ? 'المستندات الإلزامية' : 'Required Types' }}</span>
                             <strong>{{ $summary['required_document_types'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-verification-kpi" href="{{ route('provider.index') }}">
-                            <span>Verified Partners</span>
+                            <span>{{ $isAr ? 'الشركاء المعتمدون' : 'Verified Partners' }}</span>
                             <strong>{{ $summary['verified_partners'] ?? 0 }}/{{ $summary['partners'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-3 col-md-6 mb-3">
                         <a class="sanad-verification-kpi" href="{{ route('provider.index') }}">
-                            <span>Pending Provider Docs</span>
+                            <span>{{ $isAr ? 'وثائق شركاء قيد المراجعة' : 'Pending Provider Docs' }}</span>
                             <strong>{{ $summary['pending_provider_documents'] ?? 0 }}</strong>
                         </a>
                     </div>
                     <div class="col-xl-6 col-md-6 mb-3 mb-xl-0">
                         <div class="sanad-verification-note">
-                            <span>Verified Provider Documents</span>
+                            <span>{{ $isAr ? 'وثائق شركاء معتمدة' : 'Verified Provider Documents' }}</span>
                             <strong>{{ $summary['verified_provider_documents'] ?? 0 }}/{{ $summary['provider_documents'] ?? 0 }}</strong>
                         </div>
                     </div>
                     <div class="col-xl-6 col-md-6 mb-0">
                         <div class="sanad-verification-note">
-                            <span>Verification Control</span>
-                            <strong>Admin review and required document toggles enabled</strong>
+                            <span>{{ $isAr ? 'التحكم بالتحقق' : 'Verification Control' }}</span>
+                            <strong>{{ $isAr ? 'مراجعة الإدارة ومفاتيح المستندات الإلزامية مفعلة' : 'Admin review and required document toggles enabled' }}</strong>
                         </div>
                     </div>
                 </div>

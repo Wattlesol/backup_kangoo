@@ -18,7 +18,15 @@
                 $serviceconfig = $settings->has('service-configurations') ? json_decode($settings['service-configurations']->value) : null;
                 $othersetting = $settings->has('OTHER_SETTING') ? json_decode($settings['OTHER_SETTING']->value) : null;
         @endphp
-         @if ($sectionData && isset($sectionData['header_setting']) && $sectionData['header_setting'] == 1)
+        @if(request()->routeIs('frontend.index'))
+        <ul class="navbar-nav iq-nav-menu list-unstyled quick-landing-nav" id="header-menu">
+            <li class="nav-item"><a class="nav-link active" href="#home">{{ app()->getLocale() === 'ar' ? 'الرئيسية' : 'Home' }}</a></li>
+            <li class="nav-item"><a class="nav-link" href="#services">{{ app()->getLocale() === 'ar' ? 'الخدمات' : 'Services' }}</a></li>
+            <li class="nav-item"><a class="nav-link" href="#how">{{ app()->getLocale() === 'ar' ? 'كيف تعمل؟' : 'How it works' }}</a></li>
+            <li class="nav-item"><a class="nav-link" href="#trust">{{ app()->getLocale() === 'ar' ? 'الأمان' : 'Security' }}</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ route('user.help_support') }}">{{ app()->getLocale() === 'ar' ? 'الدعم' : 'Support' }}</a></li>
+        </ul>
+        @elseif ($sectionData && isset($sectionData['header_setting']) && $sectionData['header_setting'] == 1)
         <ul class="navbar-nav iq-nav-menu list-unstyled" id="header-menu">
             @if($sectionData['home'] == 1)
             <li class="nav-item">
@@ -59,7 +67,7 @@
             </li>
             @endif --}}
         </ul>
-    @endif
+        @endif
     </div>
     <!-- container-fluid.// -->
 </nav>

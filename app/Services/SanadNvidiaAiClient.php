@@ -11,13 +11,13 @@ class SanadNvidiaAiClient
     public function chat(array $messages, array $options = []): array
     {
         $primaryModel = $options['model'] ?? config('sanad.ai.model', 'nvidia/nemotron-3.5-lightning-30b-a3b');
-        $fallbackModels = $options['fallback_models'] ?? ['nvidia/nemotron-3.5-lightning-30b-a3b', 'meta/llama-3.1-70b-instruct'];
+        $fallbackModels = $options['fallback_models'] ?? config('sanad.ai.fallback_models', []);
         $modelsToTry = array_unique(array_filter(array_merge([$primaryModel], $fallbackModels ?: [])));
 
         $payload = [
             'messages' => $messages,
             'temperature' => (float) ($options['temperature'] ?? config('sanad.ai.temperature', 0.2)),
-            'max_tokens' => (int) ($options['max_tokens'] ?? config('sanad.ai.max_tokens', 2048)),
+            'max_tokens' => (int) ($options['max_tokens'] ?? config('sanad.ai.max_tokens', 900)),
         ];
         foreach (['top_p', 'reasoning_effort', 'chat_template_kwargs'] as $optionKey) {
             if (array_key_exists($optionKey, $options)) {
@@ -52,7 +52,9 @@ class SanadNvidiaAiClient
         $reasoning = (string) data_get($message, 'reasoning_content', '');
 
         // If content is empty or contains prompt/thinking echoes, clean it up using parseNemotronResponse
-        $cleanContent = $this->parseNemotronResponse($content);
+        $cleanContent = ($options['parse_response'] ?? true)
+            ? $this->parseNemotronResponse($content)
+            : trim($content);
 
         return [
             'content' => $cleanContent !== '' ? $cleanContent : trim($content),
@@ -143,8 +145,10 @@ class SanadNvidiaAiClient
             throw new RuntimeException('NVIDIA_API_KEY is not configured.');
         }
 
-        return Http::timeout(45)
-            ->retry(2, 500)
+        // Keep the interactive request bounded. The RAG service already has a
+        // deterministic fallback, so retrying multiple slow models only makes
+        // the browser look frozen and can exceed reverse-proxy timeouts.
+        return Http::timeout((int) config('sanad.ai.chat_timeout', 55))
             ->acceptJson()
             ->withToken($apiKey);
     }

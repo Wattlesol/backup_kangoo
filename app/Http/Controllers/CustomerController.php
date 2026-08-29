@@ -394,11 +394,10 @@ class CustomerController extends Controller
 
         $user = \Auth::user();
 
-        if($request->login == 'user_login' && $user->user_type === 'user'){
-            // For customer login, check if there's an intended URL (e.g., checkout page)
-            return redirect()->intended(RouteServiceProvider::FRONTEND);
+        if($request->login == 'user_login' && in_array($user->user_type, ['user', 'customer'], true)){
+            return redirect()->intended(route('customer-portal.dashboard'));
         }
-        elseif($request->login == 'user_login' && $user->user_type !== 'user') {
+        elseif($request->login == 'user_login' && !in_array($user->user_type, ['user', 'customer'], true)) {
             Auth::logout();
             return redirect()->back()->withErrors(['message' => 'You are not allowed to log in from here.']);
         }

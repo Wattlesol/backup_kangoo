@@ -18,7 +18,7 @@ pass() {
 cd "$(dirname "$0")/.."
 
 grep -Fq "Fallback to human support" resources/views/sanad/ai-console.blade.php || fail "AI console missing fallback policy"
-grep -Fq "Needs human review by Sanad support" resources/views/sanad/ai-console.blade.php || fail "AI console missing escalation note"
+grep -Fq "Needs human review by Quick operations" resources/views/sanad/ai-console.blade.php || fail "AI console missing Quick escalation note"
 pass "AI console has visible fallback and escalation wording"
 
 php -l app/Http/Controllers/API/SanadController.php
@@ -52,7 +52,7 @@ else
     --data "{\"question\":\"$unique_question\"}")"
 
   [[ "$ai_code" -ge 200 && "$ai_code" -lt 300 ]] || fail "AI ask returned HTTP ${ai_code}"
-  jq -e '.data.requires_escalation == true and .data.status == "escalated" and (.data.answer | contains("Sanad support team"))' "$ai_response" >/dev/null
+  jq -e '.data.requires_escalation == true and .data.status == "escalated" and (.data.answer | contains("Quick operations team"))' "$ai_response" >/dev/null
   pass "API low-confidence AI question escalates to support"
 fi
 

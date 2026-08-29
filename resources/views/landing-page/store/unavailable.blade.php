@@ -11,10 +11,10 @@
                     <div class="mb-4">
                         <i class="fas fa-store-slash fa-5x text-muted"></i>
                     </div>
-                    <h1 class="h2 fw-bold text-dark mb-3">Store Unavailable</h1>
+                    @php $isAr = app()->getLocale() === 'ar'; @endphp<h1 class="h2 fw-bold text-dark mb-3">{{ $isAr ? 'المتجر غير متاح' : 'Store Unavailable' }}</h1>
                     <p class="text-muted mb-4">{{ $message }}</p>
                     <a href="{{ url('/') }}" class="btn btn-primary">
-                        <i class="fas fa-home"></i> Go Home
+                        <i class="fas fa-home"></i> {{ $isAr ? 'العودة للرئيسية' : 'Go Home' }}
                     </a>
                 </div>
             </div>

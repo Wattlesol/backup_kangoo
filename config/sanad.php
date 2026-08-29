@@ -1,6 +1,16 @@
 <?php
 
 return [
+    'brand' => [
+        'name' => 'Quick',
+        'name_ar' => 'كويك',
+        'tagline_ar' => 'لإنجاز المعاملات الحكومية',
+    ],
+
+    'ui' => [
+        'quick_public_shell' => true,
+    ],
+
     'terminology' => [
         'booking' => 'request',
         'bookings' => 'requests',
@@ -64,7 +74,13 @@ return [
         'ocr_model' => env('NVIDIA_AI_OCR_MODEL', env('NVIDIA_AI_MODEL', 'nvidia/nemotron-3.5-lightning-30b-a3b')),
         'embedding_model' => env('NVIDIA_AI_EMBEDDING_MODEL', 'nvidia/nv-embedqa-e5-v5'),
         'temperature' => env('SANAD_AI_TEMPERATURE', 0.2),
-        'max_tokens' => env('SANAD_AI_MAX_TOKENS', 2048),
+        'max_tokens' => env('SANAD_AI_MAX_TOKENS', 900),
+        'chat_timeout' => env('SANAD_AI_CHAT_TIMEOUT', 55),
+        'fallback_models' => array_values(array_filter(array_map('trim', explode(',', env('NVIDIA_AI_FALLBACK_MODELS', ''))))),
+        'translation_ollama_fallback' => env('SANAD_TRANSLATION_OLLAMA_FALLBACK', false),
+        'translation_ollama_only' => env('SANAD_TRANSLATION_OLLAMA_ONLY', false),
+        'translation_ollama_url' => env('SANAD_TRANSLATION_OLLAMA_URL', 'http://127.0.0.1:11434'),
+        'translation_ollama_model' => env('SANAD_TRANSLATION_OLLAMA_MODEL', 'llama3.1:8b'),
         'requires_escalation_when_confidence_below' => env('SANAD_AI_ESCALATION_THRESHOLD', 0.65),
         'vector_store' => env('SANAD_VECTOR_STORE', 'database'),
         'chunk_size' => env('SANAD_RAG_CHUNK_SIZE', 900),

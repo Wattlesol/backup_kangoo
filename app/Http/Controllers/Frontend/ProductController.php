@@ -211,7 +211,7 @@ class ProductController extends Controller
 
         $product = Product::with(['store', 'category'])->findOrFail($productId);
 
-        $pageTitle = 'Checkout - ' . $product->name;
+        $pageTitle = (app()->getLocale() === 'ar' ? 'إتمام الطلب - ' : 'Checkout - ') . $product->name;
 
         return view('landing-page.products.checkout', compact('product', 'quantity', 'pageTitle'));
     }
@@ -331,7 +331,7 @@ class ProductController extends Controller
                      ->where('customer_id', $user->id)
                      ->findOrFail($id);
 
-        $pageTitle = 'Order Details - #' . $order->order_number;
+        $pageTitle = (app()->getLocale() === 'ar' ? 'تفاصيل الطلب - #' : 'Order Details - #') . $order->order_number;
 
         return view('landing-page.products.order-detail', compact('order', 'pageTitle'));
     }
@@ -413,7 +413,7 @@ class ProductController extends Controller
             return redirect()->route('frontend.index')->with('error', 'Orders not found');
         }
 
-        $pageTitle = 'Order Success';
+        $pageTitle = app()->getLocale() === 'ar' ? 'تم استلام طلبك بنجاح' : 'Order Success';
 
         return view('landing-page.products.order-success', compact('orders', 'pageTitle'));
     }
@@ -440,7 +440,7 @@ class ProductController extends Controller
                           ->first();
         }
 
-        $pageTitle = 'Payment Failed';
+        $pageTitle = app()->getLocale() === 'ar' ? 'فشلت عملية الدفع' : 'Payment Failed';
 
         return view('landing-page.products.payment-failed', compact('order', 'pageTitle'));
     }
@@ -453,7 +453,7 @@ class ProductController extends Controller
         $latitude = $request->get('latitude');
         $longitude = $request->get('longitude');
 
-        $pageTitle = 'Stores';
+        $pageTitle = __('messages.store');
 
         return view('landing-page.stores.index', compact('pageTitle', 'latitude', 'longitude'));
     }
@@ -635,8 +635,8 @@ class ProductController extends Controller
 
         if (!$mainStore || !$mainStore->is_active) {
             return view('landing-page.store.unavailable', [
-                'pageTitle' => 'Store Unavailable',
-                'message' => 'The store is currently unavailable. Please check back later.'
+                'pageTitle' => app()->getLocale() === 'ar' ? 'المتجر غير متاح' : 'Store Unavailable',
+                'message' => app()->getLocale() === 'ar' ? 'المتجر غير متاح حالياً. يرجى التحقق مرة أخرى لاحقاً.' : 'The store is currently unavailable. Please check back later.'
             ]);
         }
 

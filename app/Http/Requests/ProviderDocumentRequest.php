@@ -26,8 +26,11 @@ class ProviderDocumentRequest extends FormRequest
     public function rules()
     {
         return [
-            'document_id'              => 'required',
-            'provider_document'        => 'mimes:jpg,jpeg,png,pdf,docx'
+            'id'                       => 'nullable|integer',
+            'provider_id'              => 'nullable|integer|exists:users,id',
+            'document_id'              => 'required|integer|exists:documents,id',
+            'is_verified'              => 'nullable|boolean',
+            'provider_document'        => 'nullable|file|mimes:jpg,jpeg,png,pdf,docx|max:10240'
         ];
     }
 

@@ -18,6 +18,7 @@ use App\Models\SanadCustomerComplaint;
 use App\Models\SanadDocumentRequest;
 use App\Models\SanadDocumentVaultItem;
 use App\Models\Service;
+use App\Models\ServicePackage;
 use App\Models\User;
 use App\Services\SanadDocumentOcrAgent;
 use App\Services\SanadAiFirstResponderService;
@@ -25,6 +26,7 @@ use App\Services\SanadAiRagService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -32,6 +34,16 @@ use Illuminate\Support\Str;
 
 class SanadCustomerPortalController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $user = Auth::user();
+            abort_unless($user && in_array($user->user_type, ['user', 'customer'], true), 403);
+
+            return $next($request);
+        });
+    }
+
     public function dashboard()
     {
         $user = $this->customer();
@@ -60,6 +72,15 @@ class SanadCustomerPortalController extends Controller
         $categories = Category::where('status', 1)->orderBy('display_order')->orderBy('name')->get();
         $services = Service::with(['category', 'subcategory'])
             ->where('status', 1)
+            ->when($request->type === 'single', fn ($query) => $query->whereDoesntHave('servicePackage'))
+            ->when($request->type === 'bundle', fn ($query) => $query->whereHas('servicePackage'))
+            ->when($request->type === 'recurring', function ($query) {
+                $recurringPackageIds = ServicePackage::query()
+                    ->where('status', 1)
+                    ->where('package_type', 'recurring')
+                    ->pluck('id');
+                $query->whereHas('servicePackage', fn ($mapping) => $mapping->whereIn('service_package_id', $recurringPackageIds));
+            })
             ->when($request->category_id, fn ($query) => $query->where('category_id', $request->category_id))
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -80,26 +101,28 @@ class SanadCustomerPortalController extends Controller
     public function service(Service $service)
     {
         $service->load(['category', 'subcategory', 'serviceAddon']);
+        $docs = collect($service->required_documents ?: []);
         $relatedServices = Service::where('status', 1)
             ->where('id', '!=', $service->id)
             ->where('category_id', $service->category_id)
             ->take(4)
             ->get();
 
-        return view('customer-portal.service-show', compact('service', 'relatedServices'));
+        return view('customer-portal.service-show', compact('service', 'docs', 'relatedServices'));
     }
 
     public function createRequest(Request $request)
     {
-        $service = $request->service_id ? Service::where('status', 1)->findOrFail($request->service_id) : null;
+        $selectedService = $request->service_id ? Service::where('status', 1)->findOrFail($request->service_id) : null;
         $services = Service::where('status', 1)->orderBy('name')->get();
+        $docs = collect(optional($selectedService)->required_documents ?: []);
         $vaultDocuments = SanadDocumentVaultItem::where('owner_id', Auth::id())
             ->whereNull('booking_id')
             ->where('source', 'vault')
             ->latest()
             ->get();
 
-        return view('customer-portal.request-create', compact('service', 'services', 'vaultDocuments'));
+        return view('customer-portal.request-create', compact('selectedService', 'services', 'docs', 'vaultDocuments'));
     }
 
     public function storeRequest(Request $request)
@@ -208,8 +231,13 @@ class SanadCustomerPortalController extends Controller
         $thread = $this->customerThread($booking);
         $complaints = SanadCustomerComplaint::where('booking_id', $booking->id)->latest()->get();
         $vaultDocuments = SanadDocumentVaultItem::where('owner_id', Auth::id())->where('source', 'vault')->latest()->get();
+        $stage = $booking->sanad_stage ?: $booking->status ?: 'submitted';
+        $progress = in_array($stage, ['completed', 'closed'], true)
+            ? 100
+            : (['submitted' => 15, 'pending_review' => 25, 'assigned_to_partner' => 40, 'assigned_to_employee' => 55, 'in_progress' => 70, 'awaiting_customer_action' => 65, 'awaiting_quality_review' => 85, 'escalated' => 60][$stage] ?? 20);
+        $docs = collect(optional($booking->service)->required_documents ?: []);
 
-        return view('customer-portal.request-show', compact('booking', 'thread', 'complaints', 'vaultDocuments'));
+        return view('customer-portal.request-show', compact('booking', 'thread', 'complaints', 'vaultDocuments', 'stage', 'progress', 'docs'));
     }
 
     public function uploadRequestDocument(Request $request, $id)
@@ -353,8 +381,8 @@ class SanadCustomerPortalController extends Controller
             'ocr_status' => $analysis['ocr_status'],
             'ocr_confidence' => $analysis['ocr_confidence'],
             'message' => $expiryDate
-                ? 'Sanad AI found an expiry date. Please confirm before saving.'
-                : ($analysis['message'] ?: 'Sanad AI could not find an expiry date. Please set a follow-up reminder before saving.'),
+                ? 'Quick AI found an expiry date. Please confirm before saving.'
+                : ($analysis['message'] ?: 'Quick AI could not find an expiry date. Please set a follow-up reminder before saving.'),
         ]);
     }
 
@@ -504,7 +532,7 @@ class SanadCustomerPortalController extends Controller
             return back()
                 ->withInput($request->except(['file']))
                 ->withErrors([
-                    'file' => 'Sanad AI could not detect an expiry date. Please upload a clearer replacement where the expiry date is visible, or enter the expiry date manually.',
+                    'file' => 'Quick AI could not detect an expiry date. Please upload a clearer replacement where the expiry date is visible, or enter the expiry date manually.',
                 ]);
         }
 
@@ -694,10 +722,10 @@ class SanadCustomerPortalController extends Controller
         $documentRequests = $booking->sanadDocumentRequests()->with('document')->latest()->get();
         $requiredDocuments = $booking->service
             ? collect($booking->service->required_documents ?: [])->map(function ($doc) {
-                $name = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
+                $storedName = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
                 return [
-                    'key' => is_array($doc) ? ($doc['key'] ?? Str::slug($name, '_')) : Str::slug($name, '_'),
-                    'name' => $name,
+                    'key' => is_array($doc) ? ($doc['key'] ?? Str::slug($storedName, '_')) : Str::slug($storedName, '_'),
+                    'name' => localized_service_document_name($doc),
                 ];
             })->values()
             : collect();
@@ -742,7 +770,7 @@ class SanadCustomerPortalController extends Controller
                 'id' => 'msg-' . $message->id,
                 'timestamp' => optional($message->created_at)->timestamp ?: 0,
                 'created_at' => optional($message->created_at)->format('Y-m-d H:i'),
-                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender' => $message->sender_role === 'system' ? 'Quick AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
                 'sender_role' => $message->sender_role,
                 'message' => $message->message,
                 'message_type' => $message->message_type ?: 'text',
@@ -758,7 +786,7 @@ class SanadCustomerPortalController extends Controller
             'status' => true,
             'request' => [
                 'id' => $booking->id,
-                'reference' => $booking->sanad_reference ?: '#' . $booking->id,
+                'reference' => $booking->quick_reference,
                 'customer' => optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'Customer',
                 'avatar' => Str::upper(Str::substr(optional($booking->customer)->display_name ?: optional($booking->customer)->email ?: 'C', 0, 1)),
                 'service' => optional($booking->service)->name ?: 'No service',
@@ -789,7 +817,7 @@ class SanadCustomerPortalController extends Controller
             'timeline' => $timelineData,
             'messages' => $visibleMessages->map(fn ($message) => [
                 'id' => $message->id,
-                'sender' => $message->sender_role === 'system' ? 'Sanad AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
+                'sender' => $message->sender_role === 'system' ? 'Quick AI' : (optional($message->sender)->display_name ?: Str::headline($message->sender_role ?: 'system')),
                 'sender_role' => $message->sender_role,
                 'message' => $message->message,
                 'message_type' => $message->message_type ?: 'text',
@@ -947,12 +975,15 @@ class SanadCustomerPortalController extends Controller
 
     public function notifications()
     {
+        $accessibleRequestIds = $this->customerRequests($this->customer())->pluck('id');
+
         return view('customer-portal.notifications', [
             'notifications' => Auth::user()->notifications()->latest()->paginate(20),
-            'buzzAlerts' => SanadBuzzAlert::where(function ($query) {
-                $query->where('recipient_id', Auth::id())
-                    ->orWhereIn('recipient_role', ['user', 'customer']);
-            })->latest()->paginate(10),
+            'buzzAlerts' => SanadBuzzAlert::whereIn('booking_id', $accessibleRequestIds)
+                ->where(function ($query) {
+                    $query->where('recipient_id', Auth::id())
+                        ->orWhereIn('recipient_role', ['user', 'customer']);
+                })->latest()->paginate(10),
         ]);
     }
 
@@ -1017,6 +1048,19 @@ class SanadCustomerPortalController extends Controller
 
     private function complaintTypes(): array
     {
+        if (app()->getLocale() === 'ar') {
+            return [
+                'document_issue' => 'مشكلة في المستندات',
+                'payment_billing' => 'الدفع أو الفوترة',
+                'request_delay' => 'تأخر الطلب',
+                'status_update' => 'تحديث حالة الطلب',
+                'service_quality' => 'جودة الخدمة',
+                'communication_issue' => 'مشكلة في التواصل',
+                'incorrect_information' => 'معلومات غير صحيحة',
+                'other' => 'أخرى',
+            ];
+        }
+
         return [
             'document_issue' => 'Document Issue',
             'payment_billing' => 'Payment / Billing',
@@ -1064,7 +1108,7 @@ class SanadCustomerPortalController extends Controller
         }
         $this->audit('customer_ai_question_asked', $interaction, ['booking_id' => optional($booking)->id]);
 
-        return back()->withSuccess('Sanad AI response generated.');
+        return back()->withSuccess('Quick AI response generated.');
     }
 
     public function handleAiHandover(Request $request, $id, SanadAiFirstResponderService $firstResponder)
@@ -1086,18 +1130,54 @@ class SanadCustomerPortalController extends Controller
                 'status' => true,
                 'decision' => $data['decision'],
                 'message' => $data['decision'] === 'yes'
-                    ? 'Sanad team has been notified.'
+                    ? 'Quick team has been notified.'
                     : 'Okay, no handover requested.',
                 'result' => $result,
             ]);
         }
 
-        return back()->withSuccess($data['decision'] === 'yes' ? 'Sanad team has been notified.' : 'Okay, no handover requested.');
+        return back()->withSuccess($data['decision'] === 'yes' ? 'Quick team has been notified.' : 'Okay, no handover requested.');
     }
 
     public function profile()
     {
         return view('customer-portal.profile', ['user' => $this->customer()]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $this->customer();
+        $data = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['nullable', 'string', 'max:100'],
+            'contact_number' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'language_option' => ['required', 'in:ar,en'],
+        ]);
+        $data['display_name'] = trim($data['first_name'].' '.($data['last_name'] ?? ''));
+        $user->update($data);
+        session()->put('locale', $data['language_option']);
+        session()->put('dir', $data['language_option'] === 'ar' ? 'rtl' : 'ltr');
+        app()->setLocale($data['language_option']);
+
+        return back()->withSuccess($data['language_option'] === 'ar' ? 'تم تحديث الملف الشخصي.' : 'Profile updated successfully.');
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $user = $this->customer();
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (!Hash::check($data['current_password'], $user->password)) {
+            return back()->withErrors(['current_password' => app()->getLocale() === 'ar' ? 'كلمة المرور الحالية غير صحيحة.' : 'The current password is incorrect.']);
+        }
+
+        $user->update(['password' => Hash::make($data['password'])]);
+
+        return back()->withSuccess(app()->getLocale() === 'ar' ? 'تم تغيير كلمة المرور.' : 'Password changed successfully.');
     }
 
     private function customer()
@@ -1160,7 +1240,7 @@ class SanadCustomerPortalController extends Controller
     private function nextReference(): string
     {
         $next = (int) Booking::max('id') + 1;
-        return 'SANAD-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        return 'QUICK-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }
 
     private function expectedCompletion(Service $service)
@@ -1189,7 +1269,7 @@ class SanadCustomerPortalController extends Controller
         }
 
         if ($booking->chat_owner_type === 'sanad_team') {
-            return 'Sanad Team';
+            return 'Quick Team';
         }
 
         if ($booking->chat_owner_type === 'partner_team') {
@@ -1207,13 +1287,13 @@ class SanadCustomerPortalController extends Controller
     private function aiAnswer(string $question, ?Booking $booking, string $knowledge): array
     {
         $context = $booking
-            ? 'Your request ' . ($booking->sanad_reference ?: '#' . $booking->id) . ' is currently at ' . Str::headline($booking->sanad_stage ?: $booking->status) . '. The next expected step is managed by the Sanad team.'
+            ? 'Your request ' . $booking->quick_reference . ' is currently at ' . Str::headline($booking->sanad_stage ?: $booking->status) . '. The next expected step is managed by the Quick team.'
             : 'I can help you choose a Sanad service, understand requirements, processing time, pricing, and next steps.';
         $knowledgeHint = $knowledge ? ' I found related Sanad knowledge and request guidance for this topic.' : '';
         $requiresEscalation = Str::contains(Str::lower($question), ['complaint', 'urgent', 'delay', 'reject', 'wrong', 'human']);
 
         return [
-            'text' => $context . $knowledgeHint . ($requiresEscalation ? ' I will flag this for the Sanad team because it may need human review.' : ''),
+            'text' => $context . $knowledgeHint . ($requiresEscalation ? ' I will flag this for the Quick team because it may need human review.' : ''),
             'confidence' => $requiresEscalation ? 0.62 : 0.82,
             'requires_escalation' => $requiresEscalation,
         ];

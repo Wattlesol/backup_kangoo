@@ -20,20 +20,20 @@
                         {{ Form::hidden('id') }}
                         <div class="row">
                             <div class="form-group col-md-4">
-                                {{ Form::label('name_en', 'English Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name_en', old('name_en', $categorydata->name_en ?: $categorydata->name), ['placeholder' => 'English Name', 'class' => 'form-control', 'required']) }}
+                                {{ Form::label('name_en', __('messages.english_name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_en', old('name_en', $categorydata->name_en ?: $categorydata->name), ['placeholder' => __('messages.english_name'), 'class' => 'form-control', 'required']) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
                             <div class="form-group col-md-4">
-                                {{ Form::label('name_ar', 'Arabic Name <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
-                                {{ Form::text('name_ar', old('name_ar'), ['placeholder' => 'Arabic Name', 'class' => 'form-control', 'required', 'dir' => 'rtl']) }}
+                                {{ Form::label('name_ar', __('messages.arabic_name').' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
+                                {{ Form::text('name_ar', old('name_ar'), ['placeholder' => __('messages.arabic_name'), 'class' => 'form-control', 'required', 'dir' => 'rtl']) }}
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
                             <div class="form-group col-md-4">
-                                {{ Form::label('display_order', 'Display Order', ['class' => 'form-control-label']) }}
-                                {{ Form::number('display_order', old('display_order'), ['placeholder' => 'Display Order', 'class' =>'form-control', 'min' => 0]) }}
+                                {{ Form::label('display_order', __('messages.display_order'), ['class' => 'form-control-label']) }}
+                                {{ Form::number('display_order', old('display_order'), ['placeholder' => __('messages.display_order'), 'class' =>'form-control', 'min' => 0]) }}
                             </div>
 
                             <div class="form-group col-md-4">
@@ -42,13 +42,13 @@
                             </div>
 
                             <div class="form-group col-md-4">
-                                <label class="form-control-label" for="category_icon">Icon</label>
+                                <label class="form-control-label" for="category_icon">{{ __('messages.icon') }}</label>
                                 <div class="custom-file">
                                     <input type="file" name="category_icon" class="custom-file-input" onchange="previewCategoryIcon(event)" accept="image/*" >
                                     @if($categorydata && getMediaFileExit($categorydata, 'category_icon'))
                                     <label class="custom-file-label upload-label">{{ $categorydata->getFirstMedia('category_icon')->file_name }}</label>
                                     @else
-                                    <label class="custom-file-label upload-label">{{ __('messages.choose_file',['file' => 'Icon' ]) }}</label>
+                                    <label class="custom-file-label upload-label">{{ __('messages.choose_file',['file' => __('messages.icon') ]) }}</label>
                                     @endif
                                 </div>
                             </div>

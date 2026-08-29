@@ -51,7 +51,7 @@
     function setupThemeListener() {
         // Watch for theme toggle clicks
         document.addEventListener('click', function(e) {
-            if (e.target.closest('.change-mode') || e.target.closest('[data-theme-toggle]')) {
+            if (e.target.closest('.change-mode') || e.target.closest('[data-theme-toggle]') || e.target.closest('[data-quick-theme-toggle]')) {
                 const newTheme = e.target.dataset.themeToggle ||
                                (document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
 

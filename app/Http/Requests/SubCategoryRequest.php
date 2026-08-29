@@ -26,7 +26,8 @@ class SubCategoryRequest extends FormRequest
         $id = request()->route('subcategory') ?: request()->id;
 
         return [
-            'name'              => 'required|unique:sub_categories,name,'.$id,
+            'name_en'           => 'required|string|max:150|unique:sub_categories,name_en,'.$id,
+            'name_ar'           => 'required|string|max:150',
             'status'            => 'required',
             'category_id'       => 'required',
         ];

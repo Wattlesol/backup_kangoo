@@ -9,10 +9,10 @@
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">Quality Control</h5>
+                            @php $isAr = app()->getLocale() === 'ar'; @endphp<h5 class="font-weight-bold">{{ $isAr ? 'مراقبة الجودة' : 'Quality Control' }}</h5>
                             <!-- Button trigger modal -->
                             <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
-                                Create
+                                {{ $isAr ? 'إنشاء' : 'Create' }}
                             </button>
 
                             <!-- Modal -->
@@ -31,40 +31,46 @@
                                                 <div class="row">
                                                     <div class="col-md-12">
                                                         <div class="form-group">
-                                                        <label for="exampleInputEmail1" class="form-label">Issue Title<span style="color: red">*</span></label>
-                                                            <input type="text" class="form-control" value="{{@old('title')}}"  name="title" aria-describedby="emailHelp"
-                                                                   placeholder="عنوان الشكوي">
+                                                            <label for="complaint_title" class="form-label font-weight-bold">{{ $isAr ? 'عنوان المشكلة' : 'Issue Title' }} <span class="text-danger">*</span></label>
+                                                            <input type="text" class="form-control" id="complaint_title" value="{{@old('title')}}" name="title" required placeholder="عنوان الشكوى أو المشكلة">
                                                         </div>
                                                     </div>
 
                                                     <div class="form-group col-md-12">
-                                                        <label for="issue_type" class="form-control-label">Issue Type</label>
+                                                        <label for="issue_type" class="form-control-label font-weight-bold">{{ $isAr ? 'نوع المشكلة' : 'Issue Type' }} <span class="text-danger">*</span></label>
                                                         <select name="issue_type" id="issue_type" class="form-control" required>
-                                                            <option value="customer_complaint">Customer Complaint</option>
-                                                            <option value="escalation">Escalation</option>
-                                                            <option value="sla_violation">SLA Violation</option>
-                                                            <option value="customer_feedback">Customer Feedback</option>
+                                                            <option value="customer_complaint">Customer Complaint (شكوى عميل)</option>
+                                                            <option value="escalation">Escalation (تصعيد إداري)</option>
+                                                            <option value="sla_violation">SLA Violation (مخالفة اتفاقية مستوى الخدمة)</option>
+                                                            <option value="customer_feedback">Customer Feedback (ملاحظات العميل)</option>
                                                         </select>
                                                     </div>
+
                                                     <div class="form-group col-md-12">
-                                                        {{ Form::label('name', __('messages.select_name',[ 'select' => __('messages.provider') ]).' <span class="text-danger">*</span>',['class'=>'form-control-label'],false) }}
-                                                        <br />
-                                                        {{ Form::select('provider_id', [], 0, [
-                                                                    'class' => 'select2js form-group',
-                                                                    'id' => 'provider_id',
-                                                                    'name' => 'provider_id',
-                                                                    'onchange' => 'selectprovider(this)',
-                                                                    'required',
-                                                                    'data-placeholder' => __('messages.select_name',[ 'select' => __('messages.provider') ]),
-                                                                    'data-ajax--url' => route('ajax-list', ['type' => 'provider']),
-                                                                ]) }}
+                                                        <label for="modal_provider_id" class="form-control-label font-weight-bold">Partner (الشريك) <span class="text-danger">*</span></label>
+                                                        <select name="provider_id" id="modal_provider_id" class="form-control" required>
+                                                            <option value="">Select Partner (اختر الشريك)...</option>
+                                                            @foreach($providers ?? [] as $prov)
+                                                                <option value="{{ $prov->id }}">{{ $prov->display_name ?: $prov->first_name ?: ('Partner #'.$prov->id) }}</option>
+                                                            @endforeach
+                                                        </select>
                                                     </div>
 
+                                                    <div class="form-group col-md-12">
+                                                        <label for="complaint_details" class="form-control-label font-weight-bold">Complaint Details (تفاصيل الشكوى) <span class="text-danger">*</span></label>
+                                                        <textarea name="details" id="complaint_details" class="form-control" rows="4" required placeholder="اكتب تفاصيل الشكوى أو الملاحظة هنا..."></textarea>
+                                                    </div>
+
+                                                    <div class="form-group col-md-12">
+                                                        <label for="complaint_file" class="form-control-label font-weight-bold">Attachment (مرفق توثيقي - اختياري)</label>
+                                                        <input type="file" name="file" id="complaint_file" class="form-control-file">
+                                                    </div>
                                                 </div>
 
-                                                <button type="submit" class="btn btn-success">{{ __('messages.create') }}</button>
-                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-
+                                                <div class="d-flex justify-content-end gap-2 mt-3">
+                                                    <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal">{{ $isAr ? 'إغلاق' : 'Close' }}</button>
+                                                    <button type="submit" class="btn btn-success"><i class="fas fa-check-circle mr-1"></i> {{ __('messages.create') }}</button>
+                                                </div>
                                             </form>
                                         </div>
                                         <div class="modal-footer">
@@ -84,9 +90,9 @@
                 <form class="row">
                     <!-- Provider Field -->
                     <div class="col-md-6">
-                        <label for="issue_type_filter">Issue Type</label>
+                        <label for="issue_type_filter">{{ $isAr ? 'نوع المشكلة' : 'Issue Type' }}</label>
                         <select name="issue_type" id="issue_type_filter" class="form-control mb-2">
-                            <option value="">All Issue Types</option>
+                            <option value="">All {{ $isAr ? 'نوع المشكلة' : 'Issue Type' }}s</option>
                             <option value="customer_complaint">Customer Complaints</option>
                             <option value="escalation">Escalations</option>
                             <option value="sla_violation">SLA Violations</option>
@@ -129,18 +135,43 @@
 
 
     @if(auth()->user()->hasAnyRole(['admin', 'demo_admin']))
+        @php
+            $sanadComplaintTypeLabels = $isAr ? [
+                'document_issue' => 'مشكلة في المستندات',
+                'payment_billing' => 'المدفوعات والفوترة',
+                'request_delay' => 'تأخر الطلب',
+                'status_update' => 'تحديث حالة الطلب',
+                'service_quality' => 'جودة الخدمة',
+                'communication_issue' => 'مشكلة في التواصل',
+                'incorrect_information' => 'معلومات غير صحيحة',
+                'other' => 'أخرى',
+            ] : [];
+            $sanadComplaintPriorityLabels = $isAr ? [
+                'low' => 'منخفضة',
+                'normal' => 'عادية',
+                'high' => 'مرتفعة',
+                'urgent' => 'عاجلة',
+            ] : [];
+            $sanadComplaintStatusLabels = $isAr ? [
+                'open' => 'مفتوحة',
+                'pending' => 'قيد الانتظار',
+                'in_progress' => 'قيد المعالجة',
+                'resolved' => 'محلولة',
+                'closed' => 'مغلقة',
+            ] : [];
+        @endphp
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
                     <div>
-                        <h5 class="font-weight-bold mb-1">Sanad Customer Complaints & Support Tickets</h5>
-                        <span class="text-muted">Customer-created complaints linked to active or closed Sanad requests.</span>
+                        <h5 class="font-weight-bold mb-1">{{ $isAr ? 'شكاوى عملاء كويك وتذاكر الدعم' : 'Quick Customer Complaints & Support Tickets' }}</h5>
+                        <span class="text-muted">{{ $isAr ? 'شكاوى العملاء المرتبطة بطلبات كويك النشطة أو المغلقة.' : 'Customer-created complaints linked to active or closed Quick requests.' }}</span>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <span class="badge badge-light border p-2">Total: {{ $sanadComplaintStats['total'] ?? 0 }}</span>
-                        <span class="badge badge-info p-2">Open: {{ $sanadComplaintStats['open'] ?? 0 }}</span>
-                        <span class="badge badge-danger p-2">Urgent: {{ $sanadComplaintStats['urgent'] ?? 0 }}</span>
-                        <span class="badge badge-success p-2">Resolved: {{ $sanadComplaintStats['resolved'] ?? 0 }}</span>
+                        <span class="badge badge-light border p-2">{{ $isAr ? 'الإجمالي' : 'Total' }}: {{ $sanadComplaintStats['total'] ?? 0 }}</span>
+                        <span class="badge badge-info p-2">{{ $isAr ? 'المفتوحة' : 'Open' }}: {{ $sanadComplaintStats['open'] ?? 0 }}</span>
+                        <span class="badge badge-danger p-2">{{ $isAr ? 'العاجلة' : 'Urgent' }}: {{ $sanadComplaintStats['urgent'] ?? 0 }}</span>
+                        <span class="badge badge-success p-2">{{ $isAr ? 'المحلولة' : 'Resolved' }}: {{ $sanadComplaintStats['resolved'] ?? 0 }}</span>
                     </div>
                 </div>
 
@@ -149,14 +180,14 @@
                         <thead>
                             <tr>
                                 <th>#</th>
-                                <th>Request</th>
-                                <th>Customer</th>
-                                <th>Type</th>
-                                <th>Priority</th>
-                                <th>Status</th>
-                                <th>Description</th>
-                                <th>Timeline</th>
-                                <th>Attachment</th>
+                                <th>{{ $isAr ? 'الطلب' : 'Request' }}</th>
+                                <th>{{ $isAr ? 'العميل' : 'Customer' }}</th>
+                                <th>{{ $isAr ? 'النوع' : 'Type' }}</th>
+                                <th>{{ $isAr ? 'الأولوية' : 'Priority' }}</th>
+                                <th>{{ $isAr ? 'الحالة' : 'Status' }}</th>
+                                <th>{{ $isAr ? 'الوصف' : 'Description' }}</th>
+                                <th>{{ $isAr ? 'الجدول الزمني' : 'Timeline' }}</th>
+                                <th>{{ $isAr ? 'المرفق' : 'Attachment' }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -164,53 +195,62 @@
                                 @php
                                     $booking = $complaint->booking;
                                     $attachmentUrl = $complaint->getFirstMediaUrl('sanad_complaint_attachment');
+                                    $complaintTypeLabel = $isAr
+                                        ? ($sanadComplaintTypeLabels[$complaint->complaint_type] ?? Str::headline($complaint->complaint_type))
+                                        : Str::headline($complaint->complaint_type);
+                                    $complaintPriorityLabel = $isAr
+                                        ? ($sanadComplaintPriorityLabels[$complaint->priority] ?? Str::headline($complaint->priority))
+                                        : Str::headline($complaint->priority);
+                                    $complaintStatusLabel = $isAr
+                                        ? ($sanadComplaintStatusLabels[$complaint->status] ?? Str::headline($complaint->status))
+                                        : Str::headline($complaint->status);
                                 @endphp
                                 <tr>
                                     <td>{{ method_exists($sanadComplaints, 'firstItem') ? $sanadComplaints->firstItem() + $key : $key + 1 }}</td>
                                     <td>
                                         @if($booking)
                                             <a href="{{ route('sanad.requests.show', $booking->id) }}" class="font-weight-bold">
-                                                {{ $booking->sanad_reference ?: '#' . $booking->id }}
+                                                {{ $booking->quick_reference }}
                                             </a>
-                                            <div class="text-muted small">{{ optional($booking->service)->name ?: optional($booking->service)->name_en ?: '-' }}</div>
-                                            <div class="text-muted small">Partner: {{ optional($booking->provider)->display_name ?: 'Not assigned' }}</div>
+                                            <div class="text-muted small">{{ $isAr ? (optional($booking->service)->name_ar ?: optional($booking->service)->name_en ?: optional($booking->service)->name ?: '-') : (optional($booking->service)->name_en ?: optional($booking->service)->name ?: '-') }}</div>
+                                            <div class="text-muted small">{{ $isAr ? 'الشريك' : 'Partner' }}: {{ optional($booking->provider)->display_name ?: ($isAr ? 'غير مُسند' : 'Not assigned') }}</div>
                                         @else
-                                            <span class="text-muted">No linked request</span>
+                                            <span class="text-muted">{{ $isAr ? 'لا يوجد طلب مرتبط' : 'No linked request' }}</span>
                                         @endif
                                     </td>
                                     <td>
                                         <strong>{{ optional($complaint->customer)->display_name ?: optional($complaint->customer)->email ?: '-' }}</strong>
                                         <div class="text-muted small">{{ optional($complaint->customer)->email }}</div>
                                     </td>
-                                    <td>{{ Str::headline($complaint->complaint_type) }}</td>
+                                    <td>{{ $complaintTypeLabel }}</td>
                                     <td>
                                         <span class="badge badge-{{ $complaint->priority === 'urgent' ? 'danger' : ($complaint->priority === 'high' ? 'warning' : 'secondary') }}">
-                                            {{ Str::headline($complaint->priority) }}
+                                            {{ $complaintPriorityLabel }}
                                         </span>
                                     </td>
                                     <td>
                                         <span class="badge badge-{{ in_array($complaint->status, ['resolved', 'closed'], true) ? 'success' : 'info' }}">
-                                            {{ Str::headline($complaint->status) }}
+                                            {{ $complaintStatusLabel }}
                                         </span>
                                     </td>
                                     <td style="min-width: 260px;">{{ Str::limit($complaint->description, 180) }}</td>
                                     <td>
-                                        <div class="small">Created: {{ optional($complaint->created_at)->format('Y-m-d H:i') }}</div>
-                                        <div class="small text-muted">Resolved: {{ optional($complaint->resolved_at)->format('Y-m-d H:i') ?: 'Open with Sanad support.' }}</div>
+                                        <div class="small">{{ $isAr ? 'تاريخ الإنشاء' : 'Created' }}: {{ optional($complaint->created_at)->format('Y-m-d H:i') }}</div>
+                                        <div class="small text-muted">{{ $isAr ? 'تاريخ الحل' : 'Resolved' }}: {{ optional($complaint->resolved_at)->format('Y-m-d H:i') ?: ($isAr ? 'مفتوحة لدى دعم كويك.' : 'Open with Quick support.') }}</div>
                                     </td>
                                     <td>
                                         @if($attachmentUrl)
                                             <a href="{{ $attachmentUrl }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-paperclip mr-1"></i> Open
+                                                <i class="fas fa-paperclip mr-1"></i> {{ $isAr ? 'فتح' : 'Open' }}
                                             </a>
                                         @else
-                                            <span class="text-muted small">None</span>
+                                            <span class="text-muted small">{{ $isAr ? 'لا يوجد' : 'None' }}</span>
                                         @endif
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">No Sanad customer complaints found for the selected filters.</td>
+                                    <td colspan="9" class="text-center text-muted py-4">{{ $isAr ? 'لم يتم العثور على شكاوى عملاء كويك وفق عوامل التصفية المحددة.' : 'No Quick customer complaints found for the selected filters.' }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -233,7 +273,7 @@
             <tr>
                 <th>#</th>
                 <th>Partner</th>
-                <th>Issue Type</th>
+                <th>{{ $isAr ? 'نوع المشكلة' : 'Issue Type' }}</th>
                 <th>الحاله</th>
                 <th>انشاء بواسطه</th>
                 <th>عرض</th>

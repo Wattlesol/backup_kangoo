@@ -58,11 +58,17 @@ class ServiceAddonController extends Controller
                     </div>
                 </div>';
             })
-            ->editColumn('name', function($query){
-                return '<a class="btn-link btn-link-hover"  href='.route('serviceaddon.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+           ->editColumn('name', function($query){
+               return '<a class="btn-link btn-link-hover"  href='.route('serviceaddon.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+           })
+            ->editColumn('name_ar', function($query){
+                if (!empty($query->name_ar)) {
+                    return '<a class="btn-link btn-link-hover" href='.route('serviceaddon.create', ['id' => $query->id]).' dir="rtl">'.$query->name_ar.'</a>';
+                }
+                return '-';
             })
 
-            ->addColumn('targets', function ($query) {
+           ->addColumn('targets', function ($query) {
                 $targets = [];
 
                 if ($query->categories->isNotEmpty()) {
@@ -83,9 +89,9 @@ class ServiceAddonController extends Controller
             ->addColumn('action', function ($serviceaddon) {
                 return view('serviceaddon.action', compact('serviceaddon'))->render();
             })
-            ->addIndexColumn()
-            ->rawColumns(['action', 'status','name','check','price','targets'])
-            ->toJson();
+           ->addIndexColumn()
+            ->rawColumns(['action', 'status','name','name_ar','check','price','targets'])
+           ->toJson();
     }
 
     public function bulk_action(Request $request)

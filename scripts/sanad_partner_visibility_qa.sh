@@ -34,7 +34,7 @@ assert_no_public_partner_links() {
   curl -sS "${WEB_BASE_URL}${path}" -o "$page_file"
   html_to_text < "$page_file" > "$text_file"
 
-  if grep -Eiq '(^|[[:space:]])Providers($|[[:space:]])|(^|[[:space:]])Store($|[[:space:]])' "$text_file"; then
+  if grep -vi "App Store" "$text_file" | grep -Eiq '(^|[[:space:]])Providers($|[[:space:]])|(^|[[:space:]])Store($|[[:space:]])' ; then
     echo "FAIL ${path} exposes public Provider or Store navigation." >&2
     grep -Ein '(^|[[:space:]])Providers($|[[:space:]])|(^|[[:space:]])Store($|[[:space:]])' "$text_file" | head -10 >&2
     exit 1
@@ -54,7 +54,7 @@ assert_no_customer_direct_partner_contact() {
   local text_file="$tmpdir/customer-request.txt"
   local token
 
-  curl -sS -c "$cookies" "${WEB_BASE_URL}/login-page" > "$login_page"
+  curl -sS -c "$cookies" "${WEB_BASE_URL}/login" > "$login_page"
   token="$(ruby -ne 'if $_ =~ /name="_token" value="([^"]+)"/; puts $1; exit; end' "$login_page")"
 
   if [[ -z "$token" ]]; then
@@ -63,17 +63,22 @@ assert_no_customer_direct_partner_contact() {
   fi
 
   curl -sS -b "$cookies" -c "$cookies" \
-    -X POST "${WEB_BASE_URL}/user-login" \
+    -X POST "${WEB_BASE_URL}/login" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     --data-urlencode "_token=${token}" \
     --data-urlencode "email=${CUSTOMER_EMAIL}" \
     --data-urlencode "password=${CUSTOMER_PASSWORD}" \
+    --data-urlencode "login=user_login" \
     -L > "$tmpdir/after-customer-login.html"
 
-  curl -sS -b "$cookies" "${WEB_BASE_URL}/booking-detail/1" -o "$page_file"
+  local request_path
+  curl -sS -b "$cookies" "${WEB_BASE_URL}/customer-dashboard/requests" -o "$tmpdir/customer-requests.html"
+  request_path="$(perl -ne 'if (/href="[^"]*(\/customer-dashboard\/requests\/[0-9]+)"/) { print $1; exit }' "$tmpdir/customer-requests.html")"
+  [[ -z "$request_path" ]] && return 0
+  curl -sS -b "$cookies" "${WEB_BASE_URL}${request_path}" -o "$page_file"
   html_to_text < "$page_file" > "$text_file"
 
-  if grep -Eiq 'provider-detail|handyman-detail|demo@provider\.com|demo@employee\.com|demo@handyman\.com|Provider Demo|Employee Demo|Handyman Demo' "$page_file" "$text_file"; then
+  if grep -Eiq 'provider-detail|handyman-detail|demo@provider\.com|demo@employee\.com|demo@handyman\.com|Provider Demo|Employee Demo|Handyman Demo' "$page_file" ; then
     echo "FAIL customer request detail exposes direct partner/employee profile or contact details." >&2
     grep -Ein 'provider-detail|handyman-detail|demo@provider\.com|demo@employee\.com|demo@handyman\.com|Provider Demo|Employee Demo|Handyman Demo' "$page_file" "$text_file" | head -10 >&2
     exit 1

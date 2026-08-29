@@ -1,161 +1,121 @@
+@php
+    $isAr = app()->getLocale() === 'ar';
+    $pageTitle = $isAr ? 'طابور الطلبات' : 'Request queue';
+@endphp
 <x-master-layout>
-    <div class="container-fluid">
+    <div class="quick-request-queue" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
         <div class="row">
             <div class="col-lg-12">
-                <div class="card card-block card-stretch">
-                    <div class="card-body">
+                <div class="quick-admin-hero quick-queue-hero">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                             <div>
-                                <h4 class="font-weight-bold mb-1">{{ $pageTitle }}</h4>
-                                <span class="text-muted">Role-aware request operations queue</span>
+                                <span class="quick-admin-hero-eyebrow">{{ $isAr ? 'طابور العمليات الموحد' : 'Unified operations queue' }}</span>
+                                <h1 class="font-weight-bold mb-1">{{ $isAr ? 'طلبات وعمليات كويك الحكومية' : 'Quick government requests and operations' }}</h1>
+                                <p class="text-muted mb-0">{{ $isAr ? 'البحث والفلترة وتوزيع المهام ومتابعة نوافذ الإنجاز لكافة المعاملات.' : 'Search, filter, assign, and monitor completion windows for every request.' }}</p>
                             </div>
-                            <a href="{{ route('home') }}" class="btn-link btn-link-hover">Back to dashboard</a>
+                            <a href="{{ route('home') }}" class="quick-table-btn">{{ $isAr ? 'العودة للوحة التحكم' : 'Back to dashboard' }}</a>
                         </div>
-                    </div>
                 </div>
             </div>
 
             <div class="col-lg-12">
-                <div class="card">
-                    <div class="card-body">
+                <div class="quick-card quick-queue-panel">
                         <div class="row sanad-summary-grid">
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
                                 <a href="{{ route('sanad.requests.index') }}" class="sanad-summary-card">
-                                    <span>Total</span>
+                                    <span>{{ $isAr ? 'الإجمالي' : 'Total' }}</span>
                                     <strong>{{ $summary['total'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
                                 <a href="{{ route('sanad.requests.index', ['action_state' => 'needs_action']) }}" class="sanad-summary-card">
-                                    <span>Needs Action</span>
+                                    <span>{{ $isAr ? 'يتطلب إجراءً' : 'Needs Action' }}</span>
                                     <strong>{{ $summary['needs_action'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
                                 <a href="{{ route('sanad.requests.index', ['assignment_state' => 'unassigned']) }}" class="sanad-summary-card">
-                                    <span>Unassigned</span>
+                                    <span>{{ $isAr ? 'غير مسند' : 'Unassigned' }}</span>
                                     <strong>{{ $summary['unassigned'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
                                 <a href="{{ route('sanad.requests.index', ['sla_state' => 'overdue']) }}" class="sanad-summary-card">
-                                    <span>Overdue SLA</span>
+                                    <span>{{ $isAr ? 'متأخر عن SLA' : 'Overdue SLA' }}</span>
                                     <strong>{{ $summary['overdue_sla'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
                                 <a href="{{ route('sanad.requests.index', ['action_state' => 'pending_documents']) }}" class="sanad-summary-card">
-                                    <span>Pending Docs</span>
+                                    <span>{{ $isAr ? 'مستندات معلقة' : 'Pending Docs' }}</span>
                                     <strong>{{ $summary['pending_documents'] ?? 0 }}</strong>
-                                </a>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index', ['action_state' => 'unread_buzz']) }}" class="sanad-summary-card">
-                                    <span>Unread Buzz</span>
-                                    <strong>{{ $summary['unread_buzz'] ?? 0 }}</strong>
-                                </a>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index', ['payment_state' => 'pending']) }}" class="sanad-summary-card">
-                                    <span>Payment Pending</span>
-                                    <strong>{{ $summary['payment_pending'] ?? 0 }}</strong>
-                                </a>
-                            </div>
-                            <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index', ['payment_state' => 'paid']) }}" class="sanad-summary-card">
-                                    <span>Paid</span>
-                                    <strong>{{ $summary['paid'] ?? 0 }}</strong>
                                 </a>
                             </div>
                         </div>
 
                         <form method="GET" action="{{ route('sanad.requests.index') }}" class="sanad-filter-form mb-4">
                             <div class="row">
-                                <div class="col-lg-3 col-md-6 mb-3">
-                                    <label class="form-control-label">Search</label>
-                                    <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Reference, service, customer">
+                                <div class="col-lg-6 col-md-6 mb-3">
+                                    <label class="form-control-label">{{ $isAr ? "البحث" : "Search" }}</label>
+                                    <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="{{ $isAr ? 'الرقم المرجعي، الخدمة، العميل' : 'Reference, service, customer' }}">
                                 </div>
                                 <div class="col-lg-2 col-md-6 mb-3">
-                                    <label class="form-control-label">Lifecycle Stage</label>
+                                    <label class="form-control-label">{{ $isAr ? "مرحلة دورة الطلب" : "Lifecycle Stage" }}</label>
                                     <select name="sanad_stage" class="form-control">
-                                        <option value="">All stages</option>
+                                        <option value="">{{ $isAr ? "جميع المراحل" : "All stages" }}</option>
                                         @foreach(config('sanad.request_lifecycle', []) as $stage)
                                             <option value="{{ $stage }}" {{ request('sanad_stage') === $stage ? 'selected' : '' }}>{{ Str::headline($stage) }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                                 <div class="col-lg-2 col-md-6 mb-3">
-                                    <label class="form-control-label">Priority</label>
-                                    <select name="sanad_priority" class="form-control">
-                                        <option value="">All priorities</option>
-                                        @foreach(['urgent', 'high', 'normal', 'low'] as $priority)
-                                            <option value="{{ $priority }}" {{ request('sanad_priority') === $priority ? 'selected' : '' }}>{{ Str::headline($priority) }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-lg-2 col-md-6 mb-3">
-                                    <label class="form-control-label">SLA</label>
+                                    <label class="form-control-label">{{ $isAr ? "اتفاقية مستوى الخدمة" : "SLA" }}</label>
                                     <select name="sla_state" class="form-control">
                                         <option value="">Any SLA</option>
-                                        <option value="overdue" {{ request('sla_state') === 'overdue' ? 'selected' : '' }}>Overdue</option>
-                                        <option value="due_soon" {{ request('sla_state') === 'due_soon' ? 'selected' : '' }}>Due soon</option>
+                                        <option value="overdue" {{ request('sla_state') === 'overdue' ? 'selected' : '' }}>{{ $isAr ? "متأخر" : "Overdue" }}</option>
+                                        <option value="due_soon" {{ request('sla_state') === 'due_soon' ? 'selected' : '' }}>{{ $isAr ? "يستحق قريباً" : "Due soon" }}</option>
                                         <option value="none" {{ request('sla_state') === 'none' ? 'selected' : '' }}>No SLA</option>
                                     </select>
                                 </div>
                                 <div class="col-lg-2 col-md-6 mb-3">
-                                    <label class="form-control-label">Assignment</label>
+                                    <label class="form-control-label">{{ $isAr ? "حالة الإسناد" : "Assignment" }}</label>
                                     <select name="assignment_state" class="form-control">
                                         <option value="">Any assignment</option>
                                         <option value="assigned" {{ request('assignment_state') === 'assigned' ? 'selected' : '' }}>Assigned</option>
-                                        <option value="unassigned" {{ request('assignment_state') === 'unassigned' ? 'selected' : '' }}>Unassigned</option>
+                                        <option value="unassigned" {{ request('assignment_state') === 'unassigned' ? 'selected' : '' }}>{{ $isAr ? "غير مسند" : "Unassigned" }}</option>
                                     </select>
                                 </div>
-                                <div class="col-lg-2 col-md-6 mb-3">
-                                    <label class="form-control-label">Action State</label>
-                                    <select name="action_state" class="form-control">
-                                        <option value="">Any action</option>
-                                        <option value="needs_action" {{ request('action_state') === 'needs_action' ? 'selected' : '' }}>Needs action</option>
-                                        <option value="pending_documents" {{ request('action_state') === 'pending_documents' ? 'selected' : '' }}>Pending documents</option>
-                                        <option value="unread_buzz" {{ request('action_state') === 'unread_buzz' ? 'selected' : '' }}>Unread Buzz</option>
-                                        <option value="open_chat" {{ request('action_state') === 'open_chat' ? 'selected' : '' }}>Open chat</option>
-                                    </select>
+                                <div class="col-lg-12">
+                                    <details class="quick-advanced-filters" {{ request()->hasAny(['sanad_priority','action_state','payment_state']) ? 'open' : '' }}>
+                                        <summary>{{ $isAr ? 'فلاتر متقدمة' : 'Advanced filters' }}</summary>
+                                        <div class="row pt-3">
+                                            <div class="col-lg-4 col-md-6 mb-3"><label class="form-control-label">{{ $isAr ? 'الأولوية' : 'Priority' }}</label><select name="sanad_priority" class="form-control"><option value="">{{ $isAr ? 'جميع الأولويات' : 'All priorities' }}</option>@foreach(['urgent','high','normal','low'] as $priority)<option value="{{ $priority }}" {{ request('sanad_priority') === $priority ? 'selected' : '' }}>{{ Str::headline($priority) }}</option>@endforeach</select></div>
+                                            <div class="col-lg-4 col-md-6 mb-3"><label class="form-control-label">{{ $isAr ? 'حالة الإجراء' : 'Action state' }}</label><select name="action_state" class="form-control"><option value="">{{ $isAr ? 'كل الإجراءات' : 'Any action' }}</option><option value="needs_action" {{ request('action_state') === 'needs_action' ? 'selected' : '' }}>Needs action</option><option value="pending_documents" {{ request('action_state') === 'pending_documents' ? 'selected' : '' }}>Pending documents</option><option value="unread_buzz" {{ request('action_state') === 'unread_buzz' ? 'selected' : '' }}>Unread Buzz</option><option value="open_chat" {{ request('action_state') === 'open_chat' ? 'selected' : '' }}>Open chat</option></select></div>
+                                            <div class="col-lg-4 col-md-6 mb-3"><label class="form-control-label">{{ $isAr ? 'حالة الدفع' : 'Payment' }}</label><select name="payment_state" class="form-control"><option value="">{{ $isAr ? 'كل حالات الدفع' : 'Any payment' }}</option>@foreach(['paid','pending','advanced_paid','pending_by_admin','failed','no_payment'] as $payment)<option value="{{ $payment }}" {{ request('payment_state') === $payment ? 'selected' : '' }}>{{ Str::headline($payment) }}</option>@endforeach</select></div>
+                                        </div>
+                                    </details>
                                 </div>
-                                <div class="col-lg-2 col-md-6 mb-3">
-                                    <label class="form-control-label">Payment</label>
-                                    <select name="payment_state" class="form-control">
-                                        <option value="">Any payment</option>
-                                        <option value="paid" {{ request('payment_state') === 'paid' ? 'selected' : '' }}>Paid</option>
-                                        <option value="pending" {{ request('payment_state') === 'pending' ? 'selected' : '' }}>Pending</option>
-                                        <option value="advanced_paid" {{ request('payment_state') === 'advanced_paid' ? 'selected' : '' }}>Advanced Paid</option>
-                                        <option value="pending_by_admin" {{ request('payment_state') === 'pending_by_admin' ? 'selected' : '' }}>Pending By Admin</option>
-                                        <option value="failed" {{ request('payment_state') === 'failed' ? 'selected' : '' }}>Failed</option>
-                                        <option value="no_payment" {{ request('payment_state') === 'no_payment' ? 'selected' : '' }}>No Payment</option>
-                                    </select>
+                                <div class="col-lg-2 col-md-6 mb-3 d-flex align-items-end gap-2">
+                                    <button type="submit" class="btn btn-primary quick-primary-btn">{{ $isAr ? 'تطبيق الفلاتر' : 'Apply Filters' }}</button>
                                 </div>
-                                <div class="col-lg-1 col-md-6 mb-3 d-flex align-items-end gap-2">
-                                    <button type="submit" class="btn btn-primary">Apply Filters</button>
-                                </div>
-                                <div class="col-lg-1 col-md-6 mb-3 d-flex align-items-end">
-                                    <a href="{{ route('sanad.requests.index') }}" class="btn btn-light">Reset</a>
+                                <div class="col-lg-2 col-md-6 mb-3 d-flex align-items-end">
+                                    <a href="{{ route('sanad.requests.index') }}" class="btn btn-light quick-secondary-btn">{{ $isAr ? 'إعادة ضبط' : 'Reset' }}</a>
                                 </div>
                             </div>
                         </form>
 
                         <div class="table-responsive">
-                            <table class="table table-striped border sanad-requests-table">
+                            <table class="quick-table sanad-requests-table">
                                 <thead>
                                     <tr>
-                                        <th>Request</th>
-                                        <th>Service</th>
-                                        <th>Customer</th>
-                                        <th>Partner</th>
-                                        <th>Employees</th>
-                                        <th>Stage</th>
-                                        <th>Priority</th>
-                                        <th>Payment</th>
-                                        <th>SLA</th>
-                                        <th>Updated</th>
-                                        <th class="text-right">Action</th>
+                                        <th>{{ $isAr ? 'الطلب' : 'Request' }}</th>
+                                        <th>{{ $isAr ? 'الخدمة' : 'Service' }}</th>
+                                        <th>{{ $isAr ? 'العميل' : 'Customer' }}</th>
+                                        <th>{{ $isAr ? 'الشريك' : 'Partner' }}</th>
+                                        <th>{{ $isAr ? 'المرحلة' : 'Stage' }}</th>
+                                        <th>{{ $isAr ? "حالة الدفع" : "Payment" }}</th>
+                                        <th>{{ $isAr ? "اتفاقية SLA" : "SLA" }}</th>
+                                        <th class="text-right">{{ $isAr ? "الإجراء" : "Action" }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -165,23 +125,23 @@
                                             $rowFlags = [];
                                             if ($requestItem->sla_due_at && $requestItem->sla_due_at->isPast()) {
                                                 $slaClass = 'text-danger';
-                                                $rowFlags[] = 'Overdue';
+                                                $rowFlags[] = $isAr ? 'متأخر' : 'Overdue';
                                             } elseif ($requestItem->sla_due_at && $requestItem->sla_due_at->lessThanOrEqualTo(now()->addDay())) {
                                                 $slaClass = 'text-warning';
-                                                $rowFlags[] = 'Due soon';
+                                                $rowFlags[] = $isAr ? 'يستحق قريباً' : 'Due soon';
                                             }
                                             if ($requestItem->handymanAdded->isEmpty()) {
-                                                $rowFlags[] = 'Unassigned';
+                                                $rowFlags[] = $isAr ? 'غير مسند' : 'Unassigned';
                                             }
                                             if ($requestItem->sanadDocuments->where('verification_status', 'pending')->count() > 0) {
-                                                $rowFlags[] = 'Docs';
+                                                $rowFlags[] = $isAr ? 'مستندات' : 'Docs';
                                             }
                                             if ($requestItem->sanadBuzzAlerts->where('status', 'unread')->count() > 0) {
-                                                $rowFlags[] = 'Buzz';
+                                                $rowFlags[] = $isAr ? 'تنبيه' : 'Buzz';
                                             }
                                             $paymentStatus = optional($requestItem->payment)->payment_status ?: 'no_payment';
                                             if ($paymentStatus !== 'paid') {
-                                                $rowFlags[] = 'Payment';
+                                                $rowFlags[] = $isAr ? 'دفع' : 'Payment';
                                             }
                                         @endphp
                                         @php
@@ -190,11 +150,11 @@
                                                 : route('sanad.requests.show', $requestItem->id);
                                         @endphp
                                         <tr>
-                                            <td>
+                                            <td data-label="{{ $isAr ? 'الطلب' : 'Request' }}">
                                                 <a href="{{ $openRoute }}" class="btn-link btn-link-hover">
-                                                    #{{ $requestItem->sanad_reference ?: str_pad($requestItem->id, 6, '0', STR_PAD_LEFT) }}
+                                                    {{ $requestItem->quick_reference }}
                                                 </a>
-                                                <small>{{ Str::headline($requestItem->status ?: 'pending') }}</small>
+                                                <small>{{ __('messages.' . ($requestItem->status ?: 'pending')) ?: Str::headline($requestItem->status ?: 'pending') }}</small>
                                                 @if(!empty($rowFlags))
                                                     <div class="sanad-row-flags">
                                                         @foreach($rowFlags as $flag)
@@ -203,34 +163,25 @@
                                                     </div>
                                                 @endif
                                             </td>
-                                            <td>{{ optional($requestItem->service)->name ?: '-' }}</td>
-                                            <td>{{ optional($requestItem->customer)->display_name ?: '-' }}</td>
-                                            <td>{{ optional($requestItem->provider)->display_name ?: '-' }}</td>
-                                            <td>
-                                                @forelse($requestItem->handymanAdded as $mapping)
-                                                    <span class="sanad-employee-chip">{{ optional($mapping->handyman)->display_name ?: '-' }}</span>
-                                                @empty
-                                                    <span class="badge badge-light">Unassigned</span>
-                                                @endforelse
-                                            </td>
-                                            <td><span class="badge badge-primary">{{ Str::headline($requestItem->sanad_stage ?: 'submitted') }}</span></td>
-                                            <td><span class="badge badge-light">{{ Str::headline($requestItem->sanad_priority ?: 'normal') }}</span></td>
-                                            <td>
-                                                <span class="badge {{ $paymentStatus === 'paid' ? 'badge-success' : 'badge-light' }}">{{ Str::headline($paymentStatus) }}</span>
+                                            <td data-label="{{ $isAr ? 'الخدمة' : 'Service' }}">{{ optional($requestItem->service)->name ?: '-' }}</td>
+                                            <td data-label="{{ $isAr ? 'العميل' : 'Customer' }}">{{ optional($requestItem->customer)->display_name ?: '-' }}</td>
+                                            <td data-label="{{ $isAr ? 'الشريك' : 'Partner' }}">{{ optional($requestItem->provider)->display_name ?: '-' }}</td>
+                                            <td data-label="{{ $isAr ? 'المرحلة' : 'Stage' }}"><span class="badge badge-primary">{{ __('messages.stage_' . ($requestItem->sanad_stage ?: 'submitted')) ?: Str::headline($requestItem->sanad_stage ?: 'submitted') }}</span></td>
+                                            <td data-label="{{ $isAr ? 'الدفع' : 'Payment' }}">
+                                                <span class="badge {{ $paymentStatus === 'paid' ? 'badge-success' : 'badge-light' }}">{{ __('messages.' . $paymentStatus) ?: ($isAr && $paymentStatus === 'no_payment' ? 'بدون دفع' : Str::headline($paymentStatus)) }}</span>
                                                 <small>{{ $requestItem->total_amount ? getPriceFormat($requestItem->total_amount) : '-' }}</small>
                                             </td>
-                                            <td class="{{ $slaClass }}">
+                                            <td data-label="{{ $isAr ? 'اتفاقية SLA' : 'SLA' }}" class="{{ $slaClass }}">
                                                 {{ $requestItem->sla_due_at ? $requestItem->sla_due_at->format('Y-m-d H:i') : '-' }}
                                             </td>
-                                            <td>{{ optional($requestItem->updated_at)->diffForHumans() }}</td>
-                                            <td class="text-right">
-                                                <a href="{{ $openRoute }}" class="btn btn-sm btn-primary">{{ request('action_state') === 'open_chat' ? 'Open Chat' : 'Open' }}</a>
+                                            <td data-label="{{ $isAr ? 'الإجراء' : 'Action' }}" class="text-right">
+                                                <a href="{{ $openRoute }}" class="quick-table-btn">{{ request('action_state') === 'open_chat' ? ($isAr ? 'فتح المحادثة' : 'Open Chat') : ($isAr ? 'فتح' : 'Open') }}</a>
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="11">
-                                                <div class="sanad-empty-state">No Sanad requests match the current filters</div>
+                                            <td colspan="8">
+                                                <div class="sanad-empty-state">{{ $isAr ? 'لا توجد طلبات كويك مطابقة للفلاتر الحالية' : 'No Quick requests match the current filters' }}</div>
                                             </td>
                                         </tr>
                                     @endforelse
@@ -242,7 +193,6 @@
                             <span class="text-muted">Showing {{ $requests->firstItem() ?: 0 }}-{{ $requests->lastItem() ?: 0 }} of {{ $requests->total() }}</span>
                             {{ $requests->links() }}
                         </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -250,38 +200,57 @@
 
     @once
         <style>
+            .quick-request-queue {
+                max-width: 1180px;
+                margin: 0 auto;
+            }
+
+            .quick-request-queue .text-muted {
+                color: var(--quick-shell-muted) !important;
+            }
+
+            .quick-queue-panel {
+                padding: 20px;
+                overflow: hidden;
+            }
+
             .sanad-filter-form {
-                border: 1px solid rgba(0, 0, 0, 0.08);
-                border-radius: 8px;
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 16px;
                 padding: 16px;
-                background: #fff;
+                background: var(--quick-shell-surface);
             }
 
             .sanad-summary-card {
-                min-height: 86px;
+                min-height: 64px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 gap: 12px;
-                padding: 16px;
-                border: 1px solid rgba(0, 0, 0, 0.08);
-                border-radius: 8px;
-                background: #fff;
-                color: inherit;
+                padding: 14px 18px;
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 999px;
+                background: var(--quick-shell-surface);
+                color: var(--quick-shell-ink);
+                text-decoration: none;
+                transition: all .15s ease;
             }
 
             .sanad-summary-card:hover {
-                color: inherit;
-                border-color: rgba(0, 0, 0, 0.18);
+                color: var(--quick-blue);
+                border-color: rgba(31,107,255,.35);
+                box-shadow: 0 10px 24px rgba(31,107,255,.08);
             }
 
             .sanad-summary-card span {
-                color: #6c757d;
-                font-size: 13px;
+                color: var(--quick-shell-muted);
+                font-size: 11px;
+                font-weight: 800;
             }
 
             .sanad-summary-card strong {
-                font-size: 26px;
+                font-size: 18px;
+                color: var(--quick-blue);
             }
 
             .sanad-filter-form .form-control-label {
@@ -289,14 +258,36 @@
                 font-size: 13px;
             }
 
+            .quick-request-queue .table-responsive {
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 16px;
+                overflow-x: auto;
+                background: var(--quick-shell-surface);
+            }
+
+            .sanad-requests-table {
+                min-width: 980px;
+                margin: 0;
+                table-layout: fixed;
+            }
+
+            .sanad-requests-table th {
+                background: color-mix(in srgb, var(--quick-shell-bg) 72%, var(--quick-shell-surface));
+                text-transform: uppercase;
+                font-size: 11px;
+                letter-spacing: .04em;
+            }
+
             .sanad-requests-table td,
             .sanad-requests-table th {
                 vertical-align: middle;
+                white-space: normal;
+                word-break: normal;
             }
 
             .sanad-requests-table small {
                 display: block;
-                color: #6c757d;
+                color: var(--quick-shell-muted);
                 margin-top: 4px;
             }
 
@@ -306,8 +297,8 @@
                 margin: 2px 4px 2px 0;
                 padding: 3px 8px;
                 border-radius: 999px;
-                background: #f4f6f8;
-                color: #495057;
+                background: color-mix(in srgb, var(--quick-shell-bg) 80%, transparent);
+                color: var(--quick-shell-muted);
                 font-size: 12px;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -317,7 +308,7 @@
 
             .sanad-empty-state {
                 padding: 18px;
-                color: #6c757d;
+                color: var(--quick-shell-muted);
                 text-align: center;
             }
 
@@ -335,6 +326,101 @@
                 background: #fff4e5;
                 color: #9a5b00;
                 font-size: 11px;
+            }
+
+            .quick-primary-btn,
+            .quick-secondary-btn {
+                border-radius: 12px;
+                border: 1px solid var(--quick-shell-line);
+                font-size: 12px;
+                font-weight: 800;
+                min-height: 42px;
+                padding: 9px 18px;
+                text-transform: none;
+            }
+
+            .quick-primary-btn {
+                border-color: var(--quick-blue);
+                background: var(--quick-blue);
+                color: #fff;
+            }
+
+            .quick-secondary-btn {
+                background: color-mix(in srgb, var(--quick-shell-bg) 72%, var(--quick-shell-surface));
+                color: var(--quick-shell-ink);
+            }
+
+            .quick-advanced-filters summary {
+                color: var(--quick-blue);
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 800;
+            }
+
+            @media (max-width: 899px) {
+                .quick-request-queue {
+                    max-width: none;
+                }
+
+                .quick-queue-panel {
+                    padding: 14px;
+                }
+
+                .sanad-summary-card {
+                    border-radius: 14px;
+                }
+
+                .quick-request-queue .table-responsive {
+                    overflow: visible;
+                    border: 0;
+                    background: transparent;
+                }
+
+                .sanad-requests-table {
+                    display: block;
+                    min-width: 0;
+                    border-collapse: separate;
+                }
+
+                .sanad-requests-table thead {
+                    display: none;
+                }
+
+                .sanad-requests-table tbody,
+                .sanad-requests-table tr,
+                .sanad-requests-table td {
+                    display: block;
+                    width: 100%;
+                }
+
+                .sanad-requests-table tr {
+                    margin-bottom: 12px;
+                    border: 1px solid var(--quick-shell-line);
+                    border-radius: 16px;
+                    background: var(--quick-shell-surface);
+                    overflow: hidden;
+                }
+
+                .sanad-requests-table td {
+                    display: grid;
+                    grid-template-columns: minmax(92px, 34%) 1fr;
+                    gap: 12px;
+                    border-bottom: 1px solid var(--quick-shell-line);
+                    padding: 12px 14px;
+                    text-align: start !important;
+                }
+
+                .sanad-requests-table td:last-child {
+                    border-bottom: 0;
+                }
+
+                .sanad-requests-table td::before {
+                    content: attr(data-label);
+                    color: var(--quick-shell-muted);
+                    font-size: 11px;
+                    font-weight: 900;
+                    text-transform: uppercase;
+                }
             }
         </style>
     @endonce

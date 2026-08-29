@@ -5,9 +5,9 @@
                <div class="iq-error position-relative">
                      <img src="{{ asset('images/error/404.png') }}" class="img-fluid iq-error-img iq-error-img-dark mx-auto" alt="">
                      <img src="{{ asset('images/error/404-dark.png') }}" class="img-fluid iq-error-img" alt="">
-                     <h2 class="mb-0 mt-4">Oops! This Page is Not Found.</h2>
-                     <p>The requested page does not exist.</p>
-                     <a class="btn btn-primary d-inline-flex align-items-center mt-3" href="{{route('frontend.index')}}"><i class="ri-home-4-line"></i>Back to Home</a>
+                     @php $isAr = app()->getLocale() === "ar"; @endphp<h2 class="mb-0 mt-4">{{ $isAr ? "عذراً! هذه الصفحة غير موجودة." : "Oops! This Page is Not Found." }}</h2>
+                     <p>{{ $isAr ? "الصفحة المطلوبة غير متوفرة حالياً." : "The requested page does not exist." }}</p>
+                     <a class="btn btn-primary d-inline-flex align-items-center mt-3" href="{{route('frontend.index')}}"><i class="ri-home-4-line"></i> {{ $isAr ? "العودة للرئيسية" : "Back to Home" }}</a>
                </div>
             </div>
          </div>

@@ -145,10 +145,10 @@ class SanadDocumentOcrAgent
         }
 
         if (!empty($providerMetadata['provider_error'])) {
-            return 'Sanad AI could not read this file with the configured OCR model. Please set a manual reminder or try a clearer image.';
+            return 'Quick AI could not read this file with the configured OCR model. Please set a manual reminder or try a clearer image.';
         }
 
-        return 'Sanad AI reviewed the document but could not find a visible expiry date. Please set a manual follow-up reminder.';
+        return 'Quick AI reviewed the document but could not find a visible expiry date. Please set a manual follow-up reminder.';
     }
 
     private function ocrModelOptions(?string $model): array

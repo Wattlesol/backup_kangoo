@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class SanadDocumentVaultItem extends Model implements HasMedia
 {
@@ -71,8 +73,25 @@ class SanadDocumentVaultItem extends Model implements HasMedia
 
     public function publicDocumentUrl(): ?string
     {
-        return $this->getFirstMediaUrl('document')
-            ?: $this->getFirstMediaUrl('sanad_document')
-            ?: $this->file_path;
+        foreach (['document', 'sanad_document'] as $collection) {
+            $media = $this->getFirstMedia($collection);
+            if ($media && is_file($media->getPath())) {
+                return $media->getUrl();
+            }
+        }
+
+        if (!$this->file_path) {
+            return null;
+        }
+
+        if (Str::startsWith($this->file_path, ['http://', 'https://'])) {
+            return $this->file_path;
+        }
+
+        $relativePath = ltrim(Str::after($this->file_path, '/storage/'), '/');
+
+        return Storage::disk('public')->exists($relativePath)
+            ? Storage::disk('public')->url($relativePath)
+            : null;
     }
 }

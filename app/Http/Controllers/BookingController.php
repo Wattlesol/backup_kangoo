@@ -84,7 +84,7 @@ class BookingController extends Controller
         $filter = [
             'status' => $request->status,
         ];
-        $pageTitle = 'Orders';
+        $pageTitle = __('messages.orders');
         $auth_user = authSession();
         $assets = ['datatable'];
 
@@ -94,7 +94,7 @@ class BookingController extends Controller
 
     public function index_data(DataTables $datatable,Request $request)
     {
-        $query = Booking::query()->myBooking()->with(['customer', 'service', 'provider', 'payment']);
+        $query = Booking::query()->myBooking()->with(['customer', 'service', 'provider', 'payment', 'handymanAdded.handyman']);
         $filter = $request->filter;
 
         if (isset($filter)) {
@@ -122,8 +122,15 @@ class BookingController extends Controller
                 });
             })
             ->editColumn('service_id' , function ($query){
-                $service_name = ($query->service_id != null && isset($query->service)) ? ($query->service->name_en ?: $query->service->name) : "";
-                return "<a class='btn-link btn-link-hover' href=" .route('booking.show', $query->id).">".$service_name ."</a>";
+                if ($query->service_id != null && isset($query->service)) {
+                    $isAr = app()->getLocale() === 'ar';
+                    $service_name = $isAr && !empty($query->service->name_ar)
+                        ? $query->service->name_ar
+                        : ($query->service->name_en ?: $query->service->name);
+                } else {
+                    $service_name = "";
+                }
+                return "<a class='btn-link btn-link-hover' href=" .route('booking.show', $query->id).">".e($service_name)."</a>";
             })
             ->filterColumn('service_id',function($query,$keyword){
                 $query->whereHas('service',function ($q) use($keyword){
@@ -146,6 +153,20 @@ class BookingController extends Controller
             ->filterColumn('provider_id',function($query,$keyword){
                 $query->whereHas('provider',function ($q) use($keyword){
                     $q->where('display_name','like','%'.$keyword.'%');
+                });
+            })
+            ->addColumn('handyman_id', function ($query) {
+                $employees = $query->handymanAdded
+                    ->pluck('handyman.display_name')
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                return $employees->isNotEmpty() ? e($employees->join(', ')) : '-';
+            })
+            ->filterColumn('handyman_id', function ($query, $keyword) {
+                $query->whereHas('handymanAdded.handyman', function ($employeeQuery) use ($keyword) {
+                    $employeeQuery->where('display_name', 'like', '%'.$keyword.'%');
                 });
             })
             ->editColumn('status' , function ($query){
@@ -182,10 +203,21 @@ class BookingController extends Controller
                 }
             })
             ->addColumn('order_number', function ($query) {
-                return e($query->sanad_reference ?: ('ORD-'.$query->id));
+                return e($query->quick_reference);
             })
             ->addColumn('priority', function ($query) {
-                return e(ucfirst($query->sanad_priority ?: 'normal'));
+                $priority = strtolower($query->sanad_priority ?: 'normal');
+                if (app()->getLocale() === 'ar') {
+                    $map = [
+                        'low' => 'منخفض',
+                        'normal' => 'عادي',
+                        'high' => 'مرتفع',
+                        'urgent' => 'طارئ',
+                        'critical' => 'حرج',
+                    ];
+                    return $map[$priority] ?? ucfirst($priority);
+                }
+                return e(ucfirst($priority));
             })
             ->addColumn('expected_completion_at', function ($query) {
                 return optional($query->expected_completion_at)->format('Y-m-d H:i') ?: '-';
@@ -459,12 +491,12 @@ class BookingController extends Controller
 
     private function resolveBookingCustomer(Request $request): User
     {
-        if (auth()->check() && auth()->user()->user_type === 'user') {
+        if (auth()->check() && in_array(auth()->user()->user_type, ['user', 'customer'], true)) {
             return auth()->user();
         }
 
         if ($request->filled('customer_id')) {
-            $customer = User::where('user_type', 'user')->findOrFail($request->customer_id);
+            $customer = User::whereIn('user_type', ['user', 'customer'])->findOrFail($request->customer_id);
             $updates = [];
             if ($request->filled('customer_phone')) {
                 $updates['contact_number'] = $request->customer_phone;
@@ -488,7 +520,7 @@ class BookingController extends Controller
         $customer = null;
         if ($request->filled('customer_email')) {
             $emailOwner = User::where('email', $request->customer_email)->first();
-            if ($emailOwner && $emailOwner->user_type !== 'user') {
+            if ($emailOwner && !in_array($emailOwner->user_type, ['user', 'customer'], true)) {
                 throw ValidationException::withMessages([
                     'customer_email' => 'This email belongs to a non-customer account.',
                 ]);
@@ -496,7 +528,7 @@ class BookingController extends Controller
             $customer = $emailOwner;
         }
         if (!$customer && $request->filled('customer_phone')) {
-            $customer = User::where('contact_number', $request->customer_phone)->where('user_type', 'user')->first();
+            $customer = User::where('contact_number', $request->customer_phone)->whereIn('user_type', ['user', 'customer'])->first();
         }
 
         if ($customer) {
@@ -569,7 +601,7 @@ class BookingController extends Controller
 
     private function nextSanadReference(int $id): string
     {
-        return 'SANAD-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT);
+        return 'QUICK-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT);
     }
 
     private function expectedCompletion(Service $service)
@@ -759,15 +791,16 @@ class BookingController extends Controller
     }
 
     public function  bookingAssignForm(Request $request){
-
-        $bookingdata = Booking::find($request->id);
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin', 'provider']), 403);
+        $bookingdata = Booking::query()->myBooking()->findOrFail($request->id);
         $pageTitle = __('messages.assign_form_title',['form'=> __('messages.booking')]);
         return view('booking.assigned_form',compact('bookingdata','pageTitle'));
     }
 
     public function bookingAssigned(Request $request)
     {
-        $bookingdata =  Booking::find($request->id);
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin', 'provider']), 403);
+        $bookingdata = Booking::query()->myBooking()->findOrFail($request->id);
         $previousProviderId = $bookingdata->provider_id;
         $previousStatus = $bookingdata->status;
         $previousStage = $bookingdata->sanad_stage;
@@ -777,7 +810,15 @@ class BookingController extends Controller
             'assignment_mode' => 'required|in:suggested,auto,manual',
             'assignment_reason' => 'nullable|string|max:2000',
             'partner_id' => 'nullable|integer|exists:users,id',
+            'handyman_id' => 'nullable|array',
+            'handyman_id.*' => 'integer|distinct|exists:users,id',
         ]);
+        if (auth()->user()->hasRole('provider')) {
+            $request->merge([
+                'partner_id' => auth()->id(),
+                'assignment_mode' => 'manual',
+            ]);
+        }
         if ($request->assignment_mode === 'manual' && empty($request->partner_id)) {
             return response()->json(['status' => false, 'message' => 'A Partner is required for manual assignment.'], 422);
         }
@@ -793,6 +834,7 @@ class BookingController extends Controller
             $partnerId = null;
         }
         if (!$partnerId) {
+            abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
             $candidates = User::query()
                 ->where('user_type', 'provider')
                 ->where('status', 1)
@@ -849,7 +891,16 @@ class BookingController extends Controller
 
         $remove_notification_id = [];
         if($request->handyman_id != null) {
-            foreach($request->handyman_id as $handyman) {
+            $validEmployeeIds = User::query()
+                ->whereIn('id', $request->handyman_id)
+                ->where('user_type', 'handyman')
+                ->where('provider_id', $partnerId)
+                ->where('status', 1)
+                ->pluck('id');
+            if ($validEmployeeIds->count() !== count(array_unique($request->handyman_id))) {
+                return response()->json(['status' => false, 'message' => 'Every selected Employee must belong to the assigned Partner and be active.'], 422);
+            }
+            foreach($validEmployeeIds as $handyman) {
                 $assign_to_handyman = [
                     'booking_id'   => $bookingdata->id,
                     'handyman_id'  => $handyman

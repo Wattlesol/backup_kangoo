@@ -4,7 +4,7 @@ set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 BASE_WEB_URL="${SANAD_WEB_BASE_URL:-http://127.0.0.1:8092}"
-ADMIN_EMAIL="${SANAD_ADMIN_WEB_TEST_EMAIL:-admin@admin.com}"
+ADMIN_EMAIL="${SANAD_ADMIN_WEB_TEST_EMAIL:-demo@admin.com}"
 PASSWORD="${SANAD_WEB_TEST_PASSWORD:-12345678}"
 
 if ! command -v curl >/dev/null 2>&1; then
@@ -124,8 +124,8 @@ csrf="$(extract_csrf "$detail_html")"
 [[ -n "$csrf" ]] || fail "request detail CSRF token missing"
 
 stamp="$(date +%Y%m%d%H%M%S)"
-buzz_message="Sanad web action QA buzz ${stamp}"
-document_type="Sanad web action QA document ${stamp}"
+buzz_message="Quick web action QA buzz ${stamp}"
+document_type="Quick web action QA document ${stamp}"
 document_file="sanad-web-action-${stamp}.pdf"
 
 post_form "$cookies" "${BASE_WEB_URL}${request_path}/buzz" "buzz-create" \
@@ -177,4 +177,4 @@ assert_contains "$detail_text" "$document_type" "approved document"
 assert_contains "$detail_text" "Approved" "Document approved status"
 pass "Document approval action persists and renders"
 
-echo "Sanad web action QA completed successfully against ${BASE_WEB_URL}."
+echo "Quick web action QA completed successfully against ${BASE_WEB_URL}."

@@ -3,29 +3,14 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"></script>
   </head>
-      <div class="container-fluid">
+      <div class="container-fluid quick-service-catalog-page">
         <div class="row">
             @include('service.partials.sanad-service-summary')
-            <div class="col-lg-12">
-                <div class="card card-block card-stretch">
-                    <div class="card-body p-0">
-                        <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
-                            @if($auth_user->can('service add') &&  Route::currentRouteName() !=='servicepackage.service')
-                            <a href="{{ route('service.create') }}" class="float-right mr-1 btn btn-sm btn-primary "><i class="fa fa-plus-circle"></i> {{ __('messages.add_form_title',['form' => __('messages.service')  ]) }}</a>
-                            @endif
-                        </div>
-                        {{-- {{ $dataTable->table(['class' => 'table  w-100'],false) }} --}}
-                    </div>
-                </div>
-            </div>
         </div>
-      </div>
-    <div class="card">
+	    <div class="card quick-service-catalog-table-card">
         <div class="card-body">
         <div class="row justify-content-between">
-            <div>
-              <div class="col-md-12">
+              <div class="col-md-6 mb-3">
               <form action="{{ route('service.bulk-action') }}" id="quick-action-form" class="form-disabled d-flex gap-3 align-items-center">
                     @csrf
                   <select name="action_type" class="form-control select2" id="quick-action-type" style="width:100%" disabled>
@@ -48,11 +33,9 @@
                 data-title="{{ __('service',['form'=>  __('service') ]) }}"
                 title="{{ __('service',['form'=>  __('service') ]) }}"
                 data-message='{{ __("Do you want to perform this action?") }}' disabled>{{ __('messages.apply') }}</button>
-            </div>
-          
             </form>
-          </div>
-              <div class="d-flex justify-content-end">
+              </div>
+              <div class="d-flex justify-content-end ml-auto mb-3">
                 <div class="datatable-filter ml-auto">
                   <select name="column_status" id="column_status" class="select2 form-control" data-filter="select" style="width: 100%">
                     <option value="">{{ __('messages.all') }}</option>
@@ -62,7 +45,7 @@
                 </div>
                 <div class="input-group ml-2">
                     <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control dt-search" placeholder="Search..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
+                    <input type="text" class="form-control dt-search" placeholder="{{ __("messages.search") }}..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
                   </div>
               </div>
                
@@ -72,9 +55,196 @@
                 </table>
               </div>
             </div>
-        </div>
-    </div>
-    <script>
+	        </div>
+	    </div>
+	    </div>
+      @once
+        <style>
+          .quick-service-catalog-page {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 26px 22px 48px;
+          }
+
+          .quick-service-catalog-page > .row {
+            margin-left: 0;
+            margin-right: 0;
+          }
+
+          .quick-service-catalog-table-card {
+            border: 1px solid #dce6f4;
+            border-radius: 24px;
+            box-shadow: 0 18px 50px rgba(10, 22, 38, .06);
+            overflow: hidden;
+          }
+
+          .quick-service-catalog-table-card .card-body {
+            padding: 24px;
+          }
+
+          .quick-service-catalog-table-card .form-control,
+          .quick-service-catalog-table-card .input-group-text {
+            min-height: 48px;
+            border-color: #dce6f4;
+            border-radius: 12px;
+          }
+
+          .quick-service-catalog-table-card .input-group {
+            min-width: 260px;
+          }
+
+          .quick-service-catalog-table-card .input-group-text {
+            background: #f8fbff;
+          }
+
+          .quick-service-catalog-table-card .btn-primary {
+            min-height: 48px;
+            border-radius: 12px;
+            font-weight: 800;
+            padding-left: 24px;
+            padding-right: 24px;
+          }
+
+          .quick-service-catalog-table-card .table-responsive,
+          .quick-service-catalog-table-card .dataTables_wrapper .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .quick-service-catalog-table-card table.dataTable,
+          .quick-service-catalog-table-card #datatable {
+            min-width: 1120px;
+            margin-bottom: 0;
+          }
+
+          .quick-service-catalog-table-card table.dataTable thead th {
+            background: #1f6bff;
+            color: #fff;
+            border-color: rgba(255, 255, 255, .16);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            white-space: nowrap;
+          }
+
+          .quick-service-catalog-table-card table.dataTable tbody td {
+            vertical-align: middle;
+          }
+
+          @media (max-width: 899px) {
+            .quick-service-catalog-page {
+              padding: 16px 12px 36px;
+            }
+
+            .quick-service-catalog-table-card {
+              border-radius: 20px;
+            }
+
+            .quick-service-catalog-table-card .card-body {
+              padding: 16px;
+            }
+
+            .quick-service-catalog-table-card .row.justify-content-between {
+              gap: 12px;
+            }
+
+            .quick-service-catalog-table-card form,
+            .quick-service-catalog-table-card .d-flex.justify-content-end {
+              width: 100%;
+              flex-direction: column;
+              align-items: stretch !important;
+              margin-left: 0 !important;
+            }
+
+            .quick-service-catalog-table-card .datatable-filter,
+            .quick-service-catalog-table-card .input-group,
+            .quick-service-catalog-table-card .btn-primary {
+              width: 100%;
+              min-width: 0;
+              margin-left: 0 !important;
+            }
+
+            .quick-service-catalog-table-card .table-responsive,
+            .quick-service-catalog-table-card .dataTables_wrapper .table-responsive {
+              border: 1px solid #dce6f4;
+              border-radius: 16px;
+              background: #fff;
+            }
+
+            .quick-service-catalog-table-card #datatable,
+            .quick-service-catalog-table-card #datatable thead,
+            .quick-service-catalog-table-card #datatable tbody,
+            .quick-service-catalog-table-card #datatable tr,
+            .quick-service-catalog-table-card #datatable th,
+            .quick-service-catalog-table-card #datatable td {
+              display: block;
+              width: 100% !important;
+              min-width: 0;
+            }
+
+            .quick-service-catalog-table-card #datatable thead {
+              display: none;
+            }
+
+            .quick-service-catalog-table-card #datatable tbody tr {
+              border: 1px solid #dce6f4;
+              border-radius: 16px;
+              margin: 12px;
+              padding: 10px 12px;
+              background: #fff;
+              box-shadow: 0 10px 24px rgba(10,22,38,.05);
+            }
+
+            .quick-service-catalog-table-card #datatable tbody td {
+              display: flex;
+              flex-direction: column;
+              align-items: stretch;
+              gap: 6px;
+              border: 0;
+              border-bottom: 1px solid #edf3fb;
+              padding: 10px 0;
+              text-align: left;
+              white-space: normal !important;
+              overflow-wrap: anywhere;
+            }
+
+            .quick-service-catalog-table-card #datatable tbody td > * {
+              max-width: 100%;
+              min-width: 0;
+              white-space: normal !important;
+              overflow-wrap: anywhere;
+              text-align: left;
+            }
+
+            .quick-service-catalog-table-card #datatable tbody td:last-child {
+              border-bottom: 0;
+            }
+
+            .quick-service-catalog-table-card #datatable tbody td::before {
+              content: attr(data-label);
+              color: #64748b;
+              font-size: 12px;
+              font-weight: 800;
+              text-align: left;
+              text-transform: uppercase;
+              letter-spacing: .02em;
+            }
+
+            .quick-service-catalog-table-card #datatable tbody td:first-child::before {
+              content: "";
+            }
+
+            .quick-service-catalog-table-card .dataTables_length,
+            .quick-service-catalog-table-card .dataTables_paginate {
+              width: 100%;
+              text-align: center;
+              justify-content: center;
+            }
+          }
+        </style>
+      @endonce
+	    <script>
         document.addEventListener('DOMContentLoaded', (event) => {
           
         window.renderedDataTable = $('#datatable').DataTable({
@@ -108,12 +278,12 @@
                     {
                         data: 'name',
                         name: 'name',
-                        title: "English Name"
+                        title: "{{ __("messages.english_name") }}"
                     },
                     {
                         data:'name_ar',
                         name:'name_ar',
-                        title:"Arabic Name"
+                        title:"{{ __("messages.arabic_name") }}"
                     },
                     {
                         data:'category_id',
@@ -123,17 +293,17 @@
                     {
                         data:'government_entity',
                         name:'government_entity',
-                        title:"Government Entity"
+                        title:"{{ __("messages.government_entity") }}"
                     },
                     {
                         data:'government_fee',
                         name:'government_fee',
-                        title:"Government Fees"
+                        title:"{{ __("messages.government_fee") }}"
                     },
                     {
                         data:'service_fee',
                         name:'service_fee',
-                        title:"Service Fees"
+                        title:"{{ __("messages.service_fee") }}"
                     },
                     {
                         data:'is_featured',
@@ -153,9 +323,20 @@
                         title: "{{ __('messages.action') }}"
                     }
                     
-                ]
-                
-            });
+	                ],
+                  drawCallback: function () {
+                    const labels = this.api().columns().header().toArray().map((header) => $(header).text().trim());
+                    $('#datatable tbody tr').each(function () {
+                      $(this).find('td').each(function (index) {
+                        const label = labels[index] || '';
+                        if (label) {
+                          $(this).attr('data-label', label);
+                        }
+                      });
+                    });
+                  }
+
+	            });
       });
 
     function resetQuickAction () {

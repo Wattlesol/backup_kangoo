@@ -121,7 +121,7 @@ class SanadAiFirstResponderService
             'thread_id' => $thread->id,
             'sender_id' => null,
             'sender_role' => 'system',
-            'message' => "I don't have enough information on this. I can connect you with a Sanad agent if you want.",
+            'message' => "I don't have enough information on this. I can connect you with a Quick agent if you want.",
             'message_type' => 'ai_handover_prompt',
             'ai_interaction_id' => $interaction->id,
             'visible_to' => self::SHARED_ROLES,
@@ -149,10 +149,10 @@ class SanadAiFirstResponderService
     public function assignChat(Booking $booking, string $targetType, ?User $targetUser, User $actor, ?string $note = null): void
     {
         $label = match ($targetType) {
-            'sanad_team' => 'Sanad team',
+            'sanad_team' => 'Quick team',
             'partner_team' => 'Partner team',
             'user' => $targetUser ? $this->displayName($targetUser) : 'team member',
-            default => 'Sanad team',
+            default => 'Quick team',
         };
 
         $booking->forceFill([

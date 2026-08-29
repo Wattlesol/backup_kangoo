@@ -1,17 +1,22 @@
 <x-master-layout>
-    <div class="container-fluid sanad-document-queue">
-        <div class="card card-block card-stretch">
-            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+@php
+    $isAr = app()->getLocale() === 'ar';
+    $partnerDocumentName = function ($document, $fallback = null) use ($isAr) {
+        return optional($document)->localized_name
+            ?: ($fallback ?: ($isAr ? 'مستند مطلوب' : 'Required document'));
+    };
+@endphp
+<div class="sanad-document-queue quick-document-page" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
+        <div class="quick-admin-hero quick-documents-hero">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
-                    <h4 class="font-weight-bold mb-1">Document Review</h4>
-                    <span class="text-muted">Partner onboarding verification and request-specific service documents.</span>
+                    <div class="quick-documents-kicker"><x-quick-icon name="shield" /> {{ $isAr ? 'الامتثال وتدقيق الوثائق الرسمية' : 'Compliance & document intake' }}</div>
+                    <h4 class="font-weight-bold mb-1">{{ $isAr ? 'مراجعة المستندات وتوثيق الشركاء' : 'Document Verification & Vault' }}</h4>
+                    <span class="text-muted">{{ $isAr ? 'بوابة موحدة لاعتماد ملفات الشركاء وتدقيق مستندات معاملات العملاء.' : 'Unified partner onboarding verification and customer request document review.' }}</span>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{{ route('provider.index') }}" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-user-tie mr-1"></i> Partners
-                    </a>
-                    <a href="{{ route('sanad.requests.index') }}" class="btn btn-sm btn-primary">
-                        <i class="fas fa-folder-open mr-1"></i> Orders
+                    <a href="{{ route('sanad.requests.index') }}" class="quick-table-btn">
+                        <x-quick-icon name="briefcase" /> {{ $isAr ? 'طابور الطلبات' : 'Request Queue' }}
                     </a>
                 </div>
             </div>
@@ -19,86 +24,70 @@
 
         <div class="row sanad-summary-grid">
             <div class="col-lg-3 col-md-6">
-                <div class="card total-provider-card sanad-dashboard-stat-card">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h4 class="mb-2 booking-text font-weight-bold">{{ $partnerSummary['partners'] }}</h4>
-                                <p class="mb-0 booking-text">Partners</p>
-                            </div>
-                            <div class="col-auto d-flex flex-column">
-                                <div class="iq-card-icon iq-card-icon-provider icon-shape text-white rounded-circle shadow">
-                                    <i class="fas fa-user-tie"></i>
-                                </div>
-                            </div>
+                <div class="quick-kpi-card sanad-dashboard-stat-card">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h4 class="mb-2 booking-text font-weight-bold">{{ $partnerSummary['partners'] }}</h4>
+                            <p class="mb-0 booking-text">{{ $isAr ? "الشركاء" : "Partners" }}</p>
+                        </div>
+                        <div class="quick-kpi-icon">
+                            <x-quick-icon name="briefcase" size="22" />
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
-                <div class="card total-service-card sanad-dashboard-stat-card">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h4 class="mb-2 booking-text font-weight-bold">{{ $partnerSummary['pending'] }}</h4>
-                                <p class="mb-0 booking-text">Partner Docs Pending</p>
-                            </div>
-                            <div class="col-auto d-flex flex-column">
-                                <div class="iq-card-icon iq-card-icon-service icon-shape text-white rounded-circle shadow">
-                                    <i class="fas fa-file-signature"></i>
-                                </div>
-                            </div>
+                <div class="quick-kpi-card sanad-dashboard-stat-card">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h4 class="mb-2 booking-text font-weight-bold">{{ $partnerSummary['pending'] }}</h4>
+                            <p class="mb-0 booking-text">{{ $isAr ? "مستندات الشركاء المعلقة" : "Partner Docs Pending" }}</p>
+                        </div>
+                        <div class="quick-kpi-icon">
+                            <x-quick-icon name="shield" size="22" />
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
-                <div class="card total-booking-card sanad-dashboard-stat-card">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h4 class="mb-2 booking-text font-weight-bold">{{ $orderSummary['orders'] }}</h4>
-                                <p class="mb-0 booking-text">Requests With Docs</p>
-                            </div>
-                            <div class="col-auto d-flex flex-column">
-                                <div class="iq-card-icon iq-card-icon-booking icon-shape text-white rounded-circle shadow">
-                                    <i class="fas fa-folder-open"></i>
-                                </div>
-                            </div>
+                <div class="quick-kpi-card sanad-dashboard-stat-card">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h4 class="mb-2 booking-text font-weight-bold">{{ $orderSummary['orders'] }}</h4>
+                            <p class="mb-0 booking-text">{{ $isAr ? "طلبات تحتوي مستندات" : "Requests With Docs" }}</p>
+                        </div>
+                        <div class="quick-kpi-icon">
+                            <x-quick-icon name="briefcase" size="22" />
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
-                <div class="card total-revenue sanad-dashboard-stat-card">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <h4 class="mb-2 booking-text font-weight-bold">{{ $orderSummary['pending'] }}</h4>
-                                <p class="mb-0 booking-text">Request Docs Pending</p>
-                            </div>
-                            <div class="col-auto d-flex flex-column">
-                                <div class="iq-card-icon iq-card-icon-revenue icon-shape text-white rounded-circle shadow">
-                                    <i class="fas fa-clipboard-check"></i>
-                                </div>
-                            </div>
+                <div class="quick-kpi-card sanad-dashboard-stat-card">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h4 class="mb-2 booking-text font-weight-bold">{{ $orderSummary['pending'] }}</h4>
+                            <p class="mb-0 booking-text">{{ $isAr ? "مستندات الطلبات المعلقة" : "Request Docs Pending" }}</p>
+                        </div>
+                        <div class="quick-kpi-icon">
+                            <x-quick-icon name="check" size="22" />
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+        </div>
 
-        <div class="card">
-            <div class="card-body">
+        <div class="quick-card quick-document-panel">
                 <ul class="nav nav-tabs nav-fill tabslink sanad-tabs mb-4" role="tablist">
                     <li class="nav-item">
                         <a class="nav-link {{ request('tab') !== 'orders' ? 'active' : '' }}" data-toggle="tab" href="#partner-documents" role="tab">
-                            <i class="fas fa-building mr-2"></i> Partner Onboarding
+                            <i class="fas fa-building mr-2"></i> {{ $isAr ? "توثيق الشركاء" : "Partner Onboarding" }}
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {{ request('tab') === 'orders' ? 'active' : '' }}" data-toggle="tab" href="#request-documents" role="tab">
-                            <i class="fas fa-id-card mr-2"></i> Service Documents
+                            <i class="fas fa-id-card mr-2"></i> {{ $isAr ? "مستندات الخدمات والطلبات" : "Service Documents" }}
                         </a>
                     </li>
                 </ul>
@@ -109,17 +98,17 @@
                             <input type="hidden" name="tab" value="partners">
                             <div class="form-row align-items-end">
                                 <div class="col-md-3 mb-2">
-                                    <label class="form-control-label">Review Status</label>
+                                    <label class="form-control-label">{{ $isAr ? "حالة المراجعة" : "Review Status" }}</label>
                                     <select name="partner_status" class="form-control">
-                                        <option value="">All partner documents</option>
-                                        <option value="pending" {{ request('partner_status') === 'pending' || request('partner_status') === '0' ? 'selected' : '' }}>Pending Review</option>
-                                        <option value="approved" {{ request('partner_status') === 'approved' || request('partner_status') === '1' ? 'selected' : '' }}>Approved</option>
-                                        <option value="rejected" {{ request('partner_status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                        <option value="">{{ $isAr ? "جميع مستندات الشركاء" : "All partner documents" }}</option>
+                                        <option value="pending" {{ request('partner_status') === 'pending' || request('partner_status') === '0' ? 'selected' : '' }}>{{ $isAr ? 'قيد المراجعة' : 'Pending Review' }}</option>
+                                        <option value="approved" {{ request('partner_status') === 'approved' || request('partner_status') === '1' ? 'selected' : '' }}>{{ $isAr ? 'معتمد' : 'Approved' }}</option>
+                                        <option value="rejected" {{ request('partner_status') === 'rejected' ? 'selected' : '' }}>{{ $isAr ? 'مرفوض' : 'Rejected' }}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2 mb-2">
                                     <button class="btn btn-primary btn-block">
-                                        <i class="fas fa-filter mr-1"></i> Filter
+                                        <i class="fas fa-filter mr-1"></i> {{ $isAr ? "تصفية" : "Filter" }}
                                     </button>
                                 </div>
                             </div>
@@ -127,7 +116,7 @@
 
                         <div class="row">
                             @forelse($partnerCards as $index => $card)
-                                @php($partner = $card['partner'])
+                                @php $partner = $card['partner']; @endphp
                                 <div class="col-xl-4 col-lg-6 col-md-6 mb-3">
                                     <div class="sanad-entity-card">
                                         <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
@@ -137,14 +126,14 @@
                                                 <div class="text-muted small">{{ optional($partner)->contact_number ?: 'No phone' }}</div>
                                             </div>
                                             <span class="badge badge-{{ $card['status'] === 'verified' ? 'success' : ($card['status'] === 'in_review' ? 'warning' : 'light') }}">
-                                                {{ Str::headline($card['status']) }}
+                                                {{ $card['status'] === 'verified' ? ($isAr ? 'موثق ومعتمد' : 'Verified') : ($card['status'] === 'in_review' ? ($isAr ? 'قيد المراجعة' : 'In Review') : ($isAr ? 'غير مكتمل' : Str::headline($card['status']))) }}
                                             </span>
                                         </div>
 
                                         <div class="sanad-metric-grid mb-3">
-                                            <div><span>Approved</span><strong>{{ $card['approved'] }}/{{ $card['total'] }}</strong></div>
-                                            <div><span>Uploaded</span><strong>{{ $card['uploaded'] }}</strong></div>
-                                            <div><span>Pending</span><strong>{{ $card['pending'] }}</strong></div>
+                                            <div><span>{{ $isAr ? 'معتمد' : 'Approved' }}</span><strong>{{ $card['approved'] }}/{{ $card['total'] }}</strong></div>
+                                            <div><span>{{ $isAr ? 'تم الرفع' : 'Uploaded' }}</span><strong>{{ $card['uploaded'] }}</strong></div>
+                                            <div><span>{{ $isAr ? 'معلق' : 'Pending' }}</span><strong>{{ $card['pending'] }}</strong></div>
                                         </div>
                                         <div class="progress sanad-progress mb-3">
                                             <div class="progress-bar" style="width: {{ $card['progress'] }}%"></div>
@@ -152,23 +141,23 @@
 
                                         <div class="sanad-mini-list mb-3">
                                             @foreach($card['documents']->take(3) as $document)
-                                                @php($hasUpload = getMediaFileExit($document, 'provider_document'))
+                                                @php $hasUpload = getMediaFileExit($document, 'provider_document'); @endphp
                                                 <div class="sanad-mini-row">
-                                                    <span>{{ optional($document->document)->name ?: 'Required document' }}</span>
+                                                    <span>{{ $partnerDocumentName($document->document) }}</span>
                                                     <span class="text-{{ $document->verification_status === 'rejected' ? 'danger' : ($document->is_verified ? 'success' : ($hasUpload ? 'warning' : 'muted')) }}">
-                                                        {{ $document->verification_status === 'rejected' ? 'Rejected' : ($document->is_verified ? 'Approved' : ($hasUpload ? 'Review' : 'Missing')) }}
+                                                        {{ $document->verification_status === 'rejected' ? ($isAr ? 'مرفوض' : 'Rejected') : ($document->is_verified ? ($isAr ? 'معتمد' : 'Approved') : ($hasUpload ? ($isAr ? 'قيد المراجعة' : 'Review') : ($isAr ? 'مفقود' : 'Missing'))) }}
                                                     </span>
                                                 </div>
                                             @endforeach
                                             @if($card['documents']->count() > 3)
-                                                <div class="small text-muted mt-1">+{{ $card['documents']->count() - 3 }} more requirements</div>
+                                                <div class="small text-muted mt-1">+{{ $card['documents']->count() - 3 }} {{ $isAr ? 'متطلبات إضافية' : 'more requirements' }}</div>
                                             @endif
                                         </div>
 
                                         <div class="sanad-card-actions">
-                                            <a href="{{ route('provider.show', ['provider' => optional($partner)->id]) }}" class="btn btn-sm sanad-action-button sanad-profile-link">Open Partner Profile</a>
+                                            <a href="{{ route('provider.show', ['provider' => optional($partner)->id]) }}" class="btn btn-sm sanad-action-button sanad-profile-link">{{ $isAr ? "فتح ملف الشريك" : "Open Partner Profile" }}</a>
                                             <button class="btn btn-sm sanad-action-button sanad-collapse-toggle collapsed" type="button" data-toggle="collapse" data-target="#partner-drawer-{{ $index }}" aria-expanded="false" aria-controls="partner-drawer-{{ $index }}">
-                                                <span class="sanad-collapse-label"><i class="fas fa-list-alt mr-1"></i> Document checklist</span>
+                                                <span class="sanad-collapse-label"><i class="fas fa-list-alt mr-1"></i> {{ $isAr ? "قائمة المستندات المطلوبة" : "Document checklist" }}</span>
                                                 <span class="sanad-collapse-count">{{ $card['documents']->count() }}</span>
                                             </button>
                                         </div>
@@ -178,22 +167,22 @@
                                                 <table class="table table-sm table-hover mb-0 sanad-document-table">
                                                     <thead>
                                                         <tr>
-                                                            <th>Document</th>
-                                                            <th>Status</th>
-                                                            <th class="text-right">Action</th>
+                                                            <th>{{ $isAr ? "المستند" : "Document" }}</th>
+                                                            <th>{{ $isAr ? "الحالة" : "Status" }}</th>
+                                                            <th class="text-right">{{ $isAr ? "الإجراء" : "Action" }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         @foreach($card['documents'] as $document)
-                                                            @php($hasUpload = getMediaFileExit($document, 'provider_document'))
-                                                            @php($media = $hasUpload ? $document->getFirstMedia('provider_document') : null)
-                                                            @php($mediaUrl = $media ? $media->getFullUrl() : null)
-                                                            @php($mimeType = optional($media)->mime_type ?: '')
-                                                            @php($isImage = Str::startsWith($mimeType, 'image/'))
-                                                            @php($isPdf = $mimeType === 'application/pdf' || Str::endsWith(Str::lower((string) optional($media)->file_name), '.pdf'))
+                                                            @php $hasUpload = getMediaFileExit($document, 'provider_document'); @endphp
+                                                            @php $media = $hasUpload ? $document->getFirstMedia('provider_document') : null; @endphp
+                                                            @php $mediaUrl = $media ? $media->getFullUrl() : null; @endphp
+                                                            @php $mimeType = optional($media)->mime_type ?: ''; @endphp
+                                                            @php $isImage = Str::startsWith($mimeType, 'image/'); @endphp
+                                                            @php $isPdf = $mimeType === 'application/pdf' || Str::endsWith(Str::lower((string) optional($media)->file_name), '.pdf'); @endphp
                                                             <tr>
                                                                 <td>
-                                                                    <strong>{{ optional($document->document)->name ?: 'Required document' }}</strong>
+                                                                    <strong>{{ $partnerDocumentName($document->document) }}</strong>
                                                                     <div class="small text-muted">{{ optional($document->document)->is_required ? 'Required' : 'Optional' }} · {{ $hasUpload ? (optional($media)->file_name ?: 'Uploaded') : 'Not uploaded yet' }}</div>
                                                                     @if($document->review_reason)
                                                                         <div class="small text-danger">{{ $document->review_reason }}</div>
@@ -204,9 +193,9 @@
                                                                 </td>
                                                                 <td class="text-right">
                                                                     @if($hasUpload)
-                                                                        <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#partnerDocumentModal{{ $document->id }}">View</button>
+                                                                        <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#partnerDocumentModal{{ $document->id }}">{{ $isAr ? "عرض" : "View" }}</button>
                                                                     @else
-                                                                        <span class="text-muted small">Waiting upload</span>
+                                                                        <span class="text-muted small">{{ $isAr ? "بانتظار الرفع" : "Waiting upload" }}</span>
                                                                     @endif
                                                                 </td>
                                                             </tr>
@@ -215,19 +204,19 @@
                                                 </table>
                                             </div>
                                             @foreach($card['documents'] as $document)
-                                                @php($hasUpload = getMediaFileExit($document, 'provider_document'))
-                                                @php($media = $hasUpload ? $document->getFirstMedia('provider_document') : null)
-                                                @php($mediaUrl = $media ? $media->getFullUrl() : null)
-                                                @php($mimeType = optional($media)->mime_type ?: '')
-                                                @php($isImage = Str::startsWith($mimeType, 'image/'))
-                                                @php($isPdf = $mimeType === 'application/pdf' || Str::endsWith(Str::lower((string) optional($media)->file_name), '.pdf'))
+                                                @php $hasUpload = getMediaFileExit($document, 'provider_document'); @endphp
+                                                @php $media = $hasUpload ? $document->getFirstMedia('provider_document') : null; @endphp
+                                                @php $mediaUrl = $media ? $media->getFullUrl() : null; @endphp
+                                                @php $mimeType = optional($media)->mime_type ?: ''; @endphp
+                                                @php $isImage = Str::startsWith($mimeType, 'image/'); @endphp
+                                                @php $isPdf = $mimeType === 'application/pdf' || Str::endsWith(Str::lower((string) optional($media)->file_name), '.pdf'); @endphp
                                                 @if($hasUpload)
                                                     <div class="modal fade sanad-document-modal" id="partnerDocumentModal{{ $document->id }}" tabindex="-1" role="dialog" aria-hidden="true">
                                                         <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
                                                             <div class="modal-content">
                                                                 <div class="modal-header">
                                                                     <div>
-                                                                        <h5 class="modal-title">{{ optional($document->document)->name ?: 'Partner document' }}</h5>
+                                                                        <h5 class="modal-title">{{ $partnerDocumentName($document->document, $isAr ? 'مستند الشريك' : 'Partner document') }}</h5>
                                                                         <div class="small text-muted">{{ optional($partner)->display_name ?: 'Partner' }} · {{ optional($media)->file_name }}</div>
                                                                     </div>
                                                                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -235,11 +224,11 @@
                                                                 <div class="modal-body">
                                                                     <div class="sanad-modal-preview">
                                                                         @if($isImage)
-                                                                            <img src="{{ $mediaUrl }}" alt="{{ optional($document->document)->name ?: 'Partner document' }}">
+                                                                            <img src="{{ $mediaUrl }}" alt="{{ $partnerDocumentName($document->document, $isAr ? 'مستند الشريك' : 'Partner document') }}">
                                                                         @elseif($isPdf)
-                                                                            <iframe src="{{ $mediaUrl }}" title="{{ optional($document->document)->name ?: 'Partner document' }}"></iframe>
+                                                                            <iframe src="{{ $mediaUrl }}" title="{{ $partnerDocumentName($document->document, $isAr ? 'مستند الشريك' : 'Partner document') }}"></iframe>
                                                                         @else
-                                                                            <div class="sanad-modal-file"><i class="fas fa-file-alt"></i><span>Preview is not available for this file type.</span><a target="_blank" href="{{ $mediaUrl }}">Download file</a></div>
+                                                                            <div class="sanad-modal-file"><i class="fas fa-file-alt"></i><span>{{ $isAr ? "المعاينة غير متاحة لهذا النوع من الملفات." : "Preview is not available for this file type." }}</span><a target="_blank" href="{{ $mediaUrl }}">{{ $isAr ? "تحميل الملف" : "Download file" }}</a></div>
                                                                         @endif
                                                                     </div>
                                                                 </div>
@@ -248,13 +237,13 @@
                                                                         <form method="POST" action="{{ route('sanad.partner-documents.review', $document->id) }}" class="mb-0">
                                                                             @csrf
                                                                             <input type="hidden" name="verification_status" value="approved">
-                                                                            <button class="btn btn-primary">Approve Document</button>
+                                                                            <button class="btn btn-primary">{{ $isAr ? "اعتماد المستند" : "Approve Document" }}</button>
                                                                         </form>
                                                                         <form method="POST" action="{{ route('sanad.partner-documents.review', $document->id) }}" class="sanad-reject-form mb-0">
                                                                             @csrf
                                                                             <input type="hidden" name="verification_status" value="rejected">
-                                                                            <input name="review_reason" class="form-control" placeholder="Reason for rejection" required>
-                                                                            <button class="btn btn-outline-danger">Reject</button>
+                                                                            <input name="review_reason" class="form-control" placeholder="{{ $isAr ? 'سبب الرفض' : 'Reason for rejection' }}" required>
+                                                                            <button class="btn btn-outline-danger">{{ $isAr ? "رفض" : "Reject" }}</button>
                                                                         </form>
                                                                     </div>
                                                                 </div>
@@ -279,26 +268,26 @@
                             <input type="hidden" name="tab" value="orders">
                             <div class="form-row align-items-end">
                                 <div class="col-md-3 mb-2">
-                                    <label class="form-control-label">Review Status</label>
+                                    <label class="form-control-label">{{ $isAr ? "حالة المراجعة" : "Review Status" }}</label>
                                     <select name="order_status" class="form-control">
-                                        <option value="">All service documents</option>
+                                        <option value="">{{ $isAr ? "جميع مستندات الطلبات" : "All service documents" }}</option>
                                         @foreach(['pending','approved','rejected','replacement_requested'] as $status)
                                             <option value="{{ $status }}" {{ request('order_status') === $status ? 'selected' : '' }}>{{ Str::headline($status) }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                                 <div class="col-md-3 mb-2">
-                                    <label class="form-control-label">Submitted By</label>
+                                    <label class="form-control-label">{{ $isAr ? "مرسل بواسطة" : "Submitted By" }}</label>
                                     <select name="source" class="form-control">
-                                        <option value="">Customer and Partner</option>
-                                        <option value="customer" {{ request('source') === 'customer' ? 'selected' : '' }}>Customer</option>
-                                        <option value="partner" {{ request('source') === 'partner' ? 'selected' : '' }}>Partner</option>
-                                        <option value="request" {{ request('source') === 'request' ? 'selected' : '' }}>Request Upload</option>
+                                        <option value="">{{ $isAr ? "العميل والشريك" : "Customer and Partner" }}</option>
+                                        <option value="customer" {{ request('source') === 'customer' ? 'selected' : '' }}>{{ $isAr ? "العميل" : "Customer" }}</option>
+                                        <option value="partner" {{ request('source') === 'partner' ? 'selected' : '' }}>{{ $isAr ? "الشريك" : "Partner" }}</option>
+                                        <option value="request" {{ request('source') === 'request' ? 'selected' : '' }}>{{ $isAr ? "رفع من تفاصيل الطلب" : "Request Upload" }}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2 mb-2">
                                     <button class="btn btn-primary btn-block">
-                                        <i class="fas fa-filter mr-1"></i> Filter
+                                        <i class="fas fa-filter mr-1"></i> {{ $isAr ? "تصفية" : "Filter" }}
                                     </button>
                                 </div>
                             </div>
@@ -306,13 +295,13 @@
 
                         <div class="row">
                             @forelse($requestCards as $requestIndex => $card)
-                                @php($booking = $card['booking'])
-                                @php($service = $card['service'])
+                                @php $booking = $card['booking']; @endphp
+                                @php $service = $card['service']; @endphp
                                 <div class="col-xl-4 col-lg-6 col-md-6 mb-3">
                                     <div class="sanad-entity-card h-100">
                                         <div class="sanad-request-header mb-3">
                                             <div>
-                                                <div class="small text-muted">{{ optional($booking)->sanad_reference ?: '#'.optional($booking)->id }}</div>
+                                                <div class="small text-muted">{{ optional($booking)->quick_reference ?: 'QUICK-'.str_pad((string) optional($booking)->id, 6, '0', STR_PAD_LEFT) }}</div>
                                                 <h5 class="font-weight-bold mb-1">{{ optional(optional($booking)->customer)->display_name ?: 'Customer' }}</h5>
                                                 <div class="text-muted">{{ optional($service)->name_en ?: optional($service)->name ?: 'Service' }}</div>
                                             </div>
@@ -322,10 +311,10 @@
                                         </div>
 
                                         <div class="sanad-request-meta mb-3">
-                                            <div><span>Assigned Partner</span><strong>{{ optional(optional($booking)->provider)->display_name ?: 'Unassigned' }}</strong></div>
-                                            <div><span>Required</span><strong>{{ $card['required_count'] }}</strong></div>
-                                            <div><span>Submitted</span><strong>{{ $card['submitted_count'] }}</strong></div>
-                                            <div><span>Approved</span><strong>{{ $card['approved_count'] }}</strong></div>
+                                            <div><span>{{ $isAr ? "الشريك المسند" : "Assigned Partner" }}</span><strong>{{ optional(optional($booking)->provider)->display_name ?: 'Unassigned' }}</strong></div>
+                                            <div><span>{{ $isAr ? "مطلوب" : "Required" }}</span><strong>{{ $card['required_count'] }}</strong></div>
+                                            <div><span>{{ $isAr ? "تم الإرسال" : "Submitted" }}</span><strong>{{ $card['submitted_count'] }}</strong></div>
+                                            <div><span>{{ $isAr ? "معتمد" : "Approved" }}</span><strong>{{ $card['approved_count'] }}</strong></div>
                                         </div>
 
                                         <div class="progress sanad-progress mb-3">
@@ -334,42 +323,42 @@
 
                                         @if($card['missing_required']->isNotEmpty())
                                             <div class="sanad-section-note mb-3">
-                                                <strong>Missing required:</strong>
-                                                {{ $card['missing_required']->pluck('name')->filter()->join(', ') ?: 'Required document pending' }}
+                                                <strong>{{ $isAr ? "مستندات مطلوبة مفقودة:" : "Missing required:" }}</strong>
+                                                {{ $card['missing_required']->map(fn ($document) => localized_service_document_name($document))->filter()->join(', ') ?: ($isAr ? 'مستند مطلوب قيد الانتظار' : 'Required document pending') }}
                                             </div>
                                         @endif
 
                                         <div class="sanad-card-actions">
                                             @if($booking)
-                                                <a href="{{ route('sanad.requests.show', $booking->id) }}" class="btn btn-sm sanad-action-button sanad-profile-link">Open Request Details</a>
+                                                <a href="{{ route('sanad.requests.show', $booking->id) }}" class="btn btn-sm sanad-action-button sanad-profile-link">{{ $isAr ? "فتح تفاصيل الطلب" : "Open Request Details" }}</a>
                                             @endif
                                             <button class="btn btn-sm sanad-action-button sanad-collapse-toggle collapsed" type="button" data-toggle="collapse" data-target="#request-documents-drawer-{{ $requestIndex }}" aria-expanded="false" aria-controls="request-documents-drawer-{{ $requestIndex }}">
-                                                <span class="sanad-collapse-label"><i class="fas fa-list-alt mr-1"></i> Document requests</span>
+                                                <span class="sanad-collapse-label"><i class="fas fa-list-alt mr-1"></i> {{ $isAr ? "طلبات المستندات" : "Document requests" }}</span>
                                                 <span class="sanad-collapse-count">{{ $card['documents']->count() + $card['document_requests']->count() }}</span>
                                             </button>
                                         </div>
 
                                         <div class="collapse sanad-inline-drawer mt-3" id="request-documents-drawer-{{ $requestIndex }}">
-                                            <div class="sanad-drawer-heading">Submitted documents</div>
+                                            <div class="sanad-drawer-heading">{{ $isAr ? "المستندات المرسلة" : "Submitted documents" }}</div>
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover mb-0 sanad-document-table">
                                                     <thead>
                                                         <tr>
-                                                            <th>Document</th>
-                                                            <th>Submitted By</th>
-                                                            <th>Uploaded</th>
-                                                            <th>Status</th>
-                                                            <th class="text-right">Action</th>
+                                                            <th>{{ $isAr ? "المستند" : "Document" }}</th>
+                                                            <th>{{ $isAr ? "مرسل بواسطة" : "Submitted By" }}</th>
+                                                            <th>{{ $isAr ? "تاريخ الرفع" : "Uploaded" }}</th>
+                                                            <th>{{ $isAr ? "الحالة" : "Status" }}</th>
+                                                            <th class="text-right">{{ $isAr ? "الإجراء" : "Action" }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                             @forelse($card['documents'] as $document)
-                                                @php($media = $document->getFirstMedia('document') ?: $document->getFirstMedia('sanad_document'))
-                                                @php($documentUrl = $media ? $media->getFullUrl() : $document->file_path)
-                                                @php($fileName = optional($media)->file_name ?: $document->file_name ?: 'Uploaded document')
-                                                @php($mimeType = optional($media)->mime_type ?: '')
-                                                @php($isImage = Str::startsWith($mimeType, 'image/'))
-                                                @php($isPdf = $mimeType === 'application/pdf' || Str::endsWith(Str::lower((string) $fileName), '.pdf') || Str::endsWith(Str::lower((string) $documentUrl), '.pdf'))
+                                                @php $media = $document->getFirstMedia('document') ?: $document->getFirstMedia('sanad_document'); @endphp
+                                                @php $documentUrl = $media ? $media->getFullUrl() : $document->file_path; @endphp
+                                                @php $fileName = optional($media)->file_name ?: $document->file_name ?: 'Uploaded document'; @endphp
+                                                @php $mimeType = optional($media)->mime_type ?: ''; @endphp
+                                                @php $isImage = Str::startsWith($mimeType, 'image/'); @endphp
+                                                @php $isPdf = $mimeType === 'application/pdf' || Str::endsWith(Str::lower((string) $fileName), '.pdf') || Str::endsWith(Str::lower((string) $documentUrl), '.pdf'); @endphp
                                                 <tr>
                                                     <td>
                                                         <strong>{{ Str::headline($document->document_type) }}</strong>
@@ -378,16 +367,16 @@
                                                             <div class="small text-danger">{{ $document->review_reason }}</div>
                                                         @endif
                                                     </td>
-                                                    <td>{{ Str::headline($document->source ?: 'request') }}</td>
+                                                    <td>{{ $isAr ? ($document->source === 'customer' ? 'العميل' : ($document->source === 'partner' ? 'الشريك' : 'الطلب')) : Str::headline($document->source ?: 'request') }}</td>
                                                     <td>{{ optional($document->created_at)->format('M d, Y') ?: '-' }}</td>
                                                     <td>
-                                                        <span class="badge badge-{{ $document->verification_status === 'approved' ? 'success' : ($document->verification_status === 'rejected' ? 'danger' : 'warning') }}">{{ Str::headline($document->verification_status ?: 'pending') }}</span>
+                                                        <span class="badge badge-{{ $document->verification_status === 'approved' ? 'success' : ($document->verification_status === 'rejected' ? 'danger' : 'warning') }}">{{ $isAr ? ($document->verification_status === 'approved' ? 'معتمد' : ($document->verification_status === 'rejected' ? 'مرفوض' : ($document->verification_status === 'uploaded' ? 'تم الرفع' : 'قيد المراجعة'))) : Str::headline($document->verification_status ?: 'pending') }}</span>
                                                     </td>
                                                     <td class="text-right">
                                                         @if($documentUrl)
-                                                            <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#requestDocumentModal{{ $document->id }}">View</button>
+                                                            <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#requestDocumentModal{{ $document->id }}">{{ $isAr ? "عرض" : "View" }}</button>
                                                         @else
-                                                            <span class="text-muted small">No file</span>
+                                                            <span class="text-muted small">{{ $isAr ? "لا يوجد ملف" : "No file" }}</span>
                                                         @endif
                                                     </td>
                                                 </tr>
@@ -413,7 +402,7 @@
                                                                         @elseif($isPdf)
                                                                             <iframe src="{{ $documentUrl }}" title="{{ Str::headline($document->document_type) }}"></iframe>
                                                                         @else
-                                                                            <div class="sanad-modal-file"><i class="fas fa-file-alt"></i><span>Preview is not available for this file type.</span><a target="_blank" href="{{ $documentUrl }}">Download file</a></div>
+                                                                            <div class="sanad-modal-file"><i class="fas fa-file-alt"></i><span>{{ $isAr ? "المعاينة غير متاحة لهذا النوع من الملفات." : "Preview is not available for this file type." }}</span><a target="_blank" href="{{ $documentUrl }}">{{ $isAr ? "تحميل الملف" : "Download file" }}</a></div>
                                                                         @endif
                                                                     </div>
                                                                 </div>
@@ -422,12 +411,12 @@
                                                                         <form method="POST" action="{{ route('sanad.requests.documents.review', [$booking->id, $document->id]) }}" class="sanad-modal-review-form mb-0">
                                                                             @csrf
                                                                             <select name="verification_status" class="form-control">
-                                                                                <option value="approved">Approve</option>
-                                                                                <option value="rejected">Reject</option>
-                                                                                <option value="replacement_requested">Request replacement</option>
+                                                                                <option value="approved">{{ $isAr ? "اعتماد" : "Approve" }}</option>
+                                                                                <option value="rejected">{{ $isAr ? "رفض" : "Reject" }}</option>
+                                                                                <option value="replacement_requested">{{ $isAr ? "طلب استبدال" : "Request replacement" }}</option>
                                                                             </select>
-                                                                            <input name="reason" class="form-control" placeholder="Reason for rejection/replacement">
-                                                                            <button class="btn btn-primary">Save Review</button>
+                                                                            <input name="reason" class="form-control" placeholder="{{ $isAr ? 'سبب الرفض أو طلب الاستبدال' : 'Reason for rejection/replacement' }}">
+                                                                            <button class="btn btn-primary">{{ $isAr ? "حفظ المراجعة" : "Save Review" }}</button>
                                                                         </form>
                                                                     @endif
                                                                 </div>
@@ -436,22 +425,22 @@
                                                     </div>
                                                 @endif
                                             @empty
-                                                <tr><td colspan="5" class="text-muted text-center">No submitted documents yet.</td></tr>
+                                                <tr><td colspan="5" class="text-muted text-center">{{ $isAr ? "لا توجد مستندات مرسلة حتى الآن." : "No submitted documents yet." }}</td></tr>
                                             @endforelse
                                                     </tbody>
                                                 </table>
                                             </div>
 
-                                            <div class="sanad-drawer-heading mt-3">Additional document requests</div>
+                                            <div class="sanad-drawer-heading mt-3">{{ $isAr ? "طلبات مستندات إضافية" : "Additional document requests" }}</div>
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover mb-0 sanad-document-table">
                                                     <thead>
                                                         <tr>
-                                                            <th>Document</th>
-                                                            <th>Requested From</th>
-                                                            <th>Due</th>
-                                                            <th>Status</th>
-                                                            <th>File</th>
+                                                            <th>{{ $isAr ? "المستند" : "Document" }}</th>
+                                                            <th>{{ $isAr ? "مطلوب من" : "Requested From" }}</th>
+                                                            <th>{{ $isAr ? "تاريخ الاستحقاق" : "Due" }}</th>
+                                                            <th>{{ $isAr ? "الحالة" : "Status" }}</th>
+                                                            <th>{{ $isAr ? "الملف" : "File" }}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -460,19 +449,19 @@
                                                     <td>
                                                         <strong>{{ $documentRequest->document_name }}</strong>
                                                         <div class="small text-muted">{{ $documentRequest->reason }}</div>
-                                                        <div class="small text-muted">By {{ optional($documentRequest->requester)->display_name ?: 'Sanad Team' }}</div>
+                                                        <div class="small text-muted">By {{ optional($documentRequest->requester)->display_name ?: 'Quick Team' }}</div>
                                                     </td>
-                                                    <td>{{ Str::headline($documentRequest->requested_from) }}</td>
+                                                    <td>{{ $isAr ? ($documentRequest->requested_from === 'customer' ? 'العميل' : ($documentRequest->requested_from === 'partner' ? 'الشريك' : 'الفريق')) : Str::headline($documentRequest->requested_from) }}</td>
                                                     <td>{{ $documentRequest->due_at ? $documentRequest->due_at->format('M d, Y') : '-' }}</td>
                                                     <td>
                                                         <span class="badge badge-{{ $documentRequest->status === 'approved' ? 'success' : ($documentRequest->status === 'rejected' ? 'danger' : 'warning') }}">
-                                                            {{ Str::headline($documentRequest->status ?: 'pending') }}
+                                                            {{ $isAr ? ($documentRequest->status === 'approved' ? 'معتمد' : ($documentRequest->status === 'rejected' ? 'مرفوض' : ($documentRequest->status === 'submitted' ? 'تم الإرسال' : 'قيد الانتظار'))) : Str::headline($documentRequest->status ?: 'pending') }}
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        @php($requestDocumentUrl = $documentRequest->document ? ($documentRequest->document->getFirstMediaUrl('document') ?: $documentRequest->document->getFirstMediaUrl('sanad_document') ?: $documentRequest->document->file_path) : null)
+                                                        @php $requestDocumentUrl = $documentRequest->document ? ($documentRequest->document->getFirstMediaUrl('document') ?: $documentRequest->document->getFirstMediaUrl('sanad_document') ?: $documentRequest->document->file_path) : null; @endphp
                                                         @if($requestDocumentUrl)
-                                                            <a target="_blank" href="{{ $requestDocumentUrl }}">Submitted file</a>
+                                                            <a target="_blank" href="{{ $requestDocumentUrl }}">{{ $isAr ? "الملف المرسل" : "Submitted file" }}</a>
                                                         @else
                                                             <span class="text-muted small">Pending</span>
                                                         @endif
@@ -500,14 +489,106 @@
     </div>
 
     <style>
+            .quick-document-page {
+                max-width: 1180px;
+                margin: 0 auto;
+            }
+
+            .quick-document-page .text-muted,
+            .quick-document-page .small {
+                color: var(--quick-shell-muted) !important;
+            }
+
+            .quick-documents-hero h4 {
+                color: var(--quick-shell-ink);
+                font-size: clamp(22px, 2.5vw, 32px);
+                font-weight: 900;
+            }
+
+            .quick-documents-kicker {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                border-radius: 999px;
+                padding: 6px 14px;
+                margin-bottom: 12px;
+                color: var(--quick-blue);
+                background: rgba(31,107,255,.1);
+                font-size: 12px;
+                font-weight: 900;
+            }
+
+            .quick-document-panel {
+                overflow: hidden;
+            }
+
+            .quick-document-page .quick-kpi-card {
+                min-height: 118px;
+                margin-bottom: 20px;
+            }
+
+            .quick-document-page .quick-kpi-icon {
+                color: var(--quick-blue);
+                background: rgba(31,107,255,.1);
+            }
+
+            .quick-document-page .booking-text {
+                color: var(--quick-shell-ink) !important;
+            }
+
+            .quick-document-page .form-control {
+                min-height: 42px;
+                border-color: var(--quick-shell-line);
+                border-radius: 12px;
+                color: var(--quick-shell-ink);
+                background: var(--quick-shell-surface);
+                box-shadow: none;
+            }
+
+            .quick-document-page .btn-primary {
+                border-color: var(--quick-blue);
+                border-radius: 12px;
+                background: var(--quick-blue);
+                color: #fff;
+                font-size: 12px;
+                font-weight: 900;
+                min-height: 38px;
+                padding: 8px 14px;
+            }
+
+            .quick-document-page .nav-tabs {
+                display: inline-flex;
+                gap: 6px;
+                width: auto;
+                border: 0;
+                border-radius: 14px;
+                padding: 5px;
+                background: color-mix(in srgb, var(--quick-shell-bg) 82%, transparent);
+            }
+
+            .quick-document-page .nav-tabs .nav-link {
+                border: 0;
+                border-radius: 10px;
+                color: var(--quick-shell-muted);
+                font-size: 12px;
+                font-weight: 900;
+                padding: 10px 14px;
+            }
+
+            .quick-document-page .nav-tabs .nav-link.active {
+                color: #fff;
+                background: var(--quick-blue);
+                box-shadow: 0 8px 18px rgba(31,107,255,.16);
+            }
+
             .sanad-document-queue .card,
             .sanad-entity-card {
-                border: 1px solid #edf1f7;
-                border-radius: 8px;
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 16px;
                 box-shadow: 0 10px 28px rgba(31, 41, 55, .04);
             }
             .sanad-entity-card {
-                background: #fff;
+                background: var(--quick-shell-surface);
             }
             .sanad-summary-grid .sanad-dashboard-stat-card {
                 margin-bottom: 24px;
@@ -525,8 +606,8 @@
                 font-size: 18px;
             }
             #partner-documents .sanad-entity-card {
-                background: linear-gradient(180deg, #fbfcff 0%, #f3f6ff 100%);
-                border-color: #dce3f7;
+                background: color-mix(in srgb, var(--quick-shell-surface) 90%, var(--quick-shell-bg));
+                border-color: var(--quick-shell-line);
                 box-shadow: 0 14px 34px rgba(63, 63, 85, .10);
             }
             #partner-documents .sanad-entity-card:hover {
@@ -535,14 +616,14 @@
             }
             .sanad-metric-grid span,
             .sanad-request-meta span {
-                color: #6b7280;
+                color: var(--quick-shell-muted);
                 display: block;
                 font-size: 12px;
             }
             .sanad-filter-bar {
-                background: #fafbff;
-                border: 1px solid #edf1f7;
-                border-radius: 8px;
+                background: color-mix(in srgb, var(--quick-shell-bg) 72%, var(--quick-shell-surface));
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 16px;
                 padding: 14px 16px;
             }
             .sanad-entity-card {
@@ -559,30 +640,30 @@
             }
             .sanad-metric-grid > div,
             .sanad-request-meta > div {
-                background: #f8f9ff;
-                border: 1px solid #edf1f7;
-                border-radius: 6px;
+                background: color-mix(in srgb, var(--quick-shell-bg) 72%, var(--quick-shell-surface));
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 12px;
                 padding: 10px;
             }
             .sanad-metric-grid strong,
             .sanad-request-meta strong {
-                color: #1f2937;
+                color: var(--quick-shell-ink);
                 display: block;
                 font-size: 16px;
                 line-height: 1.3;
                 margin-top: 3px;
             }
             .sanad-progress {
-                background: #eef1f7;
+                background: color-mix(in srgb, var(--quick-shell-bg) 80%, transparent);
                 height: 7px;
                 border-radius: 999px;
             }
             .sanad-progress .progress-bar {
-                background: #5f58c9;
+                background: var(--quick-blue);
             }
             .sanad-mini-list,
             .sanad-review-list {
-                border-top: 1px solid #edf1f7;
+                border-top: 1px solid var(--quick-shell-line);
             }
             .sanad-mini-row,
             .sanad-review-row,
@@ -597,7 +678,7 @@
             }
             .sanad-review-row {
                 align-items: flex-start;
-                border-bottom: 1px solid #edf1f7;
+                border-bottom: 1px solid var(--quick-shell-line);
                 padding: 13px 0;
             }
             .sanad-review-row:last-child {
@@ -616,7 +697,7 @@
             }
             .sanad-card-actions {
                 align-items: center;
-                border-top: 1px solid #edf1f7;
+                border-top: 1px solid var(--quick-shell-line);
                 display: flex;
                 flex-wrap: nowrap;
                 gap: 8px;
@@ -626,8 +707,8 @@
             .sanad-action-button {
                 align-items: center;
                 border: 1px solid transparent;
-                border-radius: 6px;
-                color: #5f58c9;
+                border-radius: 10px;
+                color: var(--quick-blue);
                 display: inline-flex;
                 font-size: 11px;
                 font-weight: 700;
@@ -641,8 +722,8 @@
             }
             .sanad-action-button:hover,
             .sanad-action-button:focus {
-                background: #2bb86a;
-                border-color: #2bb86a;
+                background: var(--quick-blue);
+                border-color: var(--quick-blue);
                 color: #fff;
                 text-decoration: none;
             }
@@ -670,9 +751,9 @@
             }
             .sanad-collapse-count {
                 align-items: center;
-                background: #eeecff;
+                background: rgba(31,107,255,.1);
                 border-radius: 999px;
-                color: #5f58c9;
+                color: var(--quick-blue);
                 display: inline-flex;
                 font-size: 11px;
                 font-weight: 700;
@@ -689,14 +770,14 @@
                 transform: rotate(180deg);
             }
             .sanad-inline-drawer {
-                background: #fff;
-                border: 1px solid #e5e9f5;
-                border-radius: 8px;
+                background: var(--quick-shell-surface);
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 16px;
                 overflow: hidden;
                 padding-top: 12px;
             }
             .sanad-drawer-heading {
-                color: #1f2937;
+                color: var(--quick-shell-ink);
                 font-size: 12px;
                 font-weight: 700;
                 letter-spacing: .04em;
@@ -710,9 +791,9 @@
                 padding-top: 14px;
             }
             .sanad-document-tile {
-                background: #fff;
-                border: 1px solid #edf1f7;
-                border-radius: 8px;
+                background: var(--quick-shell-surface);
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 14px;
                 overflow: hidden;
                 padding: 12px;
                 transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
@@ -723,15 +804,15 @@
                 transform: translateY(-1px);
             }
             .sanad-document-tile.is-missing {
-                background: #fafbff;
+                background: color-mix(in srgb, var(--quick-shell-bg) 80%, var(--quick-shell-surface));
                 border-style: dashed;
             }
             .sanad-document-preview {
                 align-items: center;
-                background: #f6f7fb;
-                border: 1px solid #edf1f7;
-                border-radius: 8px;
-                color: #5f58c9;
+                background: color-mix(in srgb, var(--quick-shell-bg) 80%, var(--quick-shell-surface));
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 12px;
+                color: var(--quick-blue);
                 cursor: pointer;
                 display: flex;
                 height: 120px;
@@ -752,9 +833,9 @@
             }
             .sanad-file-placeholder {
                 align-items: center;
-                background: #eeecff;
+                background: rgba(31,107,255,.1);
                 border-radius: 999px;
-                color: #5f58c9;
+                color: var(--quick-blue);
                 display: flex;
                 font-size: 28px;
                 height: 64px;
@@ -782,20 +863,20 @@
                 display: block;
             }
             .sanad-document-tile-body strong {
-                color: #1f2937;
+                color: var(--quick-shell-ink);
                 font-size: 14px;
                 line-height: 1.3;
                 margin-bottom: 6px;
             }
             .sanad-document-tile-body span {
-                color: #6b7280;
+                color: var(--quick-shell-muted);
                 font-size: 12px;
                 line-height: 1.45;
                 overflow-wrap: anywhere;
             }
             .sanad-document-tile-footer {
                 align-items: center;
-                border-top: 1px solid #edf1f7;
+                border-top: 1px solid var(--quick-shell-line);
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
@@ -813,7 +894,7 @@
             }
             .sanad-document-modal .modal-content {
                 border: 0;
-                border-radius: 8px;
+                border-radius: 16px;
                 display: flex;
                 flex-direction: column;
                 max-height: calc(100vh - 48px);
@@ -829,7 +910,7 @@
             }
             .sanad-document-modal .modal-header,
             .sanad-document-modal .modal-footer {
-                border-color: #edf1f7;
+                border-color: var(--quick-shell-line);
             }
             .sanad-document-modal .modal-body {
                 flex: 1 1 auto;
@@ -843,9 +924,9 @@
             }
             .sanad-modal-preview {
                 align-items: center;
-                background: #f5f6fb;
-                border: 1px solid #edf1f7;
-                border-radius: 8px;
+                background: color-mix(in srgb, var(--quick-shell-bg) 80%, var(--quick-shell-surface));
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 14px;
                 display: flex;
                 justify-content: center;
                 height: 62vh;
@@ -875,7 +956,7 @@
             }
             .sanad-modal-file {
                 align-items: center;
-                color: #6b7280;
+                color: var(--quick-shell-muted);
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
@@ -883,7 +964,7 @@
                 text-align: center;
             }
             .sanad-modal-file i {
-                color: #5f58c9;
+                color: var(--quick-blue);
                 font-size: 46px;
             }
             .sanad-modal-review-form {
@@ -913,19 +994,19 @@
             .sanad-section-note {
                 background: #fff8e5;
                 border: 1px solid #f4d47c;
-                border-radius: 6px;
+                border-radius: 12px;
                 color: #66510d;
                 padding: 10px 12px;
             }
             .sanad-empty-state,
             .sanad-empty-inline {
-                color: #6b7280;
+                color: var(--quick-shell-muted);
                 text-align: center;
             }
             .sanad-empty-state {
-                background: #fff;
-                border: 1px dashed #d8ddec;
-                border-radius: 8px;
+                background: var(--quick-shell-surface);
+                border: 1px dashed var(--quick-shell-line);
+                border-radius: 14px;
                 padding: 32px;
             }
             .sanad-empty-inline {
@@ -937,6 +1018,31 @@
                 }
             }
             @media (max-width: 767.98px) {
+                .quick-document-page {
+                    max-width: none;
+                }
+
+                .quick-document-page .nav-tabs {
+                    display: grid;
+                    width: 100%;
+                }
+
+                .quick-documents-hero,
+                .quick-document-panel {
+                    padding: 16px;
+                    border-radius: 18px;
+                }
+
+                .quick-document-page .quick-table-btn,
+                .quick-document-page .btn-primary,
+                .quick-document-page .sanad-action-button {
+                    width: 100%;
+                }
+
+                .sanad-card-actions {
+                    display: grid;
+                }
+
                 .sanad-review-row,
                 .sanad-request-header {
                     flex-direction: column;
