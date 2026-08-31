@@ -22,14 +22,22 @@ class ServiceAddonController extends Controller
      */
     public function index(Request $request)
     {
-        //
         $filter = [
             'status' => $request->status,
         ];
         $pageTitle = __('messages.list_form_title',['form' => __('messages.service_addon')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('serviceaddon.index', compact('pageTitle','auth_user','assets','filter'));
+
+        $addonSummary = [
+            'total' => ServiceAddon::count(),
+            'active' => ServiceAddon::where('status', 1)->count(),
+            'inactive' => ServiceAddon::where('status', 0)->count(),
+            'categories' => Category::count(),
+            'services' => Service::count(),
+        ];
+
+        return view('serviceaddon.index', compact('pageTitle', 'auth_user', 'assets', 'filter', 'addonSummary'));
     }
     public function index_data(DataTables $datatable,Request $request)
     {
@@ -59,32 +67,54 @@ class ServiceAddonController extends Controller
                 </div>';
             })
            ->editColumn('name', function($query){
-               return '<a class="btn-link btn-link-hover"  href='.route('serviceaddon.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                $image = getSingleMedia($query, 'serviceaddon_image', null);
+                $nameEn = $query->name;
+                $nameAr = $query->name_ar ?: '';
+
+                $thumb = $image 
+                    ? '<img src="'.$image.'" alt="'.e($nameEn).'" class="quick-category-avatar" style="width:38px;height:38px;object-fit:cover;border-radius:10px;border:1px solid var(--quick-shell-line);flex-shrink:0;background:var(--quick-shell-surface);">'
+                    : '<div class="quick-category-avatar-placeholder" style="width:38px;height:38px;border-radius:10px;background:rgba(31,107,255,.09);color:var(--quick-blue);display:grid;place-items:center;font-weight:900;font-size:14px;border:1px solid rgba(31,107,255,.15);flex-shrink:0;">'.mb_substr($nameEn, 0, 1).'</div>';
+
+                if (auth()->user()->can('service list') || auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+                    $link = '<a class="quick-category-title-link" style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);text-decoration:none;" href="'.route('serviceaddon.create', ['id' => $query->id]).'">'.e($nameEn).'</a>';
+                } else {
+                    $link = '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">'.e($nameEn).'</span>';
+                }
+
+                $subtext = $nameAr ? '<span style="display:block;font-size:11px;color:var(--quick-shell-muted);margin-top:2px;">'.e($nameAr).'</span>' : '';
+
+                return '<div style="display:flex;align-items:center;gap:12px;">'.$thumb.'<div style="min-width:0;">'.$link.$subtext.'</div></div>';
            })
             ->editColumn('name_ar', function($query){
-                if (!empty($query->name_ar)) {
-                    return '<a class="btn-link btn-link-hover" href='.route('serviceaddon.create', ['id' => $query->id]).' dir="rtl">'.$query->name_ar.'</a>';
-                }
-                return '-';
+                return '<span style="font-weight:700;font-size:13px;color:var(--quick-shell-ink);">'.e($query->name_ar ?: '-').'</span>';
             })
 
            ->addColumn('targets', function ($query) {
+                $isAr = app()->getLocale() === 'ar';
                 $targets = [];
 
                 if ($query->categories->isNotEmpty()) {
-                    $targets[] = 'Categories: '.$query->categories->pluck('name')->implode(', ');
+                    $catNames = $query->categories->map(function($c) use ($isAr) {
+                        return $isAr && !empty($c->name_ar) ? $c->name_ar : ($c->name_en ?: $c->name);
+                    })->implode(', ');
+                    $targets[] = '<span class="quick-order-badge" style="display:inline-block;padding:3px 8px;border-radius:6px;background:rgba(31,107,255,.08);color:var(--quick-blue);font-size:11px;font-weight:700;margin-bottom:2px;">'.($isAr ? 'القطاعات: ' : 'Categories: ').e($catNames).'</span>';
                 }
 
                 if ($query->services->isNotEmpty()) {
-                    $targets[] = 'Services: '.$query->services->pluck('name')->implode(', ');
+                    $srvNames = $query->services->map(function($s) use ($isAr) {
+                        return $isAr && !empty($s->name_ar) ? $s->name_ar : ($s->name_en ?: $s->name);
+                    })->implode(', ');
+                    $targets[] = '<span class="quick-order-badge" style="display:inline-block;padding:3px 8px;border-radius:6px;background:rgba(139,92,246,.08);color:#8b5cf6;font-size:11px;font-weight:700;">'.($isAr ? 'الخدمات: ' : 'Services: ').e($srvNames).'</span>';
                 } elseif ($query->service_id != null && isset($query->service)) {
-                    $targets[] = 'Service: '.$query->service->name;
+                    $srv = $query->service;
+                    $srvName = $isAr && !empty($srv->name_ar) ? $srv->name_ar : ($srv->name_en ?: $srv->name);
+                    $targets[] = '<span class="quick-order-badge" style="display:inline-block;padding:3px 8px;border-radius:6px;background:rgba(139,92,246,.08);color:#8b5cf6;font-size:11px;font-weight:700;">'.($isAr ? 'الخدمة: ' : 'Service: ').e($srvName).'</span>';
                 }
 
-                return !empty($targets) ? implode('<br>', $targets) : 'All Services';
+                return !empty($targets) ? implode('<div style="height:3px;"></div>', $targets) : '<span style="font-size:12px;color:var(--quick-shell-muted);font-weight:600;">'.($isAr ? 'جميع الخدمات' : 'All Services').'</span>';
             })
             ->editColumn('price', function ($query) {
-                return ($query->price != null && isset($query->price)) ? getPriceFormat($query->price) : '-';
+                return ($query->price != null && isset($query->price)) ? '<span class="quick-order-badge" style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:8px;background:rgba(16,185,129,.09);color:#10b981;font-weight:800;font-size:12px;border:1px solid rgba(16,185,129,.18);">' . getPriceFormat($query->price) . '</span>' : '-';
             })
             ->addColumn('action', function ($serviceaddon) {
                 return view('serviceaddon.action', compact('serviceaddon'))->render();

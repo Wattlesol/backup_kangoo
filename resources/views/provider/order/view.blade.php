@@ -294,52 +294,9 @@
         </div>
     </div>
 
-    <button class="request-widget-toggle" type="button" id="request-widget-toggle">{{ $isAr ? 'المحادثة' : 'Chat' }}</button>
-    <div class="request-widget" id="request-widget">
-        <div class="request-widget-header">
-            <strong>{{ $isAr ? 'تواصل الطلب' : 'Request Communication' }}</strong>
-            <button type="button" id="request-widget-close">x</button>
-        </div>
-        <div class="request-widget-body">
-            <div class="widget-tabs">
-                <button type="button" class="active" data-widget-tab="sanad-chat">{{ $isAr ? 'محادثة فريق كويك الخاصة' : 'Private Quick Chat' }}</button>
-                <button type="button" data-widget-tab="customer-action">{{ $isAr ? 'طلب إجراء من العميل' : 'Request Customer Action' }}</button>
-            </div>
-            <div class="widget-panel active" id="sanad-chat">
-                <div class="chat-log">
-                    @forelse($chatMessages as $message)
-                        <div class="chat-message">
-                            <strong>{{ optional($message->sender)->display_name ?: ($isAr ? 'النظام' : 'System') }}</strong>
-                            <span>{{ $message->created_at->format('Y-m-d H:i') }}</span>
-                            <p>{{ $message->message }}</p>
-                        </div>
-                    @empty
-                        <p class="text-muted mb-0">{{ $isAr ? 'لا توجد رسائل خاصة لفريق كويك بعد.' : 'No private Quick messages yet.' }}</p>
-                    @endforelse
-                </div>
-                <form method="POST" action="{{ route('sanad.requests.chat.store', $booking->id) }}" enctype="multipart/form-data" class="chat-composer">
-                    @csrf
-                    <input type="hidden" name="thread_type" value="partner_internal">
-                    <label class="chat-attach" title="{{ $isAr ? 'إرفاق ملف' : 'Attach file' }}">
-                        <input type="file" name="attachment">
-                        <i class="fas fa-plus"></i>
-                    </label>
-                    <textarea name="message" class="chat-message-input" rows="1" placeholder="{{ $isAr ? 'اكتب رسالة لفريق كويك' : 'Message Quick team' }}" required></textarea>
-                    <button class="chat-send" title="{{ $isAr ? 'إرسال إلى كويك' : 'Send to Quick' }}"><i class="fas fa-paper-plane"></i></button>
-                </form>
-            </div>
-            <div class="widget-panel" id="customer-action">
-                <form method="POST" action="{{ route('sanad.requests.document-requests.store', $booking->id) }}">
-                    @csrf
-                    <input type="hidden" name="requested_from" value="customer">
-                    <input name="document_name" class="form-control mb-2" placeholder="{{ $isAr ? 'المستند أو الإجراء المطلوب' : 'Document or action needed' }}" required>
-                    <input name="reason" class="form-control mb-2" placeholder="{{ $isAr ? 'سبب الطلب' : 'Why this is needed' }}" required>
-                    <textarea name="instructions" class="form-control mb-2" rows="3" placeholder="{{ $isAr ? 'تعليمات لفريق كويك والعميل' : 'Instructions for Quick/customer' }}"></textarea>
-                    <button class="btn btn-primary btn-sm">{{ $isAr ? 'إرسال الطلب عبر كويك' : 'Request via Quick' }}</button>
-                </form>
-            </div>
-        </div>
-    </div>
+    <a class="request-widget-toggle" href="{{ route('sanad.chat.workspace', ['booking_id' => $booking->id]) }}">
+        <i class="fas fa-comments"></i> {{ $isAr ? 'فتح المحادثة' : 'Go to Chat' }}
+    </a>
 
 @section('bottom_script')
 <style>
@@ -369,28 +326,8 @@
 .note-timeline { border-left: 2px solid #eef1f5; padding-left: 14px; }
 .note-entry { position: relative; padding-bottom: 16px; }
 .note-entry:before { content: ""; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #f45135; }
-.request-widget-toggle { position: fixed; right: 24px; bottom: 24px; z-index: 1050; border: 0; border-radius: 24px; background: #f45135; color: #fff; padding: 12px 18px; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
-.request-widget { display: none; position: fixed; right: 24px; bottom: 84px; width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 130px); z-index: 1050; background: #fff; border: 1px solid #e8edf3; border-radius: 8px; box-shadow: 0 20px 50px rgba(15,23,42,.2); overflow: hidden; }
-.request-widget.open { display: block; }
-.request-widget-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #eef1f5; }
-.request-widget-header button { border: 0; background: transparent; font-size: 18px; }
-.request-widget-body { padding: 16px; }
-.widget-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-.widget-tabs button { flex: 1; border: 1px solid #d9e1ec; background: #fff; padding: 8px; border-radius: 6px; }
-.widget-tabs button.active { background: #f45135; border-color: #f45135; color: #fff; }
-.widget-panel { display: none; }
-.widget-panel.active { display: block; }
-.chat-log { max-height: 220px; overflow: auto; border: 1px solid #eef1f5; border-radius: 6px; padding: 10px; margin-bottom: 12px; }
-.chat-message { border-bottom: 1px solid #f1f3f5; padding-bottom: 8px; margin-bottom: 8px; }
-.chat-message span { color: #7b8794; font-size: 12px; margin-left: 6px; }
-.chat-message p { margin: 4px 0 0; }
-.chat-composer { display: flex; align-items: flex-end; gap: 8px; border: 1px solid #d9e1ec; border-radius: 22px; padding: 6px; background: #fff; }
-.chat-attach, .chat-send { width: 34px; height: 34px; min-width: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin: 0; cursor: pointer; }
-.chat-attach { border: 1px solid #d9e1ec; color: #4a5568; background: #f8fafc; }
-.chat-attach input { display: none; }
-.chat-message-input { flex: 1; min-height: 34px; max-height: 120px; resize: none; border: 0; outline: 0; padding: 7px 4px; line-height: 20px; overflow-y: auto; }
-.chat-message-input:focus { outline: 0; box-shadow: none; }
-.chat-send { border: 0; background: #f45135; color: #fff; }
+.request-widget-toggle { position: fixed; right: 24px; bottom: 24px; z-index: 1050; display:inline-flex; align-items:center; gap:8px; border: 0; border-radius: 24px; background: #1f6bff; color: #fff; padding: 12px 18px; box-shadow: 0 12px 30px rgba(31,107,255,.22); font-weight:800; text-decoration:none; }
+.request-widget-toggle:hover { color:#fff; text-decoration:none; background:#0d57e8; }
 html[dir="rtl"] .note-timeline { border-left:0; border-right:2px solid #eef1f5; padding-left:0; padding-right:14px; }
 html[dir="rtl"] .note-entry:before { left:auto; right:-20px; }
 .quick-theme-dark .partner-order-summary,
@@ -417,22 +354,6 @@ html[dir="rtl"] .note-entry:before { left:auto; right:-20px; }
 @media (max-width: 480px) { .partner-order-facts { grid-template-columns:1fr; } }
 </style>
 <script>
-$(document).on('click', '#request-widget-toggle', function () {
-    $('#request-widget').toggleClass('open');
-});
-$(document).on('click', '#request-widget-close', function () {
-    $('#request-widget').removeClass('open');
-});
-$(document).on('click', '[data-widget-tab]', function () {
-    $('[data-widget-tab]').removeClass('active');
-    $('.widget-panel').removeClass('active');
-    $(this).addClass('active');
-    $('#' + $(this).data('widget-tab')).addClass('active');
-});
-$(document).on('input', '.chat-message-input', function () {
-    this.style.height = '34px';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-});
 $(document).on('change', '.document-type-select', function () {
     const selected = $(this).val();
     const isCustom = selected === '__custom__';

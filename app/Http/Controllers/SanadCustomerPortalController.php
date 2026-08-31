@@ -18,7 +18,6 @@ use App\Models\SanadCustomerComplaint;
 use App\Models\SanadDocumentRequest;
 use App\Models\SanadDocumentVaultItem;
 use App\Models\Service;
-use App\Models\ServicePackage;
 use App\Models\User;
 use App\Services\SanadDocumentOcrAgent;
 use App\Services\SanadAiFirstResponderService;
@@ -31,6 +30,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class SanadCustomerPortalController extends Controller
 {
@@ -51,6 +51,44 @@ class SanadCustomerPortalController extends Controller
         $activeStages = ['submitted', 'pending_review', 'assigned_to_partner', 'assigned_to_employee', 'in_progress', 'awaiting_customer_action', 'awaiting_quality_review', 'escalated'];
         $pendingActions = $this->pendingCustomerActions($user)->take(8)->get();
         $activities = $this->recentActivity($user)->take(8)->get();
+        $requestIds = $requests->pluck('id');
+        $weeklyActivity = collect(range(0, 6))->map(function ($offset) use ($requests) {
+            $date = now()->startOfDay()->subDays(6 - $offset);
+            $submissions = $requests->filter(fn ($booking) => optional($booking->created_at)->isSameDay($date))->count();
+            $completions = $requests->filter(function ($booking) use ($date) {
+                $isCompleted = in_array($booking->sanad_stage ?: $booking->status, ['completed', 'closed'], true);
+                $completedAt = $booking->closed_at ?: $booking->updated_at;
+
+                return $isCompleted && optional($completedAt)->isSameDay($date);
+            })->count();
+
+            return [
+                'date' => $date->toDateString(),
+                'day_en' => $date->format('D'),
+                'day_ar' => ['Sun' => 'ح', 'Mon' => 'ن', 'Tue' => 'ث', 'Wed' => 'ر', 'Thu' => 'خ', 'Fri' => 'ج', 'Sat' => 'س'][$date->format('D')],
+                'submissions' => $submissions,
+                'completions' => $completions,
+                'total' => $submissions + $completions,
+            ];
+        });
+        $unreadMessages = SanadChatMessage::whereHas('thread', fn ($query) => $query->whereIn('booking_id', $requestIds))
+            ->where('sender_id', '!=', $user->id)
+            ->whereNull('read_at')
+            ->where(function ($query) {
+                $query->whereNull('visible_to')
+                    ->orWhereJsonContains('visible_to', 'customer')
+                    ->orWhereJsonContains('visible_to', 'user');
+            })
+            ->count();
+        $actionStats = [
+            'pending_documents' => SanadDocumentRequest::whereIn('booking_id', $requestIds)
+                ->whereIn('requested_from', ['customer', 'user'])
+                ->whereIn('status', ['pending', 'replacement_requested', 'rejected'])
+                ->count(),
+            'pending_payments' => $requests->filter(fn ($booking) => !$booking->payment || $booking->payment->payment_status !== 'paid')->count(),
+            'unread_messages' => $unreadMessages,
+            'approved_documents' => $requests->sum(fn ($booking) => collect($booking->sanadDocuments ?? [])->where('verification_status', 'approved')->count()),
+        ];
 
         return view('customer-portal.dashboard', [
             'user' => $user,
@@ -58,7 +96,10 @@ class SanadCustomerPortalController extends Controller
             'completedRequests' => $requests->filter(fn ($request) => in_array($request->sanad_stage ?: $request->status, ['completed', 'closed'], true))->count(),
             'pendingActions' => $pendingActions,
             'activities' => $activities,
+            'weeklyActivity' => $weeklyActivity,
+            'actionStats' => $actionStats,
             'stats' => [
+                'total' => $requests->count(),
                 'active' => $requests->filter(fn ($request) => in_array($request->sanad_stage, $activeStages, true))->count(),
                 'completed' => $requests->filter(fn ($request) => in_array($request->sanad_stage ?: $request->status, ['completed', 'closed'], true))->count(),
                 'pending_actions' => $pendingActions->count(),
@@ -72,15 +113,7 @@ class SanadCustomerPortalController extends Controller
         $categories = Category::where('status', 1)->orderBy('display_order')->orderBy('name')->get();
         $services = Service::with(['category', 'subcategory'])
             ->where('status', 1)
-            ->when($request->type === 'single', fn ($query) => $query->whereDoesntHave('servicePackage'))
             ->when($request->type === 'bundle', fn ($query) => $query->whereHas('servicePackage'))
-            ->when($request->type === 'recurring', function ($query) {
-                $recurringPackageIds = ServicePackage::query()
-                    ->where('status', 1)
-                    ->where('package_type', 'recurring')
-                    ->pluck('id');
-                $query->whereHas('servicePackage', fn ($mapping) => $mapping->whereIn('service_package_id', $recurringPackageIds));
-            })
             ->when($request->category_id, fn ($query) => $query->where('category_id', $request->category_id))
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -228,41 +261,53 @@ class SanadCustomerPortalController extends Controller
         $booking = $this->customerRequests($this->customer())
             ->with(['service.category', 'service.subcategory', 'payment', 'sanadDocuments', 'sanadDocumentRequests.document', 'sanadBuzzAlerts', 'sanadRequestActions.actor', 'handymanAdded.handyman'])
             ->findOrFail($id);
-        $thread = $this->customerThread($booking);
-        $complaints = SanadCustomerComplaint::where('booking_id', $booking->id)->latest()->get();
-        $vaultDocuments = SanadDocumentVaultItem::where('owner_id', Auth::id())->where('source', 'vault')->latest()->get();
         $stage = $booking->sanad_stage ?: $booking->status ?: 'submitted';
         $progress = in_array($stage, ['completed', 'closed'], true)
             ? 100
             : (['submitted' => 15, 'pending_review' => 25, 'assigned_to_partner' => 40, 'assigned_to_employee' => 55, 'in_progress' => 70, 'awaiting_customer_action' => 65, 'awaiting_quality_review' => 85, 'escalated' => 60][$stage] ?? 20);
         $docs = collect(optional($booking->service)->required_documents ?: []);
+        $documentChoices = $this->customerDocumentChoices($booking);
+        $openBuzzAlerts = $this->visibleCustomerBuzzQuery($booking)
+            ->where('status', 'unread')
+            ->with('replies')
+            ->latest()
+            ->get();
+        $verifiedDocuments = $booking->sanadDocuments
+            ->where('verification_status', 'approved')
+            ->sortByDesc('approved_at');
 
-        return view('customer-portal.request-show', compact('booking', 'thread', 'complaints', 'vaultDocuments', 'stage', 'progress', 'docs'));
+        return view('customer-portal.request-show', compact('booking', 'stage', 'progress', 'docs', 'documentChoices', 'openBuzzAlerts', 'verifiedDocuments'));
     }
 
     public function uploadRequestDocument(Request $request, $id)
     {
         $booking = $this->customerRequests($this->customer())->with('service')->findOrFail($id);
+        $documentChoices = $this->customerDocumentChoices($booking);
         $data = $request->validate([
-            'document_key' => ['nullable', 'string', 'max:120'],
-            'document_type' => ['required', 'string', 'max:190'],
+            'document_selection' => ['required', 'string', Rule::in($documentChoices->keys()->all())],
             'file' => ['required', 'file', 'max:10240'],
         ]);
+        $choice = $documentChoices->get($data['document_selection']);
 
         $document = SanadDocumentVaultItem::create([
             'booking_id' => $booking->id,
             'service_id' => $booking->service_id,
             'owner_id' => Auth::id(),
             'uploaded_by' => Auth::id(),
-            'document_type' => $data['document_type'],
-            'document_key' => $data['document_key'] ?: Str::slug($data['document_type'], '_'),
-            'required' => false,
+            'document_type' => $choice['document_name'],
+            'document_key' => $choice['document_key'],
+            'required' => (bool) $choice['required'],
             'source' => 'request',
             'verification_status' => 'pending',
             'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
             'file_name' => $request->file('file')->getClientOriginalName(),
         ]);
         $document->addMedia($request->file('file'))->toMediaCollection('sanad_document');
+        if ($choice['document_request_id']) {
+            SanadDocumentRequest::where('booking_id', $booking->id)
+                ->whereKey($choice['document_request_id'])
+                ->update(['status' => 'submitted', 'document_id' => $document->id]);
+        }
         $this->audit('customer_request_document_uploaded', $document, ['booking_id' => $booking->id]);
 
         return back()->withSuccess('Document uploaded for review.');
@@ -741,6 +786,8 @@ class SanadCustomerPortalController extends Controller
                 'status' => Str::headline($buzz->status),
                 'message' => $buzz->message,
                 'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
+                'can_reply' => $buzz->replies->isEmpty(),
+                'reply_url' => route('customer-portal.requests.buzz.reply', [$booking->id, $buzz->id]),
                 'replies' => $buzz->replies->map(fn ($reply) => [
                     'sender' => optional($reply->sender)->display_name ?: Str::headline($reply->sender_role ?: 'user'),
                     'message' => $reply->message,
@@ -836,6 +883,8 @@ class SanadCustomerPortalController extends Controller
                 'message' => $buzz->message,
                 'recipient_role' => Str::headline($buzz->recipient_role ?: 'customer'),
                 'reply_count' => $buzz->reply_count,
+                'can_reply' => $buzz->replies->isEmpty(),
+                'reply_url' => route('customer-portal.requests.buzz.reply', [$booking->id, $buzz->id]),
                 'created_at' => optional($buzz->created_at)->format('Y-m-d H:i'),
                 'replies' => $buzz->replies->map(fn ($reply) => [
                     'sender' => optional($reply->sender)->display_name ?: Str::headline($reply->sender_role ?: 'user'),
@@ -874,12 +923,19 @@ class SanadCustomerPortalController extends Controller
         $thread = $this->customerThread($booking);
         $buzz = null;
         if ($request->filled('buzz_alert_id')) {
-            $buzz = SanadBuzzAlert::where('booking_id', $booking->id)
+            $buzz = $this->visibleCustomerBuzzQuery($booking)
                 ->where(function ($query) {
                     $query->where('recipient_id', Auth::id())
                         ->orWhereIn('recipient_role', ['user', 'customer']);
                 })
+                ->with('replies')
                 ->findOrFail($request->buzz_alert_id);
+
+            if ($buzz->replies->isNotEmpty()) {
+                return back()->withErrors(['message' => app()->getLocale() === 'ar'
+                    ? 'تم الرد على هذا التنبيه بالفعل.'
+                    : 'This Buzz has already been replied to.']);
+            }
         }
         $isAttachment = $request->hasFile('attachment') || $request->filled('vault_document_id');
         $message = SanadChatMessage::create([
@@ -905,7 +961,11 @@ class SanadCustomerPortalController extends Controller
         $thread->update(['last_message_at' => now()]);
         if ($buzz) {
             $buzz->increment('reply_count');
-            $buzz->forceFill(['last_reply_at' => now()])->save();
+            $buzz->forceFill([
+                'status' => 'acknowledged',
+                'acknowledged_at' => $buzz->acknowledged_at ?: now(),
+                'last_reply_at' => now(),
+            ])->save();
         }
         $this->audit('customer_message_sent', $message, ['booking_id' => $booking->id]);
         $this->broadcastConversationUpdate($booking->id, $buzz ? 'buzz.reply_created' : 'chat.message_created', [
@@ -957,7 +1017,7 @@ class SanadCustomerPortalController extends Controller
     {
         $request->merge(['buzz_alert_id' => $buzzId]);
 
-        return $this->sendMessage($request, $id);
+        return $this->sendMessage($request, $id, app(SanadAiFirstResponderService::class));
     }
 
     private function broadcastConversationUpdate(int $bookingId, string $type, array $payload = []): void
@@ -1210,12 +1270,65 @@ class SanadCustomerPortalController extends Controller
         return $this->whereVisibleCustomerBuzz($booking->sanadBuzzAlerts());
     }
 
+    private function customerDocumentChoices(Booking $booking)
+    {
+        $approvedDocuments = $booking->sanadDocuments()
+            ->where('verification_status', 'approved')
+            ->get(['document_key', 'document_type']);
+        $choices = collect();
+
+        foreach (collect(optional($booking->service)->required_documents ?: []) as $document) {
+            $storedName = is_array($document)
+                ? ($document['name'] ?? $document['document_name'] ?? $document['key'] ?? 'Document')
+                : $document;
+            $key = is_array($document)
+                ? ($document['key'] ?? Str::slug($storedName, '_'))
+                : Str::slug($storedName, '_');
+            $alreadyApproved = $approvedDocuments->contains(function ($approved) use ($key, $storedName) {
+                return ($approved->document_key && $approved->document_key === $key)
+                    || (!$approved->document_key && $approved->document_type === $storedName);
+            });
+
+            if (!$alreadyApproved) {
+                $choices->put('service:' . $key, [
+                    'document_key' => $key,
+                    'document_name' => $storedName,
+                    'label' => localized_service_document_name($document),
+                    'required' => true,
+                    'document_request_id' => null,
+                ]);
+            }
+        }
+
+        $booking->sanadDocumentRequests()
+            ->whereIn('requested_from', ['customer', 'user'])
+            ->whereIn('status', ['pending', 'rejected', 'replacement_requested'])
+            ->latest()
+            ->get()
+            ->each(function ($documentRequest) use ($choices) {
+                $choices->put('request:' . $documentRequest->id, [
+                    'document_key' => $documentRequest->document_key ?: Str::slug($documentRequest->document_name, '_'),
+                    'document_name' => $documentRequest->document_name,
+                    'label' => $documentRequest->document_name,
+                    'required' => (bool) $documentRequest->required,
+                    'document_request_id' => $documentRequest->id,
+                ]);
+            });
+
+        return $choices;
+    }
+
     private function whereVisibleCustomerBuzz($query)
     {
-        return $query->where(function ($buzzQuery) {
-            $buzzQuery->whereNull('action_type')
-                ->orWhere('action_type', '!=', 'chat_assignment_accept');
-        });
+        return $query
+            ->where(function ($buzzQuery) {
+                $buzzQuery->whereNull('action_type')
+                    ->orWhere('action_type', '!=', 'chat_assignment_accept');
+            })
+            ->where(function ($recipientQuery) {
+                $recipientQuery->where('recipient_id', Auth::id())
+                    ->orWhereIn('recipient_role', ['user', 'customer']);
+            });
     }
 
     private function recentActivity(User $user)

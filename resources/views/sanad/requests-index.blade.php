@@ -1,6 +1,7 @@
 @php
     $isAr = app()->getLocale() === 'ar';
     $pageTitle = $isAr ? 'طابور الطلبات' : 'Request queue';
+    $isTotalFilter = !request()->hasAny(['action_state', 'assignment_state', 'sla_state', 'payment_state', 'sanad_stage', 'sanad_priority', 'status', 'search']);
 @endphp
 <x-master-layout>
     <div class="quick-request-queue" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
@@ -20,33 +21,33 @@
 
             <div class="col-lg-12">
                 <div class="quick-card quick-queue-panel">
-                        <div class="row sanad-summary-grid">
+                        <div class="row sanad-summary-grid justify-content-center">
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index') }}" class="sanad-summary-card">
+                                <a href="{{ route('sanad.requests.index') }}" class="sanad-summary-card {{ $isTotalFilter ? 'active' : '' }}">
                                     <span>{{ $isAr ? 'الإجمالي' : 'Total' }}</span>
                                     <strong>{{ $summary['total'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index', ['action_state' => 'needs_action']) }}" class="sanad-summary-card">
+                                <a href="{{ route('sanad.requests.index', ['action_state' => 'needs_action']) }}" class="sanad-summary-card {{ request('action_state') === 'needs_action' ? 'active' : '' }}">
                                     <span>{{ $isAr ? 'يتطلب إجراءً' : 'Needs Action' }}</span>
                                     <strong>{{ $summary['needs_action'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index', ['assignment_state' => 'unassigned']) }}" class="sanad-summary-card">
+                                <a href="{{ route('sanad.requests.index', ['assignment_state' => 'unassigned']) }}" class="sanad-summary-card {{ request('assignment_state') === 'unassigned' ? 'active' : '' }}">
                                     <span>{{ $isAr ? 'غير مسند' : 'Unassigned' }}</span>
                                     <strong>{{ $summary['unassigned'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index', ['sla_state' => 'overdue']) }}" class="sanad-summary-card">
+                                <a href="{{ route('sanad.requests.index', ['sla_state' => 'overdue']) }}" class="sanad-summary-card {{ request('sla_state') === 'overdue' ? 'active' : '' }}">
                                     <span>{{ $isAr ? 'متأخر عن SLA' : 'Overdue SLA' }}</span>
                                     <strong>{{ $summary['overdue_sla'] ?? 0 }}</strong>
                                 </a>
                             </div>
                             <div class="col-lg-2 col-md-4 col-6 mb-3">
-                                <a href="{{ route('sanad.requests.index', ['action_state' => 'pending_documents']) }}" class="sanad-summary-card">
+                                <a href="{{ route('sanad.requests.index', ['action_state' => 'pending_documents']) }}" class="sanad-summary-card {{ request('action_state') === 'pending_documents' ? 'active' : '' }}">
                                     <span>{{ $isAr ? 'مستندات معلقة' : 'Pending Docs' }}</span>
                                     <strong>{{ $summary['pending_documents'] ?? 0 }}</strong>
                                 </a>
@@ -130,7 +131,7 @@
                                                 $slaClass = 'text-warning';
                                                 $rowFlags[] = $isAr ? 'يستحق قريباً' : 'Due soon';
                                             }
-                                            if ($requestItem->handymanAdded->isEmpty()) {
+                                            if (!$requestItem->provider_id) {
                                                 $rowFlags[] = $isAr ? 'غير مسند' : 'Unassigned';
                                             }
                                             if ($requestItem->sanadDocuments->where('verification_status', 'pending')->count() > 0) {
@@ -166,9 +167,9 @@
                                             <td data-label="{{ $isAr ? 'الخدمة' : 'Service' }}">{{ optional($requestItem->service)->name ?: '-' }}</td>
                                             <td data-label="{{ $isAr ? 'العميل' : 'Customer' }}">{{ optional($requestItem->customer)->display_name ?: '-' }}</td>
                                             <td data-label="{{ $isAr ? 'الشريك' : 'Partner' }}">{{ optional($requestItem->provider)->display_name ?: '-' }}</td>
-                                            <td data-label="{{ $isAr ? 'المرحلة' : 'Stage' }}"><span class="badge badge-primary">{{ __('messages.stage_' . ($requestItem->sanad_stage ?: 'submitted')) ?: Str::headline($requestItem->sanad_stage ?: 'submitted') }}</span></td>
+                                            <td data-label="{{ $isAr ? 'المرحلة' : 'Stage' }}"><span class="badge badge-primary sanad-status-badge sanad-stage-badge">{{ __('messages.stage_' . ($requestItem->sanad_stage ?: 'submitted')) ?: Str::headline($requestItem->sanad_stage ?: 'submitted') }}</span></td>
                                             <td data-label="{{ $isAr ? 'الدفع' : 'Payment' }}">
-                                                <span class="badge {{ $paymentStatus === 'paid' ? 'badge-success' : 'badge-light' }}">{{ __('messages.' . $paymentStatus) ?: ($isAr && $paymentStatus === 'no_payment' ? 'بدون دفع' : Str::headline($paymentStatus)) }}</span>
+                                                <span class="badge {{ $paymentStatus === 'paid' ? 'badge-success' : 'badge-light' }} sanad-status-badge sanad-payment-badge">{{ __('messages.' . $paymentStatus) ?: ($isAr && $paymentStatus === 'no_payment' ? 'بدون دفع' : Str::headline($paymentStatus)) }}</span>
                                                 <small>{{ $requestItem->total_amount ? getPriceFormat($requestItem->total_amount) : '-' }}</small>
                                             </td>
                                             <td data-label="{{ $isAr ? 'اتفاقية SLA' : 'SLA' }}" class="{{ $slaClass }}">
@@ -214,6 +215,19 @@
                 overflow: hidden;
             }
 
+            .sanad-summary-grid {
+                align-items: stretch;
+                row-gap: 10px;
+                margin-left: -8px;
+                margin-right: -8px;
+            }
+
+            .sanad-summary-grid > [class*="col-"] {
+                padding-left: 8px;
+                padding-right: 8px;
+                margin-bottom: 0 !important;
+            }
+
             .sanad-filter-form {
                 border: 1px solid var(--quick-shell-line);
                 border-radius: 16px;
@@ -242,6 +256,13 @@
                 box-shadow: 0 10px 24px rgba(31,107,255,.08);
             }
 
+            .sanad-summary-card.active {
+                border-color: var(--quick-blue);
+                background: var(--quick-blue);
+                color: #fff;
+                box-shadow: 0 12px 26px rgba(31,107,255,.18);
+            }
+
             .sanad-summary-card span {
                 color: var(--quick-shell-muted);
                 font-size: 11px;
@@ -251,6 +272,11 @@
             .sanad-summary-card strong {
                 font-size: 18px;
                 color: var(--quick-blue);
+            }
+
+            .sanad-summary-card.active span,
+            .sanad-summary-card.active strong {
+                color: #fff;
             }
 
             .sanad-filter-form .form-control-label {
@@ -266,10 +292,19 @@
             }
 
             .sanad-requests-table {
-                min-width: 980px;
+                min-width: 1060px;
                 margin: 0;
                 table-layout: fixed;
             }
+
+            .sanad-requests-table th:nth-child(1) { width: 14%; }
+            .sanad-requests-table th:nth-child(2) { width: 16%; }
+            .sanad-requests-table th:nth-child(3) { width: 13%; }
+            .sanad-requests-table th:nth-child(4) { width: 13%; }
+            .sanad-requests-table th:nth-child(5) { width: 16%; }
+            .sanad-requests-table th:nth-child(6) { width: 13%; }
+            .sanad-requests-table th:nth-child(7) { width: 10%; }
+            .sanad-requests-table th:nth-child(8) { width: 5%; }
 
             .sanad-requests-table th {
                 background: color-mix(in srgb, var(--quick-shell-bg) 72%, var(--quick-shell-surface));
@@ -289,6 +324,27 @@
                 display: block;
                 color: var(--quick-shell-muted);
                 margin-top: 4px;
+            }
+
+            .sanad-requests-table .sanad-status-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 28px;
+                padding: 7px 12px;
+                border-radius: 9px;
+                line-height: 1.2;
+                white-space: normal;
+                text-align: center;
+            }
+
+            .sanad-stage-badge {
+                min-width: 138px;
+                max-width: 100%;
+            }
+
+            .sanad-payment-badge {
+                min-width: 92px;
             }
 
             .sanad-employee-chip {

@@ -2,14 +2,23 @@
     $locale = app()->getLocale();
     $isAr = in_array($locale, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']);
     $dir = $isAr ? 'rtl' : 'ltr';
+    $quickTheme = in_array(session('quick_theme'), ['light', 'dark'], true) ? session('quick_theme') : 'light';
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', $locale) }}" dir="{{ $dir }}">
+<html lang="{{ str_replace('_', '-', $locale) }}" dir="{{ $dir }}" data-quick-theme="{{ $quickTheme }}" data-bs-theme="{{ $quickTheme }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('sanad.brand.name', 'Quick') }} | {{ $isAr ? 'تسجيل الدخول' : 'Sign In' }}</title>
+    <script>
+        (function () {
+            var storedTheme = localStorage.getItem('quick_theme') || localStorage.getItem('data-bs-theme');
+            var theme = storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : @json($quickTheme);
+            document.documentElement.setAttribute('data-quick-theme', theme);
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        }());
+    </script>
     <link rel="shortcut icon" href="{{ asset('brand/quick-mark.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -403,7 +412,7 @@
     </style>
 </head>
 <body>
-    <div id="auth-root" class="auth-prototype auth-light" dir="{{ $dir }}">
+    <div id="auth-root" class="auth-prototype auth-{{ $quickTheme }}" dir="{{ $dir }}">
         <main class="auth-layout">
             <!-- Left Brand Panel -->
             <section class="auth-brand-panel">
@@ -621,6 +630,7 @@
         }
 
         function applyTheme(theme) {
+            theme = theme === 'dark' ? 'dark' : 'light';
             const root = document.getElementById('auth-root');
             const moon = document.getElementById('theme-icon-moon');
             const sun = document.getElementById('theme-icon-sun');
@@ -640,6 +650,10 @@
                 }
             }
             localStorage.setItem('quick_theme', theme);
+            localStorage.setItem('data-bs-theme', theme);
+            document.documentElement.setAttribute('data-quick-theme', theme);
+            document.documentElement.setAttribute('data-bs-theme', theme);
+            document.cookie = 'quick_theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
         }
 
         function toggleTheme() {
@@ -648,7 +662,7 @@
             applyTheme(isDark ? 'light' : 'dark');
         }
 
-        const savedTheme = localStorage.getItem('quick_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        const savedTheme = localStorage.getItem('quick_theme') || localStorage.getItem('data-bs-theme') || @json($quickTheme);
         applyTheme(savedTheme);
     </script>
 </body>

@@ -1,5 +1,6 @@
 @php
     $summary = $sanadPaymentSummary ?? [];
+    $isAr = in_array(app()->getLocale(), ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']) || session('dir') === 'rtl';
     $roleScope = $summary['role_scope'] ?? [
         'label' => 'Quick finance scope',
         'description' => 'Financial information is scoped by the signed-in user role.',
@@ -8,189 +9,287 @@
 @endphp
 
 <div class="col-lg-12">
-    <div class="card sanad-payment-summary">
-        <div class="card-header quick-finance-hero d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div>
-                @php $isAr = app()->getLocale() === 'ar'; @endphp<div class="quick-finance-kicker"><x-quick-icon name="shield" /> {{ $isAr ? 'المدفوعات والتسويات الآمنة' : 'Secure payments & settlements' }}</div><h4 class="font-weight-bold mb-1">{{ $isAr ? 'المركز المالي لمنصة كويك' : 'Quick Financial Center' }}</h4>
-                <span class="text-muted">{{ $isAr ? 'مدفوعات العملاء، التسويات، العمولة، ضريبة القيمة المضافة، المرتجعات، الفواتير، والمعاملات' : 'Customer payments, settlements, commission, VAT, refunds, invoices, transactions, and wallet balances' }}</span>
+    <!-- Hero Banner Card -->
+    <div class="quick-admin-hero">
+        <div class="quick-admin-hero-content">
+            <div class="quick-admin-hero-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                <span>{{ $isAr ? 'المدفوعات والتسويات الآمنة' : 'Secure Payments & Settlements' }}</span>
             </div>
-            <div class="d-flex align-items-center gap-3 flex-wrap">
-                <a href="{{ route('sanad.requests.index', ['payment_state' => 'pending']) }}" class="btn-link btn-link-hover"><u>{{ $isAr ? 'مدفوعات معلقة' : 'Pending payments' }}</u></a>
-                @if(Route::has('providerpayout.index'))
-                    <a href="{{ route('providerpayout.index') }}" class="btn-link btn-link-hover"><u>{{ $isAr ? 'التسويات' : 'Settlements' }}</u></a>
-                @endif
-                @if(Route::has('wallet.index'))
-                    <a href="{{ route('wallet.index') }}" class="btn-link btn-link-hover"><u>{{ $isAr ? 'المحفظة' : 'Wallet' }}</u></a>
-                @endif
+            <h1>{{ $isAr ? 'المركز المالي لمنصة كويك' : 'Quick Financial Center' }}</h1>
+            <p>{{ $isAr ? 'مدفوعات العملاء، التسويات، العمولة، ضريبة القيمة المضافة، المرتجعات، الفواتير، والمعاملات المالية.' : 'Customer payments, partner settlements, platform commissions, VAT, refunds, invoices, transactions, and digital wallets.' }}</p>
+        </div>
+
+        <div class="quick-admin-hero-actions">
+            <a href="{{ route('sanad.requests.index', ['payment_state' => 'pending']) }}" class="quick-admin-hero-btn quick-admin-hero-btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>{{ $isAr ? 'مدفوعات معلقة' : 'Pending Payments' }}</span>
+            </a>
+            @if(Route::has('providerpayout.index'))
+                <a href="{{ route('providerpayout.index') }}" class="quick-admin-hero-btn quick-admin-hero-btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>{{ $isAr ? 'التسويات' : 'Settlements' }}</span>
+                </a>
+            @endif
+            @if(Route::has('wallet.index'))
+                <a href="{{ route('wallet.index') }}" class="quick-admin-hero-btn quick-admin-hero-btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 12h4"/></svg>
+                    <span>{{ $isAr ? 'المحفظة' : 'Wallet' }}</span>
+                </a>
+            @endif
+        </div>
+    </div>
+
+    <!-- Scope Indicator -->
+    <div class="sanad-finance-scope mb-4">
+        <div>
+            <strong>{{ $roleScope['label'] }}</strong>
+            <span>{{ $roleScope['description'] }}</span>
+        </div>
+        <span class="quick-pill {{ ($roleScope['can_bulk_manage'] ?? false) ? 'quick-pill-success' : 'quick-pill-neutral' }}">
+            {{ ($roleScope['can_bulk_manage'] ?? false) ? ($isAr ? 'الإدارة الجماعية مفعّلة' : 'Bulk management enabled') : ($isAr ? 'عرض مقيّد حسب الدور' : 'Scoped view only') }}
+        </span>
+    </div>
+
+    <!-- KPI Grid 1: Revenue & Core Stats -->
+    <div class="quick-kpi-grid mb-4">
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'مدفوعات العملاء' : 'Customer Payments' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(31,107,255,.1); color: #1f6bff;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                </div>
+            </div>
+            <div class="quick-kpi-value">{{ $summary['customer_payments'] ?? 0 }}</div>
+            <div class="quick-kpi-sub">
+                <b class="quick-trend-up">{{ $summary['paid_payments'] ?? 0 }}</b>
+                <span>{{ $isAr ? 'عملية مدفوعة' : 'paid transactions' }}</span>
             </div>
         </div>
-        <div class="card-body">
-            <div class="sanad-finance-scope mb-3">
-                <div>
-                    <strong>{{ $roleScope['label'] }}</strong>
-                    <span>{{ $roleScope['description'] }}</span>
-                </div>
-                <span class="badge {{ ($roleScope['can_bulk_manage'] ?? false) ? 'badge-success' : 'badge-light' }}">
-                    {{ ($roleScope['can_bulk_manage'] ?? false) ? ($isAr ? 'الإدارة الجماعية مفعّلة' : 'Bulk management enabled') : ($isAr ? 'عرض مقيّد حسب الدور' : 'Scoped view only') }}
-                </span>
-            </div>
 
-            <div class="row">
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'مدفوعات العملاء' : 'Customer Payments' }}</span>
-                        <strong>{{ $summary['customer_payments'] ?? 0 }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'مدفوعات معلقة' : 'Pending Payments' }}</span>
-                        <strong>{{ getPriceFormat($summary['pending_amount'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'التسويات' : 'Settlements' }}</span>
-                        <strong>{{ getPriceFormat($summary['settled_amount'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'عمولة المنصة' : 'Platform Commission' }}</span>
-                        <strong>{{ getPriceFormat($summary['platform_commission'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'الفواتير' : 'Invoices' }}</span>
-                        <strong>{{ $summary['paid_payments'] ?? 0 }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'ضريبة القيمة المضافة' : 'VAT' }}</span>
-                        <strong>{{ getPriceFormat($summary['vat_amount'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'المبالغ المستردة' : 'Refunds' }}</span>
-                        <strong>{{ getPriceFormat($summary['refund_amount'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-payment-kpi">
-                        <span>{{ $isAr ? 'إجمالي المعاملات' : 'Transaction Total' }}</span>
-                        <strong>{{ getPriceFormat($summary['total_amount'] ?? 0) }}</strong>
-                    </div>
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'مدفوعات معلقة' : 'Pending Payments' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(245,158,11,.1); color: #f59e0b;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 </div>
             </div>
+            <div class="quick-kpi-value">{{ getPriceFormat($summary['pending_amount'] ?? 0) }}</div>
+            <div class="quick-kpi-sub">
+                <b style="color: #f59e0b;">{{ $isAr ? 'بانتظار التحصيل' : 'awaiting capture' }}</b>
+            </div>
+        </div>
 
-            <div class="row">
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-wallet-kpi">
-                        <span>{{ $isAr ? 'الرصيد الحالي' : 'Current Balance' }}</span>
-                        <strong>{{ getPriceFormat($summary['wallet_current_balance'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-wallet-kpi">
-                        <span>{{ $isAr ? 'الرصيد المعلّق' : 'Pending Balance' }}</span>
-                        <strong>{{ getPriceFormat($summary['wallet_pending_balance'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-wallet-kpi">
-                        <span>{{ $isAr ? 'الرصيد المحرر' : 'Released Balance' }}</span>
-                        <strong>{{ getPriceFormat($summary['wallet_released_balance'] ?? 0) }}</strong>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-md-6 mb-3">
-                    <div class="sanad-wallet-kpi">
-                        <span>{{ $isAr ? 'التسوية القادمة' : 'Upcoming Settlement' }}</span>
-                        <strong>{{ getPriceFormat($summary['upcoming_settlement'] ?? 0) }}</strong>
-                    </div>
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'التسويات والمصروفات' : 'Settlements' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(16,185,129,.1); color: #10b981;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
             </div>
+            <div class="quick-kpi-value">{{ getPriceFormat($summary['settled_amount'] ?? 0) }}</div>
+            <div class="quick-kpi-sub">
+                <b class="quick-trend-up">{{ $summary['settlements_count'] ?? 0 }}</b>
+                <span>{{ $isAr ? 'تسوية منجزة' : 'settlements done' }}</span>
+            </div>
+        </div>
 
-            <div class="row">
-                <div class="col-xl-6 mb-3 mb-xl-0">
-                    <div class="sanad-finance-panel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">{{ $isAr ? 'سجل التسويات' : 'Settlement History' }}</h5>
-                            <span class="text-muted">{{ $summary['settlements_count'] ?? 0 }} {{ $isAr ? 'سجل' : 'records' }}</span>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0 sanad-finance-table">
-                                <thead>
-                                    <tr>
-                                        <th>Settlement No.</th>
-                                        <th>Transfer Date</th>
-                                        <th>Amount</th>
-                                        <th>Reference</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse(($summary['recent_settlements'] ?? []) as $settlement)
-                                        <tr>
-                                            <td>#{{ $settlement->id }}</td>
-                                            <td>{{ $settlement->paid_date ? date('Y-m-d', strtotime($settlement->paid_date)) : '-' }}</td>
-                                            <td>{{ getPriceFormat($settlement->amount ?? 0) }}</td>
-                                            <td>{{ $settlement->payment_method ?? '-' }}</td>
-                                            <td><span class="badge badge-primary1">{{ ucfirst(str_replace('_', ' ', $settlement->status ?? 'pending')) }}</span></td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="text-muted text-center py-3">No settlement history available.</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'عمولة المنصة' : 'Platform Commission' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(139,92,246,.1); color: #8b5cf6;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
                 </div>
-                <div class="col-xl-6">
-                    <div class="sanad-finance-panel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">{{ $isAr ? 'سجل المعاملات' : 'Transaction History' }}</h5>
-                            <span class="text-muted">{{ $summary['total_payments'] ?? 0 }} {{ $isAr ? 'دفعة' : 'payments' }}</span>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0 sanad-finance-table">
-                                <thead>
-                                    <tr>
-                                        <th>Invoice</th>
-                                        <th>Customer</th>
-                                        <th>Service</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse(($summary['recent_transactions'] ?? []) as $transaction)
-                                        <tr>
-                                            <td>
-                                                @if($transaction->booking_id && Route::has('invoice_pdf'))
-                                                    <a href="{{ route('invoice_pdf', $transaction->booking_id) }}" class="btn-link btn-link-hover">#{{ $transaction->booking_id }}</a>
-                                                @else
-                                                    #{{ $transaction->booking_id ?? $transaction->id }}
-                                                @endif
-                                            </td>
-                                            <td>{{ optional($transaction->customer)->display_name ?? '-' }}</td>
-                                            <td>{{ optional(optional($transaction->booking)->service)->name ?? '-' }}</td>
-                                            <td>{{ getPriceFormat($transaction->total_amount ?? 0) }}</td>
-                                            <td><span class="badge badge-primary1">{{ ucfirst(str_replace('_', ' ', $transaction->payment_status ?? 'pending')) }}</span></td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="text-muted text-center py-3">No transaction history available.</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+            </div>
+            <div class="quick-kpi-value">{{ getPriceFormat($summary['platform_commission'] ?? 0) }}</div>
+            <div class="quick-kpi-sub">
+                <b class="quick-trend-up">{{ getPriceFormat($summary['vat_amount'] ?? 0) }}</b>
+                <span>{{ $isAr ? 'ضريبة القيمة المضافة' : 'VAT inclusive' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Grid 2: Digital Wallet Balances -->
+    <div class="quick-kpi-grid mb-4">
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'رصيد المحفظة الحالي' : 'Current Balance' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(31,107,255,.1); color: #1f6bff;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 12h4"/></svg>
+                </div>
+            </div>
+            <div class="quick-kpi-value">{{ getPriceFormat($summary['wallet_current_balance'] ?? 0) }}</div>
+            <div class="quick-kpi-sub">
+                <span>{{ $isAr ? 'رصيد متاح في المحفظة' : 'available wallet balance' }}</span>
+            </div>
+        </div>
+
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'الرصيد المعلّق' : 'Pending Balance' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(245,158,11,.1); color: #f59e0b;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+            </div>
+            <div class="quick-kpi-value">{{ getPriceFormat($summary['wallet_pending_balance'] ?? 0) }}</div>
+            <div class="quick-kpi-sub">
+                <b style="color: #f59e0b;">{{ $isAr ? 'تحت إجراءات التسوية' : 'under clearance' }}</b>
+            </div>
+        </div>
+
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'الرصيد المحرر' : 'Released Balance' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(16,185,129,.1); color: #10b981;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+            </div>
+            <div class="quick-kpi-value">{{ getPriceFormat($summary['wallet_released_balance'] ?? 0) }}</div>
+            <div class="quick-kpi-sub">
+                <b class="quick-trend-up">{{ $isAr ? 'جاهز للتحويل' : 'ready for payout' }}</b>
+            </div>
+        </div>
+
+        <div class="quick-kpi-card">
+            <div class="quick-kpi-header">
+                <span>{{ $isAr ? 'التسوية القادمة' : 'Upcoming Settlement' }}</span>
+                <div class="quick-kpi-icon" style="background: rgba(139,92,246,.1); color: #8b5cf6;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+            </div>
+            <div class="quick-kpi-value">{{ getPriceFormat($summary['upcoming_settlement'] ?? 0) }}</div>
+            <div class="quick-kpi-sub">
+                <b class="quick-trend-up">{{ $isAr ? 'الدورة القادمة' : 'next scheduled cycle' }}</b>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settlement History & Transaction History Split Cards -->
+    <div class="row mb-4">
+        <!-- Settlement History -->
+        <div class="col-xl-6 mb-3 mb-xl-0">
+            <div class="quick-card h-100">
+                <div class="quick-card-header mb-3">
+                    <div>
+                        <h3 class="quick-card-title">{{ $isAr ? 'سجل التسويات' : 'Settlement History' }}</h3>
+                        <div class="quick-card-sub">{{ $isAr ? 'آخر التحويلات المصرفية والتسويات المعتمدة' : 'Recent bank transfers and settled payouts' }}</div>
                     </div>
+                    <span class="quick-pill quick-pill-neutral">
+                        {{ $summary['settlements_count'] ?? 0 }} {{ $isAr ? 'سجل' : 'records' }}
+                    </span>
+                </div>
+
+                <div class="quick-table-responsive">
+                    <table class="quick-table">
+                        <thead>
+                            <tr>
+                                <th>{{ $isAr ? 'رقم التسوية' : 'Settlement No.' }}</th>
+                                <th>{{ $isAr ? 'تاريخ التحويل' : 'Transfer Date' }}</th>
+                                <th>{{ $isAr ? 'المبلغ' : 'Amount' }}</th>
+                                <th>{{ $isAr ? 'المرجع / الطريقة' : 'Reference' }}</th>
+                                <th style="text-align: center;">{{ $isAr ? 'الحالة' : 'Status' }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse(($summary['recent_settlements'] ?? []) as $settlement)
+                                <tr>
+                                    <td>
+                                        <span class="font-weight-bold" style="color: var(--quick-blue);">#{{ $settlement->id }}</span>
+                                    </td>
+                                    <td>{{ $settlement->paid_date ? date('Y-m-d', strtotime($settlement->paid_date)) : '-' }}</td>
+                                    <td>
+                                        <strong>{{ getPriceFormat($settlement->amount ?? 0) }}</strong>
+                                    </td>
+                                    <td>{{ $settlement->payment_method ?? '-' }}</td>
+                                    <td style="text-align: center;">
+                                        @php
+                                            $stStatus = strtolower($settlement->status ?? 'pending');
+                                        @endphp
+                                        <span class="quick-badge {{ in_array($stStatus, ['paid', 'completed', 'settled', 'success'], true) ? 'quick-badge-success' : 'quick-badge-warning' }}">
+                                            {{ ucfirst(str_replace('_', ' ', $settlement->status ?? 'pending')) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="quick-table-empty">
+                                        <div class="quick-table-empty-state">
+                                            <p>{{ $isAr ? 'لا توجد تسويات مسجلة حالياً.' : 'No settlement history available.' }}</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="col-xl-6">
+            <div class="quick-card h-100">
+                <div class="quick-card-header mb-3">
+                    <div>
+                        <h3 class="quick-card-title">{{ $isAr ? 'سجل المعاملات والمدفوعات' : 'Transaction History' }}</h3>
+                        <div class="quick-card-sub">{{ $isAr ? 'آخر الدفعات والفواتير الصادرة عبر المنصة' : 'Recent customer payments and issued invoices' }}</div>
+                    </div>
+                    <span class="quick-pill quick-pill-neutral">
+                        {{ $summary['total_payments'] ?? 0 }} {{ $isAr ? 'دفعة' : 'payments' }}
+                    </span>
+                </div>
+
+                <div class="quick-table-responsive">
+                    <table class="quick-table">
+                        <thead>
+                            <tr>
+                                <th>{{ $isAr ? 'الفاتورة' : 'Invoice' }}</th>
+                                <th>{{ $isAr ? 'العميل' : 'Customer' }}</th>
+                                <th>{{ $isAr ? 'الخدمة' : 'Service' }}</th>
+                                <th>{{ $isAr ? 'المبلغ' : 'Amount' }}</th>
+                                <th style="text-align: center;">{{ $isAr ? 'الحالة' : 'Status' }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse(($summary['recent_transactions'] ?? []) as $transaction)
+                                <tr>
+                                    <td>
+                                        @if($transaction->booking_id && Route::has('invoice_pdf'))
+                                            <a href="{{ route('invoice_pdf', $transaction->booking_id) }}" class="quick-table-ref-badge">
+                                                #{{ $transaction->booking_id }}
+                                            </a>
+                                        @else
+                                            <span class="font-weight-bold" style="color: var(--quick-blue);">#{{ $transaction->booking_id ?? $transaction->id }}</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <strong>{{ optional($transaction->customer)->display_name ?? '-' }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="quick-badge quick-badge-neutral">{{ optional(optional($transaction->booking)->service)->name ?? '-' }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ getPriceFormat($transaction->total_amount ?? 0) }}</strong>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        @php
+                                            $txStatus = strtolower($transaction->payment_status ?? 'pending');
+                                        @endphp
+                                        <span class="quick-badge {{ in_array($txStatus, ['paid', 'completed', 'success'], true) ? 'quick-badge-success' : 'quick-badge-warning' }}">
+                                            {{ ucfirst(str_replace('_', ' ', $transaction->payment_status ?? 'pending')) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="quick-table-empty">
+                                        <div class="quick-table-empty-state">
+                                            <p>{{ $isAr ? 'لا توجد دفعات أو فواتير مسجلة.' : 'No transaction history available.' }}</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -199,109 +298,56 @@
 
 @once
     <style>
-        .sanad-payment-summary .card-header {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-        }
-
-        .sanad-payment-kpi,
-        .sanad-wallet-kpi {
-            min-height: 84px;
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
-            background: #fff;
-        }
-
-        .sanad-wallet-kpi {
-            background: #f8fafc;
-        }
-
-        .sanad-payment-kpi span,
-        .sanad-wallet-kpi span {
-            color: #6c757d;
-            font-size: 13px;
-        }
-
-        .sanad-payment-kpi strong,
-        .sanad-wallet-kpi strong {
-            font-size: 20px;
-            line-height: 1.1;
-            text-align: right;
-            overflow-wrap: anywhere;
-        }
-
-        .sanad-finance-panel {
-            height: 100%;
-            padding: 16px;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
-            background: #fff;
-        }
-
         .sanad-finance-scope {
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 12px;
-            padding: 14px 16px;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
-            background: #f8fafc;
+            padding: 16px 20px;
+            border: 1px solid var(--quick-shell-line);
+            border-radius: 16px;
+            background: color-mix(in srgb, var(--quick-shell-bg) 60%, var(--quick-shell-surface));
         }
 
-        .sanad-finance-scope strong,
-        .sanad-finance-scope span {
+        .sanad-finance-scope strong {
             display: block;
-        }
-
-        .sanad-finance-scope div span {
-            color: #6c757d;
             font-size: 13px;
+            color: var(--quick-shell-ink);
         }
 
-        .sanad-finance-table th {
-            white-space: nowrap;
+        .sanad-finance-scope span {
+            color: var(--quick-shell-muted);
             font-size: 12px;
-            color: #6c757d;
         }
 
-	        .sanad-finance-table td {
-	            vertical-align: middle;
-	            white-space: nowrap;
-	        }
+        .quick-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid transparent;
+        }
 
-	        @media (max-width: 899px) {
-	            .sanad-payment-summary .card-body {
-	                padding: 16px;
-	            }
+        .quick-pill-neutral {
+            background: color-mix(in srgb, var(--quick-shell-bg) 80%, var(--quick-shell-surface));
+            border-color: var(--quick-shell-line);
+            color: var(--quick-shell-ink);
+        }
 
-	            .sanad-payment-summary .row {
-	                margin-left: -6px;
-	                margin-right: -6px;
-	            }
+        .quick-pill-success {
+            background: rgba(16,185,129,.12);
+            color: #059669;
+            border-color: rgba(16,185,129,.25);
+        }
 
-	            .sanad-payment-summary [class*="col-"] {
-	                padding-left: 6px;
-	                padding-right: 6px;
-	            }
+        .quick-pill-warning {
+            background: rgba(245,158,11,.12);
+            color: #d97706;
+            border-color: rgba(245,158,11,.25);
+        }
+    </style>
+@endonce
 
-	            .sanad-payment-summary .col-xl-6 {
-	                flex: 0 0 100%;
-	                max-width: 100%;
-	            }
-
-	            .sanad-finance-panel .table-responsive {
-	                overflow-x: auto;
-	                -webkit-overflow-scrolling: touch;
-	            }
-
-	            .sanad-finance-table {
-	                min-width: 560px;
-	            }
-	        }
-	    </style>
-	@endonce

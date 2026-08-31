@@ -18,7 +18,7 @@
 
     // Initialize theme system
     function initializeTheme() {
-        const savedTheme = localStorage.getItem('data-bs-theme') || 'light';
+        const savedTheme = localStorage.getItem('quick_theme') || localStorage.getItem('data-bs-theme') || 'light';
         const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
 
         // Use saved theme if different from current
@@ -26,6 +26,7 @@
 
         // Apply theme
         document.documentElement.setAttribute('data-bs-theme', finalTheme);
+        document.documentElement.setAttribute('data-quick-theme', finalTheme);
         document.body.classList.toggle('dark', finalTheme === 'dark');
 
         // Update theme classes
@@ -34,6 +35,8 @@
 
         // Save to localStorage and cookie
         localStorage.setItem('data-bs-theme', finalTheme);
+        localStorage.setItem('quick_theme', finalTheme);
+        setCookie('quick_theme', finalTheme, 365);
         setCookie('data-bs-theme', finalTheme, 365);
         setCookie('theme_mode', finalTheme, 365);
 
@@ -57,6 +60,7 @@
 
                 // Apply new theme
                 document.documentElement.setAttribute('data-bs-theme', newTheme);
+                document.documentElement.setAttribute('data-quick-theme', newTheme);
                 document.body.classList.toggle('dark', newTheme === 'dark');
 
                 // Update theme classes
@@ -65,6 +69,8 @@
 
                 // Save preferences
                 localStorage.setItem('data-bs-theme', newTheme);
+                localStorage.setItem('quick_theme', newTheme);
+                setCookie('quick_theme', newTheme, 365);
                 setCookie('data-bs-theme', newTheme, 365);
                 setCookie('theme_mode', newTheme, 365);
 

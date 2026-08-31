@@ -100,12 +100,16 @@
 <!-- Dynamic Theme CSS Integration -->
 @php
     $userRole = auth()->check() ? auth()->user()->user_type : 'customer';
-    // Check for theme mode from various sources
-    $themeMode = 'light'; // default
-    if (request()->cookie('data-bs-theme')) {
+    // Check the shared Quick preference before legacy theme keys.
+    $themeMode = 'light';
+    if (in_array(request()->cookie('quick_theme'), ['light', 'dark'], true)) {
+        $themeMode = request()->cookie('quick_theme');
+    } elseif (request()->cookie('data-bs-theme')) {
         $themeMode = request()->cookie('data-bs-theme');
     } elseif (request()->cookie('theme_mode')) {
         $themeMode = request()->cookie('theme_mode');
+    } elseif (session('quick_theme')) {
+        $themeMode = session('quick_theme');
     } elseif (session('theme_mode')) {
         $themeMode = session('theme_mode');
     }

@@ -1188,6 +1188,8 @@ class HomeController extends Controller
 
     public function lang($locale)
     {
+        abort_unless(in_array($locale, ['ar', 'en'], true), 404);
+
         \App::setLocale($locale);
         session()->put('locale', $locale);
         \Artisan::call('cache:clear');
@@ -1208,7 +1210,7 @@ class HomeController extends Controller
             return redirect()->route('frontend.index');
         }
 
-        return redirect()->back();
+        return redirect()->back()->withCookie(cookie('quick_locale', $locale, 60 * 24 * 365, '/', null, false, false, false, 'lax'));
     }
 
     function authLogin(\Illuminate\Http\Request $request)

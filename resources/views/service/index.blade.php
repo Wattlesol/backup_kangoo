@@ -1,392 +1,493 @@
+@php
+    $locale = app()->getLocale();
+    $isAr = in_array($locale, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']) || session('dir') === 'rtl';
+    $pageTitle = $isAr ? 'دليل الخدمات الحكومية' : 'Government Service Catalog';
+    $summary = $sanadServiceSummary ?? [];
+    $totalServices = (int) ($summary['total_services'] ?? AppModelsService::where('service_type', 'service')->count());
+    $activeServices = (int) ($summary['active_services'] ?? AppModelsService::where('service_type', 'service')->where('status', 1)->count());
+    $inactiveServices = (int) ($summary['inactive_services'] ?? AppModelsService::where('service_type', 'service')->where('status', 0)->count());
+    $packagesCount = (int) ($summary['packages'] ?? AppModelsServicePackage::count());
+    $addonsCount = (int) ($summary['addons'] ?? AppModelsServiceAddon::count());
+    $activeRate = $totalServices > 0 ? (int) round(($activeServices / $totalServices) * 100) : 0;
+@endphp
+
 <x-master-layout>
-<head>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"></script>
-  </head>
-      <div class="container-fluid quick-service-catalog-page">
-        <div class="row">
-            @include('service.partials.sanad-service-summary')
-        </div>
-	    <div class="card quick-service-catalog-table-card">
-        <div class="card-body">
-        <div class="row justify-content-between">
-              <div class="col-md-6 mb-3">
-              <form action="{{ route('service.bulk-action') }}" id="quick-action-form" class="form-disabled d-flex gap-3 align-items-center">
-                    @csrf
-                  <select name="action_type" class="form-control select2" id="quick-action-type" style="width:100%" disabled>
-                      <option value="">{{ __('messages.no_action') }}</option>
-                      <option value="change-status">{{ __('messages.status') }}</option>
-                      <option value="delete">{{ __('messages.delete') }}</option>
-                      <option value="restore">{{ __('messages.restore') }}</option>
-                      <option value="permanently-delete">{{ __('messages.permanent_dlt') }}</option>
-                  </select>
-                
-                <div class="select-status d-none quick-action-field" id="change-status-action" style="width:100%">
-                    <select name="status" class="form-control select2" id="status" >
-                      <option value="1">{{ __('messages.active') }}</option>
-                      <option value="0">{{ __('messages.inactive') }}</option>
-                    </select>
+    <div class="quick-service-page" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
+        <!-- 1. Hero Banner Card -->
+        <div class="quick-admin-hero">
+            <div class="quick-admin-hero-content">
+                <div class="quick-admin-hero-eyebrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span>{{ $isAr ? 'دليل المعاملات والخدمات الحكومية' : 'Government Service Catalog' }}</span>
                 </div>
-                <button id="quick-action-apply" class="btn btn-primary" data-ajax="true"
-                data--submit="{{ route('service.bulk-action') }}"
-                data-datatable="reload" data-confirmation='true'
-                data-title="{{ __('service',['form'=>  __('service') ]) }}"
-                title="{{ __('service',['form'=>  __('service') ]) }}"
-                data-message='{{ __("Do you want to perform this action?") }}' disabled>{{ __('messages.apply') }}</button>
-            </form>
-              </div>
-              <div class="d-flex justify-content-end ml-auto mb-3">
-                <div class="datatable-filter ml-auto">
-                  <select name="column_status" id="column_status" class="select2 form-control" data-filter="select" style="width: 100%">
-                    <option value="">{{ __('messages.all') }}</option>
-                    <option value="0" {{$filter['status'] == '0' ? "selected" : ''}}>{{ __('messages.inactive') }}</option>
-                    <option value="1" {{$filter['status'] == '1' ? "selected" : ''}}>{{ __('messages.active') }}</option>
-                  </select>
-                </div>
-                <div class="input-group ml-2">
-                    <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control dt-search" placeholder="{{ __("messages.search") }}..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
-                  </div>
-              </div>
-               
-              <div class="table-responsive">
-                <table id="datatable" class="table table-striped border">
-                  
-                </table>
-              </div>
+                <h1>{{ $isAr ? 'دليل الخدمات الحكومية' : 'Government Service Catalog' }}</h1>
+                <p>{{ $isAr ? 'إدارة وتخصيص الخدمات والرسوم الحكومية وتعيين التصنيفات وتحديث التسعير وحالات التمكين للبوابة والتطبيق.' : 'Manage government transactions, official fees, category mappings, pricing, and live catalog availability.' }}</p>
             </div>
-	        </div>
-	    </div>
-	    </div>
-      @once
-        <style>
-          .quick-service-catalog-page {
-            max-width: 1180px;
-            margin: 0 auto;
-            padding: 26px 22px 48px;
-          }
 
-          .quick-service-catalog-page > .row {
-            margin-left: 0;
-            margin-right: 0;
-          }
+            <div class="quick-admin-hero-actions">
+                @if(isset($auth_user) && $auth_user->can('service add') && Route::currentRouteName() !== 'servicepackage.service')
+                    <a href="{{ route('service.create') }}" class="quick-admin-hero-btn quick-admin-hero-btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        <span>{{ $isAr ? 'إضافة خدمة جديدة' : 'Add Service' }}</span>
+                    </a>
+                @endif
+                <a href="{{ route('servicepackage.index') }}" class="quick-admin-hero-btn quick-admin-hero-btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    <span>{{ $isAr ? 'باقات الخدمات' : 'Service Bundles' }}</span>
+                </a>
+                <a href="{{ route('serviceaddon.index') }}" class="quick-admin-hero-btn quick-admin-hero-btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    <span>{{ $isAr ? 'الخدمات الإضافية' : 'Add-on Services' }}</span>
+                </a>
+            </div>
+        </div>
 
-          .quick-service-catalog-table-card {
-            border: 1px solid #dce6f4;
-            border-radius: 24px;
-            box-shadow: 0 18px 50px rgba(10, 22, 38, .06);
-            overflow: hidden;
-          }
+        <!-- 2. KPI Summary Strip -->
+        <div class="quick-kpi-grid">
+            <!-- Metric 1: Total Services -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'إجمالي الخدمات' : 'Total Services' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(31,107,255,.1); color: #1f6bff;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $totalServices }}</div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $activeRate }}%</b>
+                    <span>{{ $isAr ? 'نسبة الجاهزية والنشاط' : 'active readiness' }}</span>
+                </div>
+            </div>
 
-          .quick-service-catalog-table-card .card-body {
-            padding: 24px;
-          }
+            <!-- Metric 2: Active Services -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'الخدمات النشطة' : 'Active Services' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(16,185,129,.1); color: #10b981;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $activeServices }}</div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $activeServices }}</b>
+                    <span>{{ $isAr ? 'متاحة للطلب عبر البوابة' : 'live in portal' }}</span>
+                </div>
+            </div>
 
-          .quick-service-catalog-table-card .form-control,
-          .quick-service-catalog-table-card .input-group-text {
-            min-height: 48px;
-            border-color: #dce6f4;
-            border-radius: 12px;
-          }
+            <!-- Metric 3: Service Bundles -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'باقات الخدمات' : 'Service Bundles' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(245,158,11,.1); color: #f59e0b;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $packagesCount }}</div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $packagesCount }}</b>
+                    <span>{{ $isAr ? 'باقة مجمعة ومخفضة' : 'bundled packages' }}</span>
+                </div>
+            </div>
 
-          .quick-service-catalog-table-card .input-group {
-            min-width: 260px;
-          }
+            <!-- Metric 4: Additional Services -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'الخدمات الإضافية' : 'Add-on Services' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(139,92,246,.1); color: #8b5cf6;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $addonsCount }}</div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $addonsCount }}</b>
+                    <span>{{ $isAr ? 'إضافات وخيارات ملحقة' : 'service add-ons' }}</span>
+                </div>
+            </div>
+        </div>
 
-          .quick-service-catalog-table-card .input-group-text {
-            background: #f8fbff;
-          }
+        <!-- 3. Services Data Table Card -->
+        <div class="quick-card quick-service-table-card">
+            <!-- Toolbar: Header & Search & Bulk Actions -->
+            <div class="quick-card-header">
+                <div>
+                    <h3 class="quick-card-title">{{ $isAr ? 'قائمة الخدمات الحكومية الرسمية' : 'Official Services Directory' }}</h3>
+                    <div class="quick-card-sub">{{ $isAr ? 'عرض وتعديل وتصفية الخدمات والرسوم الحكومية وإجراء العمليات الجماعية' : 'View, edit, filter, and manage government services, fees, and statuses' }}</div>
+                </div>
 
-          .quick-service-catalog-table-card .btn-primary {
-            min-height: 48px;
-            border-radius: 12px;
-            font-weight: 800;
-            padding-left: 24px;
-            padding-right: 24px;
-          }
+                <div class="quick-category-toolbar-actions">
+                    <!-- Status Filter Pills -->
+                    <div class="quick-filter-pills" role="tablist">
+                        <button type="button" class="active" onclick="filterServiceStatus('', this)">{{ $isAr ? 'الكل' : 'All' }}</button>
+                        <button type="button" onclick="filterServiceStatus('1', this)">{{ $isAr ? 'النشطة' : 'Active' }}</button>
+                        <button type="button" onclick="filterServiceStatus('0', this)">{{ $isAr ? 'غير النشطة' : 'Inactive' }}</button>
+                    </div>
 
-          .quick-service-catalog-table-card .table-responsive,
-          .quick-service-catalog-table-card .dataTables_wrapper .table-responsive {
+                    <!-- Search Input -->
+                    <div class="quick-search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="quick-search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" class="quick-search-input dt-search" placeholder="{{ $isAr ? 'بحث في الخدمات...' : 'Search services...' }}" aria-label="Search services">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bulk Action Form Bar -->
+            <div class="quick-bulk-bar">
+                <form action="{{ route('service.bulk-action') }}" id="quick-action-form" class="quick-bulk-form form-disabled">
+                    @csrf
+                    <div class="quick-bulk-group">
+                        <span class="quick-bulk-label">{{ $isAr ? 'إجراء جماعي:' : 'Bulk action:' }}</span>
+                        <select name="action_type" class="quick-bulk-select" id="quick-action-type" disabled>
+                            <option value="">{{ __('messages.no_action') }}</option>
+                            <option value="change-status">{{ __('messages.status') }}</option>
+                            <option value="delete">{{ __('messages.delete') }}</option>
+                            <option value="restore">{{ __('messages.restore') }}</option>
+                            <option value="permanently-delete">{{ __('messages.permanent_dlt') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="quick-bulk-target d-none quick-action-field" id="change-status-action">
+                        <select name="status" class="quick-bulk-select" id="status">
+                            <option value="1">{{ __('messages.active') }}</option>
+                            <option value="0">{{ __('messages.inactive') }}</option>
+                        </select>
+                    </div>
+
+                    <button id="quick-action-apply" class="quick-bulk-apply-btn" data-ajax="true"
+                        data--submit="{{ route('service.bulk-action') }}"
+                        data-datatable="reload" data-confirmation="true"
+                        data-title="{{ __('service',['form'=> __('service') ]) }}"
+                        title="{{ __('service',['form'=> __('service') ]) }}"
+                        data-message='{{ __("Do you want to perform this action?") }}' disabled>
+                        {{ __('messages.apply') }}
+                    </button>
+                </form>
+            </div>
+
+            <!-- Responsive Data Table -->
+            <div class="quick-table-responsive">
+                <table id="datatable" class="quick-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 44px; text-align: center;">
+                                <input type="checkbox" class="form-check-input" name="select_all_table" id="select-all-table" data-type="service" onclick="selectAllTable(this)">
+                            </th>
+                            <th>{{ __("messages.english_name") }}</th>
+                            <th>{{ __("messages.arabic_name") }}</th>
+                            <th>{{ __("messages.category") }}</th>
+                            <th>{{ __("messages.price") }}</th>
+                            <th style="text-align: center;">{{ __('messages.featured') }}</th>
+                            <th style="text-align: center;">{{ __('messages.status') }}</th>
+                            <th style="text-align: {{ $isAr ? 'left' : 'right' }};">{{ __('messages.action') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @once
+    <style>
+        .quick-service-page {
             width: 100%;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-          }
+        }
 
-          .quick-service-catalog-table-card table.dataTable,
-          .quick-service-catalog-table-card #datatable {
-            min-width: 1120px;
-            margin-bottom: 0;
-          }
+        .quick-category-toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
 
-          .quick-service-catalog-table-card table.dataTable thead th {
-            background: #1f6bff;
-            color: #fff;
-            border-color: rgba(255, 255, 255, .16);
+        .quick-search-box {
+            position: relative;
+            min-width: 240px;
+        }
+
+        .quick-search-icon {
+            position: absolute;
+            inset-inline-start: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--quick-shell-muted);
+            pointer-events: none;
+        }
+
+        .quick-search-input {
+            width: 100%;
+            height: 38px;
+            border-radius: 11px;
+            border: 1px solid var(--quick-shell-line);
+            background: var(--quick-shell-surface);
+            color: var(--quick-shell-ink);
+            padding-inline-start: 36px;
+            padding-inline-end: 14px;
+            font-size: 13px;
+            outline: none;
+            transition: all .15s ease;
+        }
+
+        .quick-search-input:focus {
+            border-color: var(--quick-blue);
+            box-shadow: 0 0 0 3px rgba(31,107,255,.15);
+        }
+
+        /* Bulk Action Bar */
+        .quick-bulk-bar {
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--quick-shell-bg) 75%, var(--quick-shell-surface));
+            border: 1px solid var(--quick-shell-line);
+        }
+
+        .quick-bulk-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-bulk-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-bulk-label {
             font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: .03em;
+            font-weight: 800;
+            color: var(--quick-shell-muted);
             white-space: nowrap;
-          }
+        }
 
-          .quick-service-catalog-table-card table.dataTable tbody td {
-            vertical-align: middle;
-          }
+        .quick-bulk-select {
+            height: 36px;
+            border-radius: 9px;
+            border: 1px solid var(--quick-shell-line);
+            background: var(--quick-shell-surface);
+            color: var(--quick-shell-ink);
+            padding: 0 10px;
+            font-size: 12px;
+            font-weight: 700;
+            outline: none;
+            cursor: pointer;
+        }
 
-          @media (max-width: 899px) {
-            .quick-service-catalog-page {
-              padding: 16px 12px 36px;
+        .quick-bulk-select:focus {
+            border-color: var(--quick-blue);
+        }
+
+        .quick-bulk-apply-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 36px;
+            padding: 0 16px;
+            border-radius: 9px;
+            border: 0;
+            background: var(--quick-blue);
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+
+        .quick-bulk-apply-btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .quick-bulk-apply-btn:not(:disabled):hover {
+            background: #1455d9;
+        }
+
+        /* Modern Table Adjustments */
+        .quick-service-table-card .quick-table th {
+            padding: 14px 16px;
+        }
+
+        .quick-service-table-card .quick-table td {
+            padding: 14px 16px;
+        }
+
+        .quick-category-avatar {
+            box-shadow: 0 2px 8px rgba(10,22,38,.06);
+            transition: transform .2s ease;
+        }
+
+        .quick-category-avatar:hover {
+            transform: scale(1.08);
+        }
+
+        .quick-category-title-link:hover {
+            color: var(--quick-blue) !important;
+        }
+
+        /* Responsive Mobile Layout */
+        @media (max-width: 860px) {
+            .quick-category-toolbar-actions {
+                width: 100%;
+                justify-content: space-between;
             }
-
-            .quick-service-catalog-table-card {
-              border-radius: 20px;
+            .quick-search-box {
+                width: 100%;
+                min-width: 0;
             }
-
-            .quick-service-catalog-table-card .card-body {
-              padding: 16px;
+            .quick-bulk-form {
+                flex-direction: column;
+                align-items: stretch;
             }
-
-            .quick-service-catalog-table-card .row.justify-content-between {
-              gap: 12px;
+            .quick-bulk-select,
+            .quick-bulk-apply-btn {
+                width: 100%;
             }
+        }
+    </style>
+    @endonce
 
-            .quick-service-catalog-table-card form,
-            .quick-service-catalog-table-card .d-flex.justify-content-end {
-              width: 100%;
-              flex-direction: column;
-              align-items: stretch !important;
-              margin-left: 0 !important;
-            }
+    <script>
+        let currentServiceStatus = '';
 
-            .quick-service-catalog-table-card .datatable-filter,
-            .quick-service-catalog-table-card .input-group,
-            .quick-service-catalog-table-card .btn-primary {
-              width: 100%;
-              min-width: 0;
-              margin-left: 0 !important;
-            }
-
-            .quick-service-catalog-table-card .table-responsive,
-            .quick-service-catalog-table-card .dataTables_wrapper .table-responsive {
-              border: 1px solid #dce6f4;
-              border-radius: 16px;
-              background: #fff;
-            }
-
-            .quick-service-catalog-table-card #datatable,
-            .quick-service-catalog-table-card #datatable thead,
-            .quick-service-catalog-table-card #datatable tbody,
-            .quick-service-catalog-table-card #datatable tr,
-            .quick-service-catalog-table-card #datatable th,
-            .quick-service-catalog-table-card #datatable td {
-              display: block;
-              width: 100% !important;
-              min-width: 0;
-            }
-
-            .quick-service-catalog-table-card #datatable thead {
-              display: none;
-            }
-
-            .quick-service-catalog-table-card #datatable tbody tr {
-              border: 1px solid #dce6f4;
-              border-radius: 16px;
-              margin: 12px;
-              padding: 10px 12px;
-              background: #fff;
-              box-shadow: 0 10px 24px rgba(10,22,38,.05);
-            }
-
-            .quick-service-catalog-table-card #datatable tbody td {
-              display: flex;
-              flex-direction: column;
-              align-items: stretch;
-              gap: 6px;
-              border: 0;
-              border-bottom: 1px solid #edf3fb;
-              padding: 10px 0;
-              text-align: left;
-              white-space: normal !important;
-              overflow-wrap: anywhere;
-            }
-
-            .quick-service-catalog-table-card #datatable tbody td > * {
-              max-width: 100%;
-              min-width: 0;
-              white-space: normal !important;
-              overflow-wrap: anywhere;
-              text-align: left;
-            }
-
-            .quick-service-catalog-table-card #datatable tbody td:last-child {
-              border-bottom: 0;
-            }
-
-            .quick-service-catalog-table-card #datatable tbody td::before {
-              content: attr(data-label);
-              color: #64748b;
-              font-size: 12px;
-              font-weight: 800;
-              text-align: left;
-              text-transform: uppercase;
-              letter-spacing: .02em;
-            }
-
-            .quick-service-catalog-table-card #datatable tbody td:first-child::before {
-              content: "";
-            }
-
-            .quick-service-catalog-table-card .dataTables_length,
-            .quick-service-catalog-table-card .dataTables_paginate {
-              width: 100%;
-              text-align: center;
-              justify-content: center;
-            }
-          }
-        </style>
-      @endonce
-	    <script>
         document.addEventListener('DOMContentLoaded', (event) => {
-          
-        window.renderedDataTable = $('#datatable').DataTable({
+            window.renderedDataTable = $('#datatable').DataTable({
                 processing: true,
                 serverSide: true,
                 autoWidth: false,
-                responsive: true,
-                dom: '<"row align-items-center"><"table-responsive my-3" rt><"row align-items-center" <"col-md-6" l><"col-md-6" p>><"clear">',
+                responsive: false,
+                dom: '<"row align-items-center"><"table-responsive my-2" rt><"row align-items-center py-3" <"col-md-6" l><"col-md-6" p>><"clear">',
                 ajax: {
-                  "type"   : "GET",
-                  "url"    : '{{ route("service.service-index-data", ["postrequestid" => $postrequestid, "servicepackage" => $servicepackage]) }}',
-                  "data"   : function( d ) {
-                    d.search = {
-                      value: $('.dt-search').val()
-                    };
-                    d.filter = {
-                      column_status: $('#column_status').val()
+                    type: "GET",
+                    url: '{{ route("service.service-index-data", ["postrequestid" => $postrequestid, "servicepackage" => $servicepackage]) }}',
+                    data: function (d) {
+                        d.search = {
+                            value: $('.dt-search').val()
+                        };
+                        d.filter = {
+                            column_status: currentServiceStatus
+                        };
                     }
-                  },
                 },
-                
                 columns: [
                     {
                         name: 'check',
                         data: 'check',
-                        title: '<input type="checkbox" class="form-check-input" name="select_all_table" id="select-all-table" data-type="service" onclick="selectAllTable(this)">',
-                        exportable: false,
                         orderable: false,
                         searchable: false,
+                        className: 'text-center'
                     },
                     {
                         data: 'name',
-                        name: 'name',
-                        title: "{{ __("messages.english_name") }}"
+                        name: 'name'
                     },
                     {
-                        data:'name_ar',
-                        name:'name_ar',
-                        title:"{{ __("messages.arabic_name") }}"
+                        data: 'name_ar',
+                        name: 'name_ar'
                     },
                     {
-                        data:'category_id',
-                        name:'category_id',
-                        title: "{{ __('messages.category') }}"
+                        data: 'category_id',
+                        name: 'category_id'
                     },
                     {
-                        data:'government_entity',
-                        name:'government_entity',
-                        title:"{{ __("messages.government_entity") }}"
+                        data: 'price',
+                        name: 'price'
                     },
                     {
-                        data:'government_fee',
-                        name:'government_fee',
-                        title:"{{ __("messages.government_fee") }}"
-                    },
-                    {
-                        data:'service_fee',
-                        name:'service_fee',
-                        title:"{{ __("messages.service_fee") }}"
-                    },
-                    {
-                        data:'is_featured',
-                        name:'is_featured',
-                        title:"{{ __('messages.featured') }}"
+                        data: 'is_featured',
+                        name: 'is_featured',
+                        className: 'text-center'
                     },
                     {
                         data: 'status',
                         name: 'status',
-                        title: "{{ __('messages.status') }}"
+                        className: 'text-center'
                     },
                     {
                         data: 'action',
                         name: 'action',
                         orderable: false,
                         searchable: false,
-                        title: "{{ __('messages.action') }}"
+                        className: '{{ $isAr ? "text-left" : "text-right" }}'
                     }
-                    
-	                ],
-                  drawCallback: function () {
-                    const labels = this.api().columns().header().toArray().map((header) => $(header).text().trim());
-                    $('#datatable tbody tr').each(function () {
-                      $(this).find('td').each(function (index) {
-                        const label = labels[index] || '';
-                        if (label) {
-                          $(this).attr('data-label', label);
-                        }
-                      });
-                    });
-                  }
+                ],
+                language: {
+                    processing: '<div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div>',
+                    emptyTable: "{{ $isAr ? 'لا توجد خدمات متاحة.' : 'No services found.' }}",
+                    info: "{{ $isAr ? 'عرض _START_ إلى _END_ من أصل _TOTAL_ خدمة' : 'Showing _START_ to _END_ of _TOTAL_ entries' }}",
+                    infoEmpty: "{{ $isAr ? 'عرض 0 إلى 0 من أصل 0' : 'Showing 0 to 0 of 0 entries' }}",
+                    infoFiltered: "{{ $isAr ? '(تمت التصفية من أصل _MAX_ إجمالي)' : '(filtered from _MAX_ total entries)' }}",
+                    lengthMenu: "{{ $isAr ? 'عرض _MENU_ سجلات' : 'Show _MENU_ entries' }}",
+                    zeroRecords: "{{ $isAr ? 'لم يتم العثور على نتائج مطابقة' : 'No matching records found' }}",
+                    paginate: {
+                        first: "{{ $isAr ? 'الأول' : 'First' }}",
+                        last: "{{ $isAr ? 'الأخير' : 'Last' }}",
+                        next: "{{ $isAr ? 'التالي' : 'Next' }}",
+                        previous: "{{ $isAr ? 'السابق' : 'Previous' }}"
+                    }
+                }
+            });
 
-	            });
-      });
+            // Live search with debounce
+            let searchTimeout;
+            $('.dt-search').on('keyup input', function () {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function () {
+                    window.renderedDataTable.draw();
+                }, 250);
+            });
+        });
 
-    function resetQuickAction () {
-    const actionValue = $('#quick-action-type').val();
-    console.log(actionValue)
-    if (actionValue != '') {
-        $('#quick-action-apply').removeAttr('disabled');
-
-        if (actionValue == 'change-status') {
-            $('.quick-action-field').addClass('d-none');
-            $('#change-status-action').removeClass('d-none');
-        } else {
-            $('.quick-action-field').addClass('d-none');
+        function filterServiceStatus(status, btn) {
+            currentServiceStatus = status;
+            document.querySelectorAll('.quick-filter-pills button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            window.renderedDataTable.draw();
         }
-    } else {
-        $('#quick-action-apply').attr('disabled', true);
-        $('.quick-action-field').addClass('d-none');
-    }
-  }
 
-  $('#quick-action-type').change(function () {
-    resetQuickAction()
-  });
-  $(document).on('update_quick_action', function() {
-     
-    })
+        function resetQuickAction() {
+            const actionValue = $('#quick-action-type').val();
+            if (actionValue !== '') {
+                $('#quick-action-apply').removeAttr('disabled');
 
+                if (actionValue === 'change-status') {
+                    $('.quick-action-field').removeClass('d-none');
+                } else {
+                    $('.quick-action-field').addClass('d-none');
+                }
+            } else {
+                $('#quick-action-apply').attr('disabled', true);
+                $('.quick-action-field').addClass('d-none');
+            }
+        }
 
+        $('#quick-action-type').change(function () {
+            resetQuickAction();
+        });
 
-  $(document).on('click', '[data-ajax="true"]', function (e) {
-      e.preventDefault();
-      const button = $(this);
-      const confirmation = button.data('confirmation');
+        $(document).on('click', '[data-ajax="true"]', function (e) {
+            e.preventDefault();
+            const button = $(this);
+            const confirmation = button.data('confirmation');
 
-      if (confirmation === 'true') {
-          const message = button.data('message');
-          if (confirm(message)) {
-              const submitUrl = button.data('submit');
-              const form = button.closest('form');
-              form.attr('action', submitUrl);
-              form.submit();
-          }
-      } else {
-          const submitUrl = button.data('submit');
-          const form = button.closest('form');
-          form.attr('action', submitUrl);
-          form.submit();
-      }
-  });
-
+            if (confirmation === 'true') {
+                const message = button.data('message') || '{{ $isAr ? "هل أنت متأكد من تنفيذ هذا الإجراء؟" : "Do you want to perform this action?" }}';
+                if (confirm(message)) {
+                    const submitUrl = button.data('submit');
+                    const form = button.closest('form');
+                    form.attr('action', submitUrl);
+                    form.submit();
+                }
+            } else {
+                const submitUrl = button.data('submit');
+                const form = button.closest('form');
+                form.attr('action', submitUrl);
+                form.submit();
+            }
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
 </x-master-layout>

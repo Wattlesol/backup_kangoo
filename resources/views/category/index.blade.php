@@ -1,207 +1,501 @@
+@php
+    $locale = app()->getLocale();
+    $isAr = in_array($locale, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']) || session('dir') === 'rtl';
+    $pageTitle = $isAr ? 'دليل التصنيفات والقطاعات' : 'Category & Sector Directory';
+    $summary = $categorySummary ?? [
+        'total' => AppModelsCategory::count(),
+        'active' => AppModelsCategory::where('status', 1)->count(),
+        'inactive' => AppModelsCategory::where('status', 0)->count(),
+        'featured' => AppModelsCategory::where('is_featured', 1)->count(),
+        'subcategories' => AppModelsSubCategory::count(),
+        'services' => AppModelsService::count(),
+    ];
+    $activeRate = ($summary['total'] ?? 0) > 0 ? (int) round((($summary['active'] ?? 0) / $summary['total']) * 100) : 0;
+@endphp
 
 <x-master-layout>
-  <head>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"></script>
-  </head>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-lg-12">
-                <div class="card card-block card-stretch">
-                    <div class="card-body p-0">
-                        <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
-                            @if($auth_user->can('category add'))
-                            <a href="{{ route('category.create') }}" class="float-right mr-1 btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> {{ trans('messages.add_form_title',['form' => trans('messages.category')  ]) }}</a>
-                            @endif
-                        </div>
+    <div class="quick-category-page" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
+        <!-- 1. Hero Banner Card -->
+        <div class="quick-admin-hero">
+            <div class="quick-admin-hero-content">
+                <div class="quick-admin-hero-eyebrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/></svg>
+                    <span>{{ $isAr ? 'هيكلية وتصنيف الخدمات الحكومية' : 'Taxonomy & Service Classification' }}</span>
+                </div>
+                <h1>{{ $isAr ? 'دليل التصنيفات والقطاعات' : 'Category & Sector Directory' }}</h1>
+                <p>{{ $isAr ? 'تنظيم وتصنيف القطاعات الحكومية والمعاملات، وتحديد ترتيب الظهور وحالة التمييز وربطها بالخدمات والباقات.' : 'Manage government service categories, sector taxonomy, display orders, featured status, and linked services.' }}</p>
+            </div>
+
+            <div class="quick-admin-hero-actions">
+                @if(isset($auth_user) && $auth_user->can('category add'))
+                    <a href="{{ route('category.create') }}" class="quick-admin-hero-btn quick-admin-hero-btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        <span>{{ $isAr ? 'إضافة تصنيف جديد' : 'Add Category' }}</span>
+                    </a>
+                @endif
+                <a href="{{ route('subcategory.index') }}" class="quick-admin-hero-btn quick-admin-hero-btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+                    <span>{{ $isAr ? 'التصنيفات الفرعية' : 'Subcategories' }}</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 2. KPI Summary Strip -->
+        <div class="quick-kpi-grid">
+            <!-- Metric 1: Total -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'إجمالي التصنيفات' : 'Total Categories' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(31,107,255,.1); color: #1f6bff;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $summary['total'] ?? 0 }}</div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $activeRate }}%</b>
+                    <span>{{ $isAr ? 'نسبة الجاهزية والنشاط' : 'active readiness' }}</span>
+                </div>
+            </div>
+
+            <!-- Metric 2: Active -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'التصنيفات النشطة' : 'Active Categories' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(16,185,129,.1); color: #10b981;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $summary['active'] ?? 0 }}</div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $summary['active'] ?? 0 }}</b>
+                    <span>{{ $isAr ? 'متاحة حالياً للعملاء' : 'live for customers' }}</span>
+                </div>
+            </div>
+
+            <!-- Metric 3: Featured -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'التصنيفات المميزة' : 'Featured in Portal' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(245,158,11,.1); color: #f59e0b;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $summary['featured'] ?? 0 }}</div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $summary['featured'] ?? 0 }}</b>
+                    <span>{{ $isAr ? 'ظاهرة بالصفحة الرئيسية' : 'highlighted on home' }}</span>
+                </div>
+            </div>
+
+            <!-- Metric 4: Linked Services -->
+            <div class="quick-kpi-card">
+                <div class="quick-kpi-header">
+                    <span>{{ $isAr ? 'التصنيفات الفرعية والخدمات' : 'Subcategories & Services' }}</span>
+                    <div class="quick-kpi-icon" style="background: rgba(139,92,246,.1); color: #8b5cf6;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    </div>
+                </div>
+                <div class="quick-kpi-value">{{ $summary['subcategories'] ?? 0 }} <span style="font-size:16px;font-weight:700;color:var(--quick-shell-muted);">/ {{ $summary['services'] ?? 0 }}</span></div>
+                <div class="quick-kpi-sub">
+                    <b class="quick-trend-up">{{ $summary['services'] ?? 0 }}</b>
+                    <span>{{ $isAr ? 'خدمة حكومية مربوطة' : 'linked services' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Category Data Table Card -->
+        <div class="quick-card quick-category-table-card">
+            <!-- Toolbar: Header & Search & Bulk Actions -->
+            <div class="quick-card-header">
+                <div>
+                    <h3 class="quick-card-title">{{ $isAr ? 'قائمة التصنيفات الرسمية' : 'Official Category Directory' }}</h3>
+                    <div class="quick-card-sub">{{ $isAr ? 'عرض وتعديل وتصفية التصنيفات وإجراء العمليات الجماعية على السجلات' : 'View, edit, filter, and perform bulk operations on categories' }}</div>
+                </div>
+
+                <div class="quick-category-toolbar-actions">
+                    <!-- Status Filter Pills -->
+                    <div class="quick-filter-pills" role="tablist">
+                        <button type="button" class="active" onclick="filterCategoryStatus('', this)">{{ $isAr ? 'الكل' : 'All' }}</button>
+                        <button type="button" onclick="filterCategoryStatus('1', this)">{{ $isAr ? 'النشطة' : 'Active' }}</button>
+                        <button type="button" onclick="filterCategoryStatus('0', this)">{{ $isAr ? 'غير النشطة' : 'Inactive' }}</button>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="quick-search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="quick-search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" class="quick-search-input dt-search" placeholder="{{ $isAr ? 'بحث في التصنيفات...' : 'Search categories...' }}" aria-label="Search categories">
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="card">
-        <div class="card-body">
-        <div class="row justify-content-between ">
-            <div>
-                <div class="col-md-12">
-                  <form action="{{ route('category.bulk-action') }}" id="quick-action-form" class="form-disabled d-flex gap-3 align-items-center">
+
+            <!-- Bulk Action Form Bar -->
+            <div class="quick-bulk-bar">
+                <form action="{{ route('category.bulk-action') }}" id="quick-action-form" class="quick-bulk-form form-disabled">
                     @csrf
-                  <select name="action_type" class="form-control select2" id="quick-action-type" style="width:100%" disabled>
-                      <option value="">{{ __('messages.no_action') }}</option>
-                      <option value="change-status">{{ __('messages.status') }}</option>
-                      <option value="change-featured">{{ __('messages.featured') }}</option>
-                      <option value="delete">{{ __('messages.delete') }}</option>
-                      <option value="restore">{{ __('messages.restore') }}</option>
-                      <option value="permanently-delete">{{ __('messages.permanent_dlt') }}</option>
-                  </select>
-                
-                <div class="select-status d-none quick-action-field" id="change-status-action" style="width:100%">
-                    <select name="status" class="form-control select2" id="status" >
-                      <option value="1">{{ __('messages.active') }}</option>
-                      <option value="0">{{ __('messages.inactive') }}</option>
-                    </select>
-                </div>
-                <div class="select-status d-none quick-action-featured" id="change-featured-action" style="width:100%">
-                    <select name="is_featured" class="form-control select2" id="is_featured" >
-                      <option value="1">{{ __('messages.yes') }}</option>
-                      <option value="0">{{ __('messages.no') }}</option>
-                    </select>
-                </div>
-                <button id="quick-action-apply" class="btn btn-primary" data-ajax="true"
-                data--submit="{{ route('category.bulk-action') }}"
-                data-datatable="reload" data-confirmation='true'
-                data-title="{{ __('category',['form'=>  __('category') ]) }}"
-                title="{{ __('category',['form'=>  __('category') ]) }}"
-                data-message='{{ __("Do you want to perform this action?") }}' disabled>{{ __('messages.apply') }}</button>
-            </div>
-          
-            </form>
-          </div>
-              <div class="d-flex justify-content-end">
-                <div class="datatable-filter ml-auto">
-                  <select name="column_status" id="column_status" class="select2 form-control" data-filter="select" style="width: 100%">
-                    <option value="">{{ __('messages.all') }}</option>
-                    <option value="0" {{$filter['status'] == '0' ? "selected" : ''}}>{{ __('messages.inactive') }}</option>
-                    <option value="1" {{$filter['status'] == '1' ? "selected" : ''}}>{{ __('messages.active') }}</option>
-                  </select>
-                </div>
-                <div class="input-group ml-2">
-                    <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control dt-search" placeholder="{{ __("messages.search") }}..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
-                  </div>
-              </div>
-               
-              <div class="table-responsive">
-                <table id="datatable" class="table table-striped border">
+                    <div class="quick-bulk-group">
+                        <span class="quick-bulk-label">{{ $isAr ? 'إجراء جماعي:' : 'Bulk action:' }}</span>
+                        <select name="action_type" class="quick-bulk-select" id="quick-action-type" disabled>
+                            <option value="">{{ __('messages.no_action') }}</option>
+                            <option value="change-status">{{ __('messages.status') }}</option>
+                            <option value="change-featured">{{ __('messages.featured') }}</option>
+                            <option value="delete">{{ __('messages.delete') }}</option>
+                            <option value="restore">{{ __('messages.restore') }}</option>
+                            <option value="permanently-delete">{{ __('messages.permanent_dlt') }}</option>
+                        </select>
+                    </div>
 
+                    <div class="quick-bulk-target d-none quick-action-field" id="change-status-action">
+                        <select name="status" class="quick-bulk-select" id="status">
+                            <option value="1">{{ __('messages.active') }}</option>
+                            <option value="0">{{ __('messages.inactive') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="quick-bulk-target d-none quick-action-featured" id="change-featured-action">
+                        <select name="is_featured" class="quick-bulk-select" id="is_featured">
+                            <option value="1">{{ __('messages.yes') }}</option>
+                            <option value="0">{{ __('messages.no') }}</option>
+                        </select>
+                    </div>
+
+                    <button id="quick-action-apply" class="quick-bulk-apply-btn" data-ajax="true"
+                        data--submit="{{ route('category.bulk-action') }}"
+                        data-datatable="reload" data-confirmation="true"
+                        data-title="{{ __('category',['form'=> __('category') ]) }}"
+                        title="{{ __('category',['form'=> __('category') ]) }}"
+                        data-message='{{ __("Do you want to perform this action?") }}' disabled>
+                        {{ __('messages.apply') }}
+                    </button>
+                </form>
+            </div>
+
+            <!-- Responsive Data Table -->
+            <div class="quick-table-responsive">
+                <table id="datatable" class="quick-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 44px; text-align: center;">
+                                <input type="checkbox" class="form-check-input" name="select_all_table" id="select-all-table" data-type="category" onclick="selectAllTable(this)">
+                            </th>
+                            <th>{{ __("messages.english_name") }}</th>
+                            <th>{{ __("messages.arabic_name") }}</th>
+                            <th style="text-align: center;">{{ __("messages.display_order") }}</th>
+                            <th style="text-align: center;">{{ __('messages.featured') }}</th>
+                            <th style="text-align: center;">{{ __('messages.status') }}</th>
+                            <th style="text-align: {{ $isAr ? 'left' : 'right' }};">{{ __('messages.action') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
                 </table>
-              </div>
             </div>
         </div>
     </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', (event) => {
 
-        window.renderedDataTable = $('#datatable').DataTable({
+    @once
+    <style>
+        .quick-category-page {
+            width: 100%;
+        }
+
+        .quick-category-toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .quick-search-box {
+            position: relative;
+            min-width: 240px;
+        }
+
+        .quick-search-icon {
+            position: absolute;
+            inset-inline-start: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--quick-shell-muted);
+            pointer-events: none;
+        }
+
+        .quick-search-input {
+            width: 100%;
+            height: 38px;
+            border-radius: 11px;
+            border: 1px solid var(--quick-shell-line);
+            background: var(--quick-shell-surface);
+            color: var(--quick-shell-ink);
+            padding-inline-start: 36px;
+            padding-inline-end: 14px;
+            font-size: 13px;
+            outline: none;
+            transition: all .15s ease;
+        }
+
+        .quick-search-input:focus {
+            border-color: var(--quick-blue);
+            box-shadow: 0 0 0 3px rgba(31,107,255,.15);
+        }
+
+        /* Bulk Action Bar */
+        .quick-bulk-bar {
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--quick-shell-bg) 75%, var(--quick-shell-surface));
+            border: 1px solid var(--quick-shell-line);
+        }
+
+        .quick-bulk-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-bulk-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-bulk-label {
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--quick-shell-muted);
+            white-space: nowrap;
+        }
+
+        .quick-bulk-select {
+            height: 36px;
+            border-radius: 9px;
+            border: 1px solid var(--quick-shell-line);
+            background: var(--quick-shell-surface);
+            color: var(--quick-shell-ink);
+            padding: 0 10px;
+            font-size: 12px;
+            font-weight: 700;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .quick-bulk-select:focus {
+            border-color: var(--quick-blue);
+        }
+
+        .quick-bulk-apply-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 36px;
+            padding: 0 16px;
+            border-radius: 9px;
+            border: 0;
+            background: var(--quick-blue);
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+
+        .quick-bulk-apply-btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .quick-bulk-apply-btn:not(:disabled):hover {
+            background: #1455d9;
+        }
+
+        /* Modern Table Adjustments */
+        .quick-category-table-card .quick-table th {
+            padding: 14px 16px;
+        }
+
+        .quick-category-table-card .quick-table td {
+            padding: 14px 16px;
+        }
+
+        .quick-category-avatar {
+            box-shadow: 0 2px 8px rgba(10,22,38,.06);
+            transition: transform .2s ease;
+        }
+
+        .quick-category-avatar:hover {
+            transform: scale(1.08);
+        }
+
+        .quick-category-title-link:hover {
+            color: var(--quick-blue) !important;
+        }
+
+        /* Responsive Mobile Layout */
+        @media (max-width: 860px) {
+            .quick-category-toolbar-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .quick-search-box {
+                width: 100%;
+                min-width: 0;
+            }
+            .quick-bulk-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .quick-bulk-select,
+            .quick-bulk-apply-btn {
+                width: 100%;
+            }
+        }
+    </style>
+    @endonce
+
+    <script>
+        let currentStatusFilter = '';
+
+        document.addEventListener('DOMContentLoaded', (event) => {
+            window.renderedDataTable = $('#datatable').DataTable({
                 processing: true,
                 serverSide: true,
                 autoWidth: false,
-                responsive: true,
-                dom: '<"row align-items-center"><"table-responsive my-3" rt><"row align-items-center" <"col-md-6" l><"col-md-6" p>><"clear">',
+                responsive: false,
+                dom: '<"row align-items-center"><"table-responsive my-2" rt><"row align-items-center py-3" <"col-md-6" l><"col-md-6" p>><"clear">',
                 ajax: {
-                  "type"   : "GET",
-                  "url"    : '{{ route("category.index_data") }}',
-                  "data"   : function( d ) {
-                    d.search = {
-                      value: $('.dt-search').val()
-                    };
-                    d.filter = {
-                      column_status: $('#column_status').val()
+                    type: "GET",
+                    url: '{{ route("category.index_data") }}',
+                    data: function (d) {
+                        d.search = {
+                            value: $('.dt-search').val()
+                        };
+                        d.filter = {
+                            column_status: currentStatusFilter
+                        };
                     }
-                  },
                 },
                 columns: [
                     {
                         name: 'check',
                         data: 'check',
-                        title: '<input type="checkbox" class="form-check-input" name="select_all_table" id="select-all-table" data-type="category" onclick="selectAllTable(this)">',
-                        exportable: false,
                         orderable: false,
                         searchable: false,
+                        className: 'text-center'
                     },
                     {
                         data: 'name',
-                        name: 'name',
-                        title: "{{ __("messages.english_name") }}"
+                        name: 'name'
                     },
                     {
                         data: 'name_ar',
-                        name: 'name_ar',
-                        title: "{{ __("messages.arabic_name") }}"
+                        name: 'name_ar'
                     },
                     {
                         data: 'display_order',
                         name: 'display_order',
-                        title: "{{ __("messages.display_order") }}"
+                        className: 'text-center'
                     },
                     {
                         data: 'is_featured',
                         name: 'is_featured',
-                        title: "{{ __('messages.featured') }}"
+                        className: 'text-center'
                     },
                     {
                         data: 'status',
                         name: 'status',
-                        title: "{{ __('messages.status') }}"
+                        className: 'text-center'
                     },
                     {
                         data: 'action',
                         name: 'action',
                         orderable: false,
                         searchable: false,
-                        title: "{{ __('messages.action') }}"
+                        className: '{{ $isAr ? "text-left" : "text-right" }}'
                     }
-                    
-                ]
-                
+                ],
+                language: {
+                    processing: '<div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div>',
+                    emptyTable: "{{ $isAr ? 'لا توجد تصنيفات متاحة.' : 'No categories found.' }}",
+                    info: "{{ $isAr ? 'عرض _START_ إلى _END_ من أصل _TOTAL_ تصنيف' : 'Showing _START_ to _END_ of _TOTAL_ entries' }}",
+                    infoEmpty: "{{ $isAr ? 'عرض 0 إلى 0 من أصل 0' : 'Showing 0 to 0 of 0 entries' }}",
+                    infoFiltered: "{{ $isAr ? '(تمت التصفية من أصل _MAX_ إجمالي)' : '(filtered from _MAX_ total entries)' }}",
+                    lengthMenu: "{{ $isAr ? 'عرض _MENU_ سجلات' : 'Show _MENU_ entries' }}",
+                    zeroRecords: "{{ $isAr ? 'لم يتم العثور على نتائج مطابقة' : 'No matching records found' }}",
+                    paginate: {
+                        first: "{{ $isAr ? 'الأول' : 'First' }}",
+                        last: "{{ $isAr ? 'الأخير' : 'Last' }}",
+                        next: "{{ $isAr ? 'التالي' : 'Next' }}",
+                        previous: "{{ $isAr ? 'السابق' : 'Previous' }}"
+                    }
+                }
             });
-      });
 
-      function resetQuickAction () {
-        const actionValue = $('#quick-action-type').val();
-        if (actionValue != '') {
-            $('#quick-action-apply').removeAttr('disabled');
+            // Live search with debounce
+            let searchTimeout;
+            $('.dt-search').on('keyup input', function () {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function () {
+                    window.renderedDataTable.draw();
+                }, 250);
+            });
+        });
 
-            if (actionValue == 'change-status') {
-                $('.quick-action-field').addClass('d-none');
-                $('#change-status-action').removeClass('d-none');
-            } else {
-                $('.quick-action-field').addClass('d-none');
-            }
-            if (actionValue == 'change-featured') {
-                $('.quick-action-featured').addClass('d-none');
-                $('#change-featured-action').removeClass('d-none');
-            } else {
-                $('.quick-action-featured').addClass('d-none');
-            }
-
-        } else {
-            $('#quick-action-apply').attr('disabled', true);
-            $('.quick-action-field').addClass('d-none');
-            $('.quick-action-featured').addClass('d-none');
+        function filterCategoryStatus(status, btn) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.quick-filter-pills button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            window.renderedDataTable.draw();
         }
-      }
 
-      $('#quick-action-type').change(function () {
-        resetQuickAction()
-      });
+        function resetQuickAction() {
+            const actionValue = $('#quick-action-type').val();
+            if (actionValue !== '') {
+                $('#quick-action-apply').removeAttr('disabled');
 
-      $(document).on('update_quick_action', function() {
-      })
+                if (actionValue === 'change-status') {
+                    $('.quick-action-field').removeClass('d-none');
+                    $('.quick-action-featured').addClass('d-none');
+                } else if (actionValue === 'change-featured') {
+                    $('.quick-action-featured').removeClass('d-none');
+                    $('.quick-action-field').addClass('d-none');
+                } else {
+                    $('.quick-action-field').addClass('d-none');
+                    $('.quick-action-featured').addClass('d-none');
+                }
+            } else {
+                $('#quick-action-apply').attr('disabled', true);
+                $('.quick-action-field').addClass('d-none');
+                $('.quick-action-featured').addClass('d-none');
+            }
+        }
 
-    $(document).on('click', '[data-ajax="true"]', function (e) {
-      e.preventDefault();
-      const button = $(this);
-      const confirmation = button.data('confirmation');
+        $('#quick-action-type').change(function () {
+            resetQuickAction();
+        });
 
-      if (confirmation === 'true') {
-          const message = button.data('message');
-          if (confirm(message)) {
-              const submitUrl = button.data('submit');
-              const form = button.closest('form');
-              form.attr('action', submitUrl);
-              form.submit();
-          }
-      } else {
-          const submitUrl = button.data('submit');
-          const form = button.closest('form');
-          form.attr('action', submitUrl);
-          form.submit();
-      }
-  });
+        $(document).on('click', '[data-ajax="true"]', function (e) {
+            e.preventDefault();
+            const button = $(this);
+            const confirmation = button.data('confirmation');
 
+            if (confirmation === 'true') {
+                const message = button.data('message') || '{{ $isAr ? "هل أنت متأكد من تنفيذ هذا الإجراء؟" : "Do you want to perform this action?" }}';
+                if (confirm(message)) {
+                    const submitUrl = button.data('submit');
+                    const form = button.closest('form');
+                    form.attr('action', submitUrl);
+                    form.submit();
+                }
+            } else {
+                const submitUrl = button.data('submit');
+                const form = button.closest('form');
+                form.attr('action', submitUrl);
+                form.submit();
+            }
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
-
 </x-master-layout>

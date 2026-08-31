@@ -17,6 +17,8 @@
         ->map(fn ($mapping) => optional($mapping->handyman)->display_name)
         ->filter()
         ->implode(', ');
+    $selectedEmployeeIds = $bookingdata->handymanAdded->pluck('handyman_id')->map(fn ($id) => (int) $id);
+    $isAdminAssignmentUser = auth()->user()->hasAnyRole(['admin', 'demo_admin']);
 @endphp
 <div class="quick-request-detail" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
         <div class="row">
@@ -40,8 +42,8 @@
                                         <x-quick-icon name="check" /> {{ $isAr ? 'مراجعة واعتماد الطلب' : 'Review and approve' }}
                                     </a>
                                 @endif
-                                <a href="{{ route('sanad.chat.workspace', ['booking_id' => $bookingdata->id]) }}" class="quick-table-btn">
-                                    <x-quick-icon name="message" /> {{ $isAr ? 'المحادثة' : 'Chat' }}
+                                <a href="{{ route('sanad.chat.workspace', ['booking_id' => $bookingdata->id]) }}" class="quick-primary-link">
+                                    <x-quick-icon name="message" /> {{ $isAr ? 'فتح المحادثة' : 'Open Chat' }}
                                 </a>
                             </div>
                         </div>
@@ -155,32 +157,66 @@
                             </div>
                         </div>
 
-                        <div class="sanad-assignment-panel">
-                            <h5 class="font-weight-bold mb-3">Employee Assignment</h5>
+                        <div class="sanad-assignment-panel" id="quick-request-actions">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                                <div>
+                                    <h5 class="font-weight-bold mb-1">{{ $isAr ? 'إسناد الشريك' : 'Partner Assignment' }}</h5>
+                                    <span class="text-muted">{{ $isAr ? 'اختر الشريك المسؤول عن تنفيذ هذا الطلب.' : 'Select the partner responsible for this request.' }}</span>
+                                </div>
+                                <span class="quick-assignment-status">{{ optional($bookingdata->provider)->display_name ?: ($isAr ? 'فريق كويك' : 'Quick internal') }}</span>
+                            </div>
                             <form method="POST" action="{{ route('sanad.requests.employees.assign', $bookingdata->id) }}">
                                 @csrf
-                                <div class="row align-items-end">
-                                    <div class="col-md-9 mb-3">
-                                        <label class="form-control-label">Assign Employees</label>
-                                        <select name="handyman_id[]" class="form-control" multiple>
-                                            @foreach($assignableEmployees as $employee)
-                                                <option value="{{ $employee->id }}" {{ $bookingdata->handymanAdded->pluck('handyman_id')->contains($employee->id) ? 'selected' : '' }}>
-                                                    {{ $employee->display_name ?: $employee->email }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if($assignableEmployees->isEmpty())
-                                            <small class="text-muted">No active employees are available for this request partner.</small>
-                                        @endif
+                                @if($isAdminAssignmentUser)
+                                    <input type="hidden" name="assignment_scope" value="partner">
+                                    <div class="quick-assignment-row">
+                                        <div class="quick-assignment-field">
+                                            <label class="form-control-label">{{ $isAr ? 'الشريك' : 'Partner' }}</label>
+                                            <select name="provider_id" class="form-control">
+                                                <option value="">{{ $isAr ? 'اختر شريكاً' : 'Select a partner' }}</option>
+                                                @foreach($assignablePartners as $partner)
+                                                    <option value="{{ $partner->id }}" {{ (int) old('provider_id', $bookingdata->provider_id) === (int) $partner->id ? 'selected' : '' }}>
+                                                        {{ $partner->display_name ?: $partner->email }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @if($assignablePartners->isEmpty())
+                                                <small class="text-muted">{{ $isAr ? 'لا يوجد شركاء نشطون متاحون.' : 'No active partners are available.' }}</small>
+                                            @else
+                                                <small class="text-muted">{{ $isAr ? 'سيتم إسناد الطلب للشريك ومسح أي إسناد موظفين سابق.' : 'This assigns the request to the partner and clears any previous employee assignment.' }}</small>
+                                            @endif
+                                        </div>
+                                        <div class="quick-assignment-action">
+                                            <button type="submit" class="btn btn-primary quick-primary-btn">{{ $isAr ? 'حفظ الإسناد' : 'Save Assignment' }}</button>
+                                        </div>
                                     </div>
-                                    <div class="col-md-3 mb-3">
-                                        <button type="submit" class="btn btn-primary quick-primary-btn w-100">Save Assignment</button>
+                                @else
+                                    <input type="hidden" name="assignment_scope" value="employees_only">
+                                    <div class="row align-items-end">
+                                        <div class="col-md-9 mb-3">
+                                            <label class="form-control-label">{{ $isAr ? 'موظفو الشريك' : 'Partner employees' }}</label>
+                                            <select name="handyman_id[]" class="form-control" multiple>
+                                                @foreach($assignableEmployees as $employee)
+                                                    <option value="{{ $employee->id }}" {{ $selectedEmployeeIds->contains((int) $employee->id) ? 'selected' : '' }}>
+                                                        {{ $employee->display_name ?: $employee->email }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @if($assignableEmployees->isEmpty())
+                                                <small class="text-muted">{{ $isAr ? 'لا يوجد موظفون نشطون متاحون لهذا الشريك.' : 'No active employees are available for your partner account.' }}</small>
+                                            @else
+                                                <small class="text-muted">{{ $isAr ? 'يمكن للشريك إسناد الطلب لموظفيه فقط.' : 'Partner users can assign only their own employees.' }}</small>
+                                            @endif
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <button type="submit" class="btn btn-primary quick-primary-btn w-100">{{ $isAr ? 'حفظ الإسناد' : 'Save Assignment' }}</button>
+                                        </div>
                                     </div>
-                                </div>
+                                @endif
                             </form>
                         </div>
 
-                        <div class="sanad-action-panel mt-3" id="quick-request-actions">
+                        <div class="sanad-action-panel mt-3">
                             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                                 <div>
                                     <h5 class="font-weight-bold mb-1">Partner Order Actions</h5>
@@ -406,29 +442,33 @@
                             <strong>Quick document policy:</strong>
                             documents default to a 48-hour retention window when no date is selected. Customers must download required files before the retention date; Download before deletion guidance stays visible for every retained document.
                         </div>
-                        <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="mb-4">
+                        <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="quick-document-form mb-4">
                             @csrf
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
+                            <div class="quick-document-grid">
+                                <div>
                                     <label class="form-control-label">Document Type</label>
                                     <input type="text" name="document_type" class="form-control" placeholder="ID, contract, evidence" required>
                                 </div>
-                                <div class="col-md-6 mb-3">
+                                <div>
                                     <label class="form-control-label">File Name</label>
                                     <input type="text" name="file_name" class="form-control" placeholder="document.pdf">
                                 </div>
-                                <div class="col-md-8 mb-3">
+                                <div>
                                     <label class="form-control-label">Upload File</label>
-                                    <input type="file" name="document" class="form-control" accept="image/*,.pdf,.doc,.docx">
+                                    <label class="quick-file-picker">
+                                        <input type="file" name="document" accept="image/*,.pdf,.doc,.docx">
+                                        <span class="quick-file-icon"><i class="fas fa-paperclip"></i></span>
+                                        <span class="quick-file-label">Attach document</span>
+                                    </label>
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div>
                                     <label class="form-control-label">Retention Until</label>
                                     <input type="date" name="retention_until" class="form-control">
                                 </div>
                             </div>
                             <label class="form-control-label">Visible to:</label>
                             <div class="sanad-checkbox-row mb-3">
-                                @foreach(config('sanad.document_visibility', []) as $role)
+                                @foreach(collect(config('sanad.document_visibility', []))->unique()->values() as $role)
                                     <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" {{ $role === 'admin' ? 'checked' : '' }}> {{ $sanadRoleLabel($role) }}</label>
                                 @endforeach
                             </div>
@@ -464,53 +504,34 @@
                             @endforelse
                         </div>
                         <hr>
-                        <h6>Structured Document Requests</h6>
+                        <div class="quick-section-toolbar">
+                            <div>
+                                <h6 class="mb-1">{{ $isAr ? 'طلبات المستندات المنظمة' : 'Structured Document Requests' }}</h6>
+                                <small class="text-muted">{{ $isAr ? 'سجل الطلبات المرسلة من المحادثة.' : 'History of requests sent from chat.' }}</small>
+                            </div>
+                            <a href="{{ route('sanad.chat.workspace', ['booking_id' => $bookingdata->id]) }}" class="quick-table-btn">
+                                <x-quick-icon name="message" /> {{ $isAr ? 'طلب عبر المحادثة' : 'Request in Chat' }}
+                            </a>
+                        </div>
                         @forelse($bookingdata->sanadDocumentRequests()->latest()->get() as $documentRequest)
                             <div class="border rounded p-2 mb-2"><strong>{{ $documentRequest->document_name }}</strong> <span class="badge badge-light">{{ Str::headline($documentRequest->status) }}</span><div class="small">Requested from {{ Str::headline($documentRequest->requested_from) }}: {{ $documentRequest->reason }}</div>@if($documentRequest->document)<a href="{{ $documentRequest->document->getFirstMediaUrl('document') }}" target="_blank">Open submission</a>@endif</div>
                         @empty <div class="text-muted small">No structured document requests.</div> @endforelse
-                        @if(auth()->user()->hasAnyRole(['admin','demo_admin','employee','provider']))
-                            <form method="POST" action="{{ route('sanad.requests.document-requests.store', $bookingdata->id) }}" class="mt-3">@csrf<div class="form-row"><div class="col-md-3"><input name="document_name" class="form-control" placeholder="Document name" required></div><div class="col-md-2"><select name="requested_from" class="form-control"><option value="customer">Customer</option><option value="partner">Partner</option></select></div><div class="col-md-3"><input name="reason" class="form-control" placeholder="Reason" required></div><div class="col-md-2"><input name="due_at" type="date" class="form-control"></div><div class="col-md-2"><button class="quick-table-btn">Request document</button></div></div></form>
-                        @endif
                     </div>
                 </div>
             </div>
 
             <div class="col-lg-6">
                 <div class="quick-card sanad-ops-section">
-                    <div class="card-header">
-                        <h5 class="font-weight-bold mb-0">Buzz Alerts</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <h5 class="font-weight-bold mb-0">{{ $isAr ? 'تنبيهات وطلبات Buzz' : 'Buzz Notifications & Requests' }}</h5>
+                            <small class="text-muted">{{ $isAr ? 'سجل التنبيهات والطلبات المرسلة لهذا الطلب.' : 'History of notifications and requests sent for this request.' }}</small>
+                        </div>
+                        <a href="{{ route('sanad.chat.workspace', ['booking_id' => $bookingdata->id]) }}" class="quick-table-btn">
+                            <x-quick-icon name="message" /> {{ $isAr ? 'فتح المحادثة' : 'Open Chat' }}
+                        </a>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('sanad.requests.buzz.store', $bookingdata->id) }}" class="mb-4">
-                            @csrf
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-control-label">Recipient Role</label>
-                                    <select name="recipient_role" class="form-control">
-                                        @foreach(config('sanad.document_visibility', []) as $role)
-                                            <option value="{{ $role }}">{{ $sanadRoleLabel($role) }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-control-label">Priority</label>
-                                    <select name="priority" class="form-control">
-                                        <option value="urgent">Urgent</option>
-                                        <option value="high">High</option>
-                                        <option value="normal">Normal</option>
-                                        <option value="low">Low</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 mb-3 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-primary quick-primary-btn w-100">Send Buzz</button>
-                                </div>
-                                <div class="col-md-12 mb-3">
-                                    <label class="form-control-label">Message</label>
-                                    <textarea name="message" class="form-control" rows="3" required></textarea>
-                                </div>
-                            </div>
-                        </form>
-
                         <div class="sanad-list">
                             @forelse($buzzAlerts as $alert)
                                 <div class="sanad-list-item">
@@ -521,12 +542,6 @@
                                     </div>
                                     <div class="sanad-list-actions">
                                         <span class="badge badge-light">{{ Str::headline($alert->status) }}</span>
-                                        @if($alert->status !== 'acknowledged')
-                                            <form method="POST" action="{{ route('sanad.requests.buzz.acknowledge', [$bookingdata->id, $alert->id]) }}">
-                                                @csrf
-                                                <button type="submit" class="quick-table-btn">Acknowledge</button>
-                                            </form>
-                                        @endif
                                     </div>
                                 </div>
                             @empty
@@ -537,38 +552,6 @@
                 </div>
             </div>
 
-            <div class="col-lg-12">
-                <div class="quick-card sanad-ops-section">
-                    <div class="card-header">
-                        <h5 class="font-weight-bold mb-0">Secure Chat</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="sanad-chat-feed mb-4">
-                            @forelse($chatMessages as $message)
-                                <div class="sanad-chat-message">
-                                    <div class="d-flex justify-content-between gap-2 flex-wrap">
-                                        <strong>{{ $message->sender_role === 'system' ? 'System' : $sanadRoleLabel($message->sender_role) }}</strong>
-                                        <small>{{ optional($message->created_at)->diffForHumans() }}</small>
-                                    </div>
-                                    <p class="mb-1">{{ $message->message }}</p>
-                                    <small>Visible to: {{ $sanadRoleList($message->visible_to) ?: '-' }}</small>
-                                </div>
-                            @empty
-                                <div class="sanad-empty-state">No messages yet</div>
-                            @endforelse
-                        </div>
-
-                        <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.chat.store', $bookingdata->id) }}">
-                            @csrf
-                            <select name="thread_type" class="form-control mb-2"><option value="shared">Shared with customer and Partner</option>@if(auth()->user()->hasAnyRole(['admin','demo_admin','employee']))<option value="internal">Internal Quick team</option>@endif</select>
-                            <label class="form-control-label">Message</label>
-                            <textarea name="message" class="form-control mb-3" rows="3" required></textarea>
-                            <input type="file" name="attachment" class="form-control mb-3" accept="image/*,.pdf,.doc,.docx">
-                            <button type="submit" class="btn btn-primary quick-primary-btn">Send Message</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -686,6 +669,33 @@
                 border: 1px solid var(--quick-shell-line);
                 border-radius: 16px;
                 background: var(--quick-shell-surface);
+            }
+
+            .quick-assignment-status {
+                display: inline-flex;
+                align-items: center;
+                min-height: 32px;
+                padding: 6px 12px;
+                border-radius: 999px;
+                background: rgba(31, 107, 255, .1);
+                color: var(--quick-blue);
+                font-size: 12px;
+                font-weight: 900;
+            }
+
+            .quick-assignment-row {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                align-items: end;
+                gap: 16px;
+            }
+
+            .quick-assignment-field {
+                min-width: 0;
+            }
+
+            .quick-assignment-action .quick-primary-btn {
+                min-width: 190px;
             }
 
             .sanad-action-panel {
@@ -857,6 +867,69 @@
                 font-size: 13px;
             }
 
+            .quick-document-form {
+                padding: 16px;
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 16px;
+                background: color-mix(in srgb, var(--quick-shell-surface) 94%, var(--quick-shell-bg));
+            }
+
+            .quick-document-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 16px 18px;
+                margin-bottom: 16px;
+            }
+
+            .quick-file-picker {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-height: 42px;
+                width: 100%;
+                margin: 0;
+                padding: 8px 12px;
+                border: 1px solid var(--quick-shell-line);
+                border-radius: 12px;
+                background: var(--quick-shell-surface);
+                color: var(--quick-shell-muted);
+                cursor: pointer;
+            }
+
+            .quick-file-picker input {
+                position: absolute;
+                inline-size: 1px;
+                block-size: 1px;
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            .quick-file-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 30px;
+                height: 30px;
+                border-radius: 10px;
+                background: rgba(31, 107, 255, .1);
+                color: var(--quick-blue);
+                flex: 0 0 auto;
+            }
+
+            .quick-file-label {
+                font-size: 13px;
+                font-weight: 800;
+                color: var(--quick-shell-ink);
+            }
+
+            .quick-section-toolbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 14px;
+                margin-bottom: 14px;
+            }
+
             .sanad-list {
                 display: grid;
                 gap: 10px;
@@ -875,7 +948,6 @@
 
             .sanad-list-item span,
             .sanad-list-item small,
-            .sanad-chat-message small,
             .sanad-empty-state {
                 display: block;
                 color: var(--quick-shell-muted);
@@ -887,20 +959,6 @@
                 align-items: flex-end;
                 gap: 8px;
                 flex-shrink: 0;
-            }
-
-            .sanad-chat-feed {
-                max-height: 360px;
-                overflow: auto;
-                display: grid;
-                gap: 10px;
-            }
-
-            .sanad-chat-message {
-                padding: 14px;
-                border: 1px solid var(--quick-shell-line);
-                border-radius: 14px;
-                background: color-mix(in srgb, var(--quick-shell-surface) 92%, var(--quick-shell-bg));
             }
 
             .sanad-empty-state {
@@ -954,9 +1012,18 @@
                 }
 
                 .sanad-action-item,
-                .sanad-list-item {
+                .sanad-list-item,
+                .quick-assignment-row,
+                .quick-document-grid,
+                .quick-section-toolbar {
                     display: grid;
                     gap: 12px;
+                    grid-template-columns: 1fr;
+                }
+
+                .sanad-list-actions,
+                .quick-assignment-action .quick-primary-btn {
+                    width: 100%;
                 }
 
                 .sanad-list-actions {

@@ -15,6 +15,9 @@ class UserResource extends JsonResource
      */
     public function toArray($request)
     {
+        if (is_null($this->resource)) {
+            return [];
+        }
         $viewer = auth('sanctum')->user() ?: auth()->user();
         $providers_service_rating = (float) 0;
         $handyman_rating = (float) 0;

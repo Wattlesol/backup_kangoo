@@ -92,6 +92,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('admin-dashboard',[ API\DashboardController::class, 'adminDashboard' ]);
     Route::get('sanad/foundation', [ API\SanadController::class, 'foundation' ]);
     Route::get('sanad/requests', [ API\SanadController::class, 'requests' ]);
+    Route::get('sanad/requests/{id}', [ API\SanadController::class, 'showRequest' ]);
+    Route::post('sanad/requests/{id}/documents', [ API\SanadController::class, 'uploadRequestDocument' ]);
+    Route::post('sanad/requests/{id}/cancel', [ API\SanadController::class, 'cancelRequest' ]);
     Route::post('sanad/requests/{id}/lifecycle', [ API\SanadController::class, 'updateRequestLifecycle' ]);
     Route::get('sanad/buzz', [ API\SanadController::class, 'buzzAlerts' ]);
     Route::post('sanad/buzz', [ API\SanadController::class, 'createBuzz' ]);

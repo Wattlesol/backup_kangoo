@@ -42,7 +42,16 @@ class ServicePackageController extends Controller
         $pageTitle = __('messages.list_form_title',['form' => __('messages.service_package')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('servicepackage.index', compact('pageTitle','auth_user','assets','filter'));
+
+        $packageSummary = [
+            'total' => ServicePackage::count(),
+            'active' => ServicePackage::where('status', 1)->count(),
+            'inactive' => ServicePackage::where('status', 0)->count(),
+            'featured' => ServicePackage::where('is_featured', 1)->count(),
+            'services' => Service::count(),
+        ];
+
+        return view('servicepackage.index', compact('pageTitle', 'auth_user', 'assets', 'filter', 'packageSummary'));
     }
 
     public function index_data(DataTables $datatable,Request $request)
@@ -75,18 +84,26 @@ class ServicePackageController extends Controller
 
 
             ->editColumn('name', function($query){
+                $image = getSingleMedia($query, 'package_attachment', null);
+                $nameEn = $query->name;
+                $nameAr = $query->name_ar ?: '';
+
+                $thumb = $image 
+                    ? '<img src="'.$image.'" alt="'.e($nameEn).'" class="quick-category-avatar" style="width:38px;height:38px;object-fit:cover;border-radius:10px;border:1px solid var(--quick-shell-line);flex-shrink:0;background:var(--quick-shell-surface);">'
+                    : '<div class="quick-category-avatar-placeholder" style="width:38px;height:38px;border-radius:10px;background:rgba(31,107,255,.09);color:var(--quick-blue);display:grid;place-items:center;font-weight:900;font-size:14px;border:1px solid rgba(31,107,255,.15);flex-shrink:0;">'.mb_substr($nameEn, 0, 1).'</div>';
+
                 if (auth()->user()->can('service list')) {
-                    $link ='<a class="btn-link btn-link-hover" href='.route('servicepackage.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                    $link = '<a class="quick-category-title-link" style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);text-decoration:none;" href="'.route('servicepackage.create', ['id' => $query->id]).'">'.e($nameEn).'</a>';
                 } else {
-                    $link = $query->name;
+                    $link = '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">'.e($nameEn).'</span>';
                 }
-                return $link;
+
+                $subtext = $nameAr ? '<span style="display:block;font-size:11px;color:var(--quick-shell-muted);margin-top:2px;">'.e($nameAr).'</span>' : '';
+
+                return '<div style="display:flex;align-items:center;gap:12px;">'.$thumb.'<div style="min-width:0;">'.$link.$subtext.'</div></div>';
             })
             ->editColumn('name_ar', function($query){
-                if (auth()->user()->can('service list') && !empty($query->name_ar)) {
-                    return '<a class="btn-link btn-link-hover" href='.route('servicepackage.create', ['id' => $query->id]).' dir="rtl">'.$query->name_ar.'</a>';
-                }
-                return $query->name_ar ? '<span dir="rtl">'.$query->name_ar.'</span>' : '-';
+                return '<span style="font-weight:700;font-size:13px;color:var(--quick-shell-ink);">'.e($query->name_ar ?: '-').'</span>';
             })
 
             ->editColumn('category_id', function ($query) {
@@ -99,13 +116,13 @@ class ServicePackageController extends Controller
                 return ($query->package_type != null && isset($query->package_type)) ? ucfirst($query->package_type) : '-';
             })
             ->editColumn('price', function ($query) {
-                return ($query->price != null && isset($query->price)) ? getPriceFormat($query->price) : '-';
+                return ($query->price != null && isset($query->price)) ? '<span class="quick-order-badge" style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:8px;background:rgba(16,185,129,.09);color:#10b981;font-weight:800;font-size:12px;border:1px solid rgba(16,185,129,.18);">' . getPriceFormat($query->price) . '</span>' : '-';
             })
             ->addColumn('action', function ($servicepackage) {
                 return view('servicepackage.action', compact('servicepackage'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['action', 'status','name','name_ar','check'])
+            ->rawColumns(['action', 'status','name','name_ar','check','price'])
             ->toJson();
     }
 

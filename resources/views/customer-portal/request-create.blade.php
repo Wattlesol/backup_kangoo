@@ -33,8 +33,28 @@
                 @endforelse
             </div>
             @if($vaultDocuments->count())
-                <h5 class="mt-3">{{ app()->getLocale() === "ar" ? "إعادة الاستخدام من خزينة المستندات" : "Reuse From Document Vault" }}</h5>
-                <div class="row">@foreach($vaultDocuments as $document)<div class="col-md-4"><label><input type="checkbox" name="vault_document_ids[]" value="{{ $document->id }}"> {{ $document->document_type }}</label></div>@endforeach</div>
+                <div class="quick-vault-picker mt-3" data-vault-picker>
+                    <h5>{{ app()->getLocale() === "ar" ? "إعادة الاستخدام من خزينة المستندات" : "Reuse From Document Vault" }}</h5>
+                    <div class="row align-items-end">
+                        <div class="col-md-9 form-group mb-md-0">
+                            <label for="vault-document-select">{{ $isAr ? 'اختر مستنداً محفوظاً' : 'Choose a saved document' }}</label>
+                            <select id="vault-document-select" class="sanad-form-control" data-vault-select>
+                                <option value="">{{ $isAr ? 'اختر من خزينة المستندات' : 'Select from document vault' }}</option>
+                                @foreach($vaultDocuments as $document)
+                                    <option value="{{ $document->id }}" data-label="{{ $document->document_type }}" data-status="{{ quick_status_label($document->verification_status ?? 'pending') }}">
+                                        {{ $document->document_type }} @if($document->file_name) - {{ $document->file_name }} @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" class="sanad-btn secondary w-100" data-vault-add>{{ $isAr ? 'إضافة المستند' : 'Add Document' }}</button>
+                        </div>
+                    </div>
+                    <div class="quick-vault-selected mt-2" data-vault-selected aria-live="polite">
+                        <p class="sanad-muted mb-0" data-vault-empty>{{ $isAr ? 'لم يتم اختيار أي مستند محفوظ بعد.' : 'No saved documents selected yet.' }}</p>
+                    </div>
+                </div>
             @endif
             <h5 class="mt-3">{{ app()->getLocale() === "ar" ? "المراجعة والدفع" : "Review and Payment" }}</h5>
             <div class="sanad-grid mb-3">
@@ -46,4 +66,63 @@
         </div>
     </form>
 </div>
+@if($vaultDocuments->count())
+    <script>
+        (function () {
+            var picker = document.querySelector('[data-vault-picker]');
+            if (!picker) return;
+            var select = picker.querySelector('[data-vault-select]');
+            var addButton = picker.querySelector('[data-vault-add]');
+            var selectedList = picker.querySelector('[data-vault-selected]');
+            var emptyState = picker.querySelector('[data-vault-empty]');
+            var selectedIds = new Set();
+            var removeText = @json($isAr ? 'إزالة' : 'Remove');
+
+            addButton.addEventListener('click', function () {
+                var option = select.options[select.selectedIndex];
+                if (!option || !option.value || selectedIds.has(option.value)) {
+                    return;
+                }
+
+                selectedIds.add(option.value);
+                if (emptyState) {
+                    emptyState.style.display = 'none';
+                }
+
+                var row = document.createElement('div');
+                row.className = 'quick-vault-row';
+                row.dataset.vaultRow = option.value;
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'vault_document_ids[]';
+                input.value = option.value;
+                var copy = document.createElement('div');
+                var title = document.createElement('strong');
+                title.textContent = option.dataset.label || option.textContent.trim();
+                var status = document.createElement('span');
+                status.textContent = option.dataset.status || '';
+                var removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'btn btn-sm btn-outline-secondary';
+                removeButton.textContent = removeText;
+
+                copy.appendChild(title);
+                copy.appendChild(status);
+                row.appendChild(input);
+                row.appendChild(copy);
+                row.appendChild(removeButton);
+
+                removeButton.addEventListener('click', function () {
+                    selectedIds.delete(option.value);
+                    row.remove();
+                    if (!selectedIds.size && emptyState) {
+                        emptyState.style.display = '';
+                    }
+                });
+                selectedList.appendChild(row);
+                select.value = '';
+            });
+        })();
+    </script>
+@endif
 </x-master-layout>

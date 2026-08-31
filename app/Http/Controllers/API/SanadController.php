@@ -70,6 +70,295 @@ class SanadController extends Controller
         ]);
     }
 
+    public function showRequest(Request $request, $id)
+    {
+        $booking = Booking::with([
+            'service.category',
+            'service.subcategory',
+            'payment',
+            'sanadDocuments',
+            'sanadDocumentRequests.document',
+            'sanadBuzzAlerts',
+            'sanadRequestActions.actor',
+            'customer',
+            'provider',
+            'handymanAdded.handyman',
+        ])
+        ->myBooking()
+        ->findOrFail($id);
+
+        $stage = $booking->sanad_stage ?: $booking->status ?: 'submitted';
+        $progress = in_array($stage, ['completed', 'closed'], true)
+            ? 100
+            : (['submitted' => 15, 'pending_review' => 25, 'assigned_to_partner' => 40, 'assigned_to_employee' => 55, 'in_progress' => 70, 'awaiting_customer_action' => 65, 'awaiting_quality_review' => 85, 'escalated' => 60][$stage] ?? 20);
+
+        // Required Documents
+        $docs = collect(optional($booking->service)->required_documents ?: []);
+        $requiredDocuments = $docs->map(function ($doc) use ($booking) {
+            $storedName = is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $doc['key'] ?? 'Document') : $doc;
+            $key = is_array($doc) ? ($doc['key'] ?? Str::slug($storedName, '_')) : Str::slug($storedName, '_');
+            $docItem = $booking->sanadDocuments->first(function ($d) use ($storedName, $key) {
+                return ($d->document_key && $d->document_key === $key) || ($d->document_type === $storedName);
+            });
+            $status = 'required';
+            if ($docItem) {
+                $status = ($docItem->verification_status === 'approved') ? 'verified' : 'submitted';
+            }
+            return [
+                'key' => $key,
+                'name' => is_array($doc) ? ($doc['name'] ?? $doc['document_name'] ?? $storedName) : $storedName,
+                'status' => $status,
+                'required' => is_array($doc) ? (bool)($doc['required'] ?? true) : true,
+                'mime_types' => is_array($doc) ? ($doc['mime_types'] ?? []) : [],
+            ];
+        })->values();
+
+        // Document Choices for uploading
+        $approvedDocuments = $booking->sanadDocuments->where('verification_status', 'approved');
+        $documentChoices = collect();
+        foreach ($docs as $document) {
+            $storedName = is_array($document) ? ($document['name'] ?? $document['document_name'] ?? $document['key'] ?? 'Document') : $document;
+            $key = is_array($document) ? ($document['key'] ?? Str::slug($storedName, '_')) : Str::slug($storedName, '_');
+            $alreadyApproved = $approvedDocuments->contains(function ($approved) use ($key, $storedName) {
+                return ($approved->document_key && $approved->document_key === $key) || (!$approved->document_key && $approved->document_type === $storedName);
+            });
+            if (!$alreadyApproved) {
+                $documentChoices->push([
+                    'id' => 'service:' . $key,
+                    'key' => $key,
+                    'name' => $storedName,
+                    'label' => is_array($document) ? ($document['name'] ?? $storedName) : $storedName,
+                    'required' => true,
+                    'document_request_id' => null,
+                ]);
+            }
+        }
+        foreach ($booking->sanadDocumentRequests->whereIn('requested_from', ['customer', 'user'])->whereIn('status', ['pending', 'rejected', 'replacement_requested']) as $dr) {
+            $documentChoices->push([
+                'id' => 'request:' . $dr->id,
+                'key' => $dr->document_key ?: Str::slug($dr->document_name, '_'),
+                'name' => $dr->document_name,
+                'label' => $dr->document_name,
+                'required' => (bool)$dr->required,
+                'document_request_id' => $dr->id,
+            ]);
+        }
+
+        // Open Buzz Alerts
+        $openBuzzAlerts = $booking->sanadBuzzAlerts
+            ->where('status', 'unread')
+            ->map(function ($buzz) {
+                return [
+                    'id' => $buzz->id,
+                    'message' => $buzz->message,
+                    'severity' => $buzz->severity ?: 'urgent',
+                    'created_at' => optional($buzz->created_at)->toIso8601String(),
+                ];
+            })->values();
+
+        // Verified Documents
+        $verifiedDocuments = $booking->sanadDocuments
+            ->where('verification_status', 'approved')
+            ->sortByDesc('approved_at')
+            ->map(function ($doc) {
+                return [
+                    'id' => $doc->id,
+                    'document_type' => $doc->document_type,
+                    'document_key' => $doc->document_key,
+                    'file_name' => $doc->file_name,
+                    'file_url' => $doc->publicDocumentUrl(),
+                    'approved_at' => optional($doc->approved_at)->toIso8601String(),
+                    'status' => 'verified',
+                ];
+            })->values();
+
+        // Pending Document Requests
+        $pendingDocumentRequests = $booking->sanadDocumentRequests
+            ->whereIn('requested_from', ['customer', 'user'])
+            ->whereIn('status', ['pending', 'rejected', 'replacement_requested'])
+            ->map(function ($dr) {
+                return [
+                    'id' => $dr->id,
+                    'document_name' => $dr->document_name,
+                    'reason' => $dr->reason,
+                    'instructions' => $dr->instructions,
+                    'status' => $dr->status,
+                    'due_at' => optional($dr->due_at)->toIso8601String(),
+                ];
+            })->values();
+
+        // Timeline Actions
+        $timeline = $booking->sanadRequestActions
+            ->sortBy('created_at')
+            ->map(function ($a) {
+                return [
+                    'id' => $a->id,
+                    'action' => $a->action,
+                    'title' => Str::headline($a->action ?? 'Update'),
+                    'note' => $a->note ?: ($a->reason ?: 'Request status updated.'),
+                    'actor' => optional($a->actor)->display_name ?: 'Quick Support',
+                    'created_at' => optional($a->created_at)->toIso8601String(),
+                ];
+            })->values();
+
+        if ($timeline->isEmpty()) {
+            $timeline = collect([[
+                'id' => 0,
+                'action' => 'request_created',
+                'title' => 'Request Created',
+                'note' => 'Your request has been submitted.',
+                'actor' => 'Quick System',
+                'created_at' => optional($booking->created_at)->toIso8601String(),
+            ]]);
+        }
+
+        // Business Logic for State & Cancellation:
+        // Direct cancellation is ONLY allowed if request is still 'pending' / 'submitted' AND not yet accepted.
+        $cancellationAllowed = in_array($stage, ['submitted', 'pending'], true) && $booking->status === 'pending';
+        $cancellationNotice = $cancellationAllowed
+            ? 'You may cancel this request before review begins.'
+            : 'This request is already ' . Str::headline($stage) . '. Cancellation requires a conversation with the Quick support team or a formal change request.';
+
+        return comman_custom_response([
+            'data' => [
+                'id' => $booking->id,
+                'sanad_reference' => $booking->sanad_reference ?: ('QUICK-' . str_pad($booking->id, 6, '0', STR_PAD_LEFT)),
+                'quick_reference' => $booking->quick_reference,
+                'service_id' => $booking->service_id,
+                'service_name' => optional($booking->service)->name,
+                'service_description' => optional($booking->service)->description,
+                'service_price' => optional($booking->service)->price,
+                'service_provider' => 'Quick',
+                'support_team' => 'Quick team',
+                'status' => $booking->status,
+                'sanad_stage' => $stage,
+                'stage_label' => Str::headline($stage),
+                'stage_description' => 'The next expected step is managed by the Quick team.',
+                'sanad_priority' => $booking->sanad_priority ?: 'normal',
+                'progress' => $progress,
+                'sla_due_at' => optional($booking->sla_due_at)->toIso8601String(),
+                'expected_completion_at' => optional($booking->expected_completion_at)->toIso8601String(),
+                'created_at' => optional($booking->created_at)->toIso8601String(),
+                'address' => $booking->address,
+                'cancellation_allowed' => $cancellationAllowed,
+                'cancellation_notice' => $cancellationNotice,
+                'open_buzz_alerts' => $openBuzzAlerts,
+                'timeline' => $timeline,
+                'required_documents' => $requiredDocuments,
+                'document_choices' => $documentChoices,
+                'pending_document_requests' => $pendingDocumentRequests,
+                'verified_documents' => $verifiedDocuments,
+                'billing' => [
+                    'invoice_available' => (bool)$booking->payment,
+                    'invoice_url' => $booking->payment ? route('invoice_pdf', $booking->id) : null,
+                    'service_fee' => optional($booking->service)->price ?: ($booking->amount ?: 0),
+                    'vat' => $booking->final_total_tax ?: 0,
+                    'total_amount' => $booking->total_amount ?: ($booking->amount ?: 0),
+                    'payment_status' => optional($booking->payment)->payment_status ?: 'pending',
+                    'payment_method' => optional($booking->payment)->payment_type ?: 'Not Specified',
+                ],
+            ]
+        ]);
+    }
+
+    public function uploadRequestDocument(Request $request, $id)
+    {
+        $booking = Booking::myBooking()->with('service')->findOrFail($id);
+        $request->validate([
+            'document_selection' => 'required|string',
+            'file' => 'required|file|max:10240',
+        ]);
+
+        $selection = $request->document_selection;
+        $docKey = $selection;
+        $docName = Str::headline($selection);
+        $docRequestId = null;
+
+        if (Str::startsWith($selection, 'service:')) {
+            $docKey = Str::after($selection, 'service:');
+            $docName = Str::headline($docKey);
+        } elseif (Str::startsWith($selection, 'request:')) {
+            $docRequestId = (int) Str::after($selection, 'request:');
+            $dr = SanadDocumentRequest::where('booking_id', $booking->id)->find($docRequestId);
+            if ($dr) {
+                $docKey = $dr->document_key ?: Str::slug($dr->document_name, '_');
+                $docName = $dr->document_name;
+            }
+        }
+
+        $user = auth()->user();
+        $file = $request->file('file');
+        $document = SanadDocumentVaultItem::create([
+            'booking_id' => $booking->id,
+            'service_id' => $booking->service_id,
+            'owner_id' => $user->id,
+            'uploaded_by' => $user->id,
+            'document_type' => $docName,
+            'document_key' => $docKey,
+            'required' => true,
+            'source' => 'request',
+            'verification_status' => 'pending',
+            'visible_to' => ['user', 'customer', 'admin', 'employee', 'handyman', 'provider'],
+            'file_name' => $file->getClientOriginalName(),
+        ]);
+        $document->addMedia($file)->toMediaCollection('sanad_document');
+
+        if ($docRequestId) {
+            SanadDocumentRequest::where('booking_id', $booking->id)
+                ->whereKey($docRequestId)
+                ->update(['status' => 'submitted', 'document_id' => $document->id]);
+        }
+
+        return comman_custom_response([
+            'message' => 'Document uploaded for review.',
+            'data' => [
+                'id' => $document->id,
+                'document_type' => $document->document_type,
+                'file_name' => $document->file_name,
+                'verification_status' => $document->verification_status,
+            ]
+        ]);
+    }
+
+    public function cancelRequest(Request $request, $id)
+    {
+        $booking = Booking::myBooking()->findOrFail($id);
+        $stage = $booking->sanad_stage ?: $booking->status ?: 'submitted';
+
+        // Direct cancellation is ONLY allowed when still pending / submitted
+        $cancellationAllowed = in_array($stage, ['submitted', 'pending'], true) && $booking->status === 'pending';
+
+        if (!$cancellationAllowed) {
+            return comman_custom_response([
+                'status' => false,
+                'message' => 'This request has already been accepted and is being processed. Cancellation requires contacting Quick Support.',
+                'cancellation_allowed' => false,
+            ], 400);
+        }
+
+        $booking->status = 'cancelled';
+        $booking->sanad_stage = 'cancelled';
+        $booking->reason = $request->input('reason', 'Cancelled by customer');
+        $booking->closed_at = now();
+        $booking->save();
+
+        if (class_exists(\App\Models\SanadRequestAction::class)) {
+            \App\Models\SanadRequestAction::create([
+                'booking_id' => $booking->id,
+                'actor_id' => auth()->id(),
+                'action' => 'cancelled',
+                'reason' => $booking->reason,
+                'note' => 'Request cancelled by customer.',
+            ]);
+        }
+
+        return comman_custom_response([
+            'status' => true,
+            'message' => 'Request cancelled successfully.',
+            'data' => $booking,
+        ]);
+    }
+
     public function communication(Request $request, $id)
     {
         $booking = Booking::myBooking()->findOrFail($id);

@@ -42,6 +42,7 @@ class SanadWebController extends Controller
         $query = Booking::with(['customer', 'service', 'provider'])->latest();
         if ($request->assignment_state === 'unassigned') $query->whereNull('provider_id');
         if ($request->assignment_state === 'assigned') $query->whereNotNull('provider_id');
+        if ($request->assignment_state === 'waiting_acceptance') $query->whereNotNull('provider_id')->whereNotIn('status', ['accept', 'accepted', 'in_progress', 'completed', 'cancelled']);
         $orders = $query->paginate(25)->withQueryString();
         $partners = User::where('user_type', 'provider')->where('status', 1)->orderBy('display_name')->get();
         $latestDecisions = SanadAssignmentDecision::with(['selectedProvider', 'actor'])
@@ -64,7 +65,7 @@ class SanadWebController extends Controller
                 ]);
             }
         }
-        return view('sanad.assignments', compact('orders', 'recommendations', 'partners', 'latestDecisions'));
+        return view('sanad.assignments', compact('orders', 'recommendations', 'partners', 'latestDecisions'), ['pageTitle' => app()->getLocale() === 'ar' ? 'الإسناد والتوزيع' : 'Assignments']);
     }
 
     public function chatWorkspace(Request $request)
@@ -1245,10 +1246,10 @@ class SanadWebController extends Controller
 
         if ($request->filled('assignment_state')) {
             if ($request->assignment_state === 'assigned') {
-                $query->whereHas('handymanAdded');
+                $query->whereNotNull('provider_id');
             }
             if ($request->assignment_state === 'unassigned') {
-                $query->whereDoesntHave('handymanAdded');
+                $query->whereNull('provider_id');
             }
         }
 
@@ -1266,7 +1267,7 @@ class SanadWebController extends Controller
             if ($request->action_state === 'needs_action') {
                 $query->where(function ($q) {
                     $q->whereNull('assigned_at')
-                        ->orWhereDoesntHave('handymanAdded')
+                        ->orWhereNull('provider_id')
                         ->orWhere(function ($slaQuery) {
                             $slaQuery->whereNotNull('sla_due_at')->where('sla_due_at', '<', now());
                         })
@@ -1333,8 +1334,8 @@ class SanadWebController extends Controller
         $documents = $this->visibleDocumentsQuery($bookingdata)->latest()->get();
         $buzzAlerts = $this->visibleBuzzQuery($bookingdata)->latest()->get();
         $chatThread = $this->visibleChatThread($bookingdata);
-        $chatMessages = $chatThread ? $chatThread->messages()->latest()->take(25)->get()->reverse()->values() : collect();
         $assignableEmployees = $this->assignableEmployees($bookingdata);
+        $assignablePartners = $this->assignablePartners();
         $monitoring = $this->requestMonitoring($bookingdata, $documents, $buzzAlerts, $chatThread);
         $billing = $this->requestBilling($bookingdata);
         $requestActions = $bookingdata->sanadRequestActions()->with('actor')->latest()->take(12)->get();
@@ -1347,8 +1348,8 @@ class SanadWebController extends Controller
             'documents',
             'buzzAlerts',
             'chatThread',
-            'chatMessages',
             'assignableEmployees',
+            'assignablePartners',
             'monitoring',
             'billing',
             'requestActions',
@@ -1518,11 +1519,67 @@ class SanadWebController extends Controller
         $this->abortUnlessEmployeeFlag('team_collaboration');
         $booking = Booking::with('handymanAdded')->myBooking()->findOrFail($id);
         $request->validate([
+            'assignment_scope' => 'nullable|string|in:partner,self,employees_only',
+            'provider_id' => 'nullable|integer',
             'handyman_id' => 'nullable|array',
             'handyman_id.*' => 'integer',
         ]);
 
-        $allowedEmployeeIds = $this->assignableEmployees($booking)->pluck('id')->map(function ($id) {
+        $assignmentScope = $request->input('assignment_scope', 'employees_only');
+        $previousProviderId = $booking->provider_id;
+        $isAdminAssignmentUser = auth()->user()->hasAnyRole(['admin', 'demo_admin']);
+
+        if (!$isAdminAssignmentUser && in_array($assignmentScope, ['partner', 'self'], true)) {
+            abort(403);
+        }
+
+        if ($assignmentScope === 'partner') {
+            $partner = $this->assignablePartners()->firstWhere('id', (int) $request->provider_id);
+            if (!$partner) {
+                return redirect()->back()->withErrors('Please select an active partner for this request.');
+            }
+
+            $previousEmployeeIds = $booking->handymanAdded()->pluck('handyman_id')->map(function ($id) {
+                return (int) $id;
+            })->all();
+
+            $booking->handymanAdded()->delete();
+            $booking->provider_id = $partner->id;
+            $booking->assignment_mode = 'manual';
+            $booking->assigned_by = optional(auth()->user())->id;
+            $booking->assigned_at = now();
+            $booking->status = 'accept';
+            $booking->sanad_stage = 'assigned_to_partner';
+            $booking->save();
+
+            SanadAssignmentDecision::create([
+                'booking_id' => $booking->id,
+                'recommended_provider_id' => null,
+                'selected_provider_id' => $partner->id,
+                'assignment_mode' => 'manual',
+                'status' => 'selected',
+                'decided_by' => optional(auth()->user())->id,
+                'score_snapshot' => [
+                    'source' => 'request_detail_assignment',
+                    'previous_provider_id' => $previousProviderId,
+                    'previous_employee_ids' => $previousEmployeeIds,
+                ],
+            ]);
+
+            $this->audit($request, 'sanad.request.partner_assigned', $booking, [
+                'previous_provider_id' => $previousProviderId,
+                'current_provider_id' => $partner->id,
+                'cleared_employee_ids' => $previousEmployeeIds,
+            ]);
+
+            return redirect()->back()->withSuccess('Request assigned to partner.');
+        }
+
+        $employeePool = $assignmentScope === 'self'
+            ? $this->internalAssignableEmployees()
+            : $this->assignableEmployees($booking);
+
+        $allowedEmployeeIds = $employeePool->pluck('id')->map(function ($id) {
             return (int) $id;
         })->all();
 
@@ -1538,6 +1595,9 @@ class SanadWebController extends Controller
         if ($invalidEmployeeIds->isNotEmpty()) {
             return redirect()->back()->withErrors('One or more selected employees cannot be assigned to this request.');
         }
+        if ($assignmentScope === 'self' && $requestedEmployeeIds->isEmpty()) {
+            return redirect()->back()->withErrors('Please select at least one Quick employee when handling the request internally.');
+        }
 
         $previousEmployeeIds = $booking->handymanAdded()->pluck('handyman_id')->map(function ($id) {
             return (int) $id;
@@ -1551,6 +1611,10 @@ class SanadWebController extends Controller
             ]);
         }
 
+        if ($assignmentScope === 'self') {
+            $booking->provider_id = null;
+            $booking->assignment_mode = 'internal';
+        }
         $booking->assigned_by = optional(auth()->user())->id;
         $booking->assigned_at = now();
         if ($requestedEmployeeIds->isNotEmpty()) {
@@ -1560,6 +1624,9 @@ class SanadWebController extends Controller
         $booking->save();
 
         $this->audit($request, 'sanad.request.employees_assigned', $booking, [
+            'assignment_scope' => $assignmentScope,
+            'previous_provider_id' => $previousProviderId,
+            'current_provider_id' => $booking->provider_id,
             'previous_employee_ids' => $previousEmployeeIds,
             'current_employee_ids' => $requestedEmployeeIds->all(),
         ]);
@@ -1985,16 +2052,34 @@ class SanadWebController extends Controller
         $booking = Booking::myBooking()->findOrFail($id);
         $request->validate([
             'priority' => 'nullable|string|in:low,normal,high,urgent',
-            'message' => 'required|string|max:1000',
+            'message' => 'nullable|string|max:1000',
+            'document_name' => 'nullable|string|max:255',
+            'recipient_role' => 'nullable|string|in:customer,partner,handyman,provider',
+            'action_type' => 'nullable|string|max:100',
         ]);
+
+        $recipientRole = $request->input('recipient_role') ?: 'customer';
+        $recipientId = ($recipientRole === 'partner' || $recipientRole === 'provider')
+            ? ($booking->provider_id ?: $booking->customer_id)
+            : $booking->customer_id;
+
+        $message = trim((string) $request->input('message'));
+        $docName = trim((string) $request->input('document_name'));
+
+        if ($message === '') {
+            $message = $this->composeAiDocumentReminderMessage($booking, $docName ?: 'المستند المطلوب', $recipientRole);
+        }
 
         $alert = SanadBuzzAlert::create([
             'booking_id' => $booking->id,
             'sender_id' => optional(auth()->user())->id,
-            'recipient_id' => $booking->customer_id,
-            'recipient_role' => 'customer',
+            'recipient_id' => $recipientId,
+            'recipient_role' => $recipientRole,
             'priority' => $request->priority ?: 'urgent',
-            'message' => $request->message,
+            'message' => $message,
+            'action_type' => $request->input('action_type') ?: ($docName ? 'document_reminder' : null),
+            'action_status' => 'pending',
+            'status' => 'unread',
         ]);
 
         $thread = SanadChatThread::firstOrCreate(
@@ -2004,8 +2089,8 @@ class SanadWebController extends Controller
         SanadChatMessage::create([
             'thread_id' => $thread->id,
             'sender_id' => auth()->id(),
-            'sender_role' => optional(auth()->user())->user_type,
-            'message' => $request->message,
+            'sender_role' => optional(auth()->user())->user_type ?: 'admin',
+            'message' => $message,
             'visible_to' => ['admin','demo_admin','employee','handyman','provider','user','customer'],
             'message_type' => 'buzz',
             'buzz_alert_id' => $alert->id,
@@ -2016,7 +2101,52 @@ class SanadWebController extends Controller
         $this->audit($request, 'sanad.buzz.created', $alert);
         $this->broadcastConversationUpdate($booking->id, 'buzz.created', ['buzz_alert_id' => $alert->id]);
 
+        if ($request->ajax() || $request->expectsJson()) {
+            return response()->json([
+                'status' => true,
+                'message' => __('messages.buzz_alert_sent') ?: 'تم إرسال تنبيه وتذكير العميل بالمستند المطلوب بنجاح.',
+                'buzz_id' => $alert->id,
+                'chat_url' => route('sanad.chat.workspace', ['booking_id' => $booking->id, 'buzz_id' => $alert->id]),
+            ]);
+        }
+
         return redirect()->to(route('sanad.chat.workspace', ['booking_id' => $booking->id, 'buzz_id' => $alert->id]))->withSuccess('Quick Buzz alert sent.');
+    }
+
+    private function composeAiDocumentReminderMessage(Booking $booking, string $documentName, string $recipientRole = 'customer'): string
+    {
+        $ref = $booking->quick_reference ?: 'QUICK-' . str_pad((string) $booking->id, 6, '0', STR_PAD_LEFT);
+        $serviceName = optional($booking->service)->name_en ?: optional($booking->service)->name ?: 'Government Service';
+        $customerName = optional($booking->customer)->display_name ?: optional($booking->customer)->first_name ?: 'العميل العزيز';
+
+        try {
+            if (class_exists(\App\Services\SanadNvidiaAiClient::class)) {
+                /** @var \App\Services\SanadNvidiaAiClient $aiClient */
+                $aiClient = app(\App\Services\SanadNvidiaAiClient::class);
+                $systemPrompt = 'You are Quick Sanad AI Operations Assistant. Compose a concise, polite, urgent 1-sentence reminder message in Arabic followed by a 1-sentence English translation. Put your response strictly inside <answer>...</answer> tags. Do not include thinking or preamble outside the tags.';
+                $userPrompt = "Target: {$customerName} ({$recipientRole}). Request reference: {$ref}. Service: {$serviceName}. Required document missing: '{$documentName}'. Politely request them to reply in chat or upload this file so processing can continue without delay.";
+
+                $res = $aiClient->chat([
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ], [
+                    'max_tokens' => 180,
+                    'temperature' => 0.2,
+                ]);
+
+                $content = trim($res['content'] ?? '');
+                if (preg_match('/<answer>\s*(.*?)\s*<\/answer>/is', $content, $m)) {
+                    $content = trim($m[1]);
+                }
+                if (!empty($content) && Str::length($content) > 15 && !Str::startsWith($content, ["Here's", "Let's", "Draft"])) {
+                    return $content;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback to standard high-quality template
+        }
+
+        return "تذكير عاجل من كويك: يرجى تزويدنا بمستند ({$documentName}) المطلوب لإكمال معالجة طلبكم رقم ({$ref}) لخدمة ({$serviceName}). نرجو إرفاق الملف أو الرد مباشرة هنا.\n\nQuick Reminder: Please provide the required document ({$documentName}) to complete your request ({$ref}). You can reply directly in this chat or upload the file.";
     }
 
     public function acknowledgeBuzz(Request $request, $id, $alertId)
@@ -2346,11 +2476,39 @@ class SanadWebController extends Controller
         $completedOrders = (clone $query)->where('status', 'completed')->count();
         $cancelledOrders = (clone $query)->where('status', 'cancelled')->count();
         $overdueOrders = (clone $query)->whereNotNull('sla_due_at')->where('sla_due_at', '<', now())->count();
+        $slaTrackedOrders = (clone $query)->whereNotNull('sla_due_at')->count();
+        $slaCompliantOrders = (clone $query)
+            ->whereNotNull('sla_due_at')
+            ->where(function ($slaQuery) {
+                $slaQuery->whereNull('closed_at')
+                    ->where('sla_due_at', '>=', now())
+                    ->orWhere(function ($closedQuery) {
+                        $closedQuery->whereNotNull('closed_at')
+                            ->whereColumn('closed_at', '<=', 'sla_due_at');
+                    });
+            })
+            ->count();
         $waitingCustomer = (clone $query)->where('sanad_stage', 'waiting_for_customer')->count();
         $waitingGovernment = (clone $query)->where('sanad_stage', 'government_processing')->count();
         $revenue = (clone $query)->whereHas('payment', function ($paymentQuery) {
             $paymentQuery->where('payment_status', 'paid');
         })->sum('total_amount');
+        $processedTodayCount = (clone $query)
+            ->whereDate('updated_at', now()->toDateString())
+            ->count();
+        $processedTodayVolume = (clone $query)
+            ->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })
+            ->whereDate('updated_at', now()->toDateString())
+            ->sum('total_amount');
+        $pendingActionCount = (clone $query)
+            ->whereIn('sanad_stage', ['pending_review', 'awaiting_customer_action', 'awaiting_quality_review', 'escalated'])
+            ->count();
+        $unassignedCount = (clone $query)
+            ->whereNotNull('sanad_stage')
+            ->whereNull('provider_id')
+            ->count();
 
         $baseMetrics = [
             ['label' => 'Total Orders', 'value' => $totalOrders, 'filter' => []],
@@ -2421,6 +2579,14 @@ class SanadWebController extends Controller
 
         return [
             'metrics' => $roleMetrics[$role] ?? $baseMetrics,
+            'active_operations' => $activeOrders,
+            'pending_action_count' => $pendingActionCount,
+            'sla_compliance' => $slaTrackedOrders > 0 ? round(($slaCompliantOrders / $slaTrackedOrders) * 100, 1) : null,
+            'sla_tracked_orders' => $slaTrackedOrders,
+            'overdue_orders' => $overdueOrders,
+            'unassigned_orders' => $unassignedCount,
+            'processed_today_count' => $processedTodayCount,
+            'processed_today_volume' => $processedTodayVolume,
             'recent_orders' => $recentOrders,
             'priority_orders' => $priorityOrders,
             'kanban' => $kanban,
@@ -2459,7 +2625,7 @@ class SanadWebController extends Controller
                         $buzzQuery->where('status', 'unread');
                     });
             })->count(),
-            'unassigned' => (clone $query)->whereDoesntHave('handymanAdded')->count(),
+            'unassigned' => (clone $query)->whereNull('provider_id')->count(),
             'overdue_sla' => (clone $query)->whereNotNull('sla_due_at')->where('sla_due_at', '<', now())->count(),
             'pending_documents' => (clone $query)->whereHas('sanadDocuments', function ($documentQuery) {
                 $documentQuery->where('verification_status', 'pending');
@@ -2585,6 +2751,28 @@ class SanadWebController extends Controller
         }
 
         return collect();
+    }
+
+    private function assignablePartners()
+    {
+        return User::where('user_type', 'provider')
+            ->where('status', 1)
+            ->orderBy('display_name')
+            ->orderBy('email')
+            ->get();
+    }
+
+    private function internalAssignableEmployees()
+    {
+        return User::with('providers')
+            ->where('user_type', 'handyman')
+            ->where('status', 1)
+            ->where(function ($query) {
+                $query->whereNull('provider_id')->orWhere('provider_id', 0);
+            })
+            ->orderBy('display_name')
+            ->orderBy('email')
+            ->get();
     }
 
     public function assignableChatTargets(Booking $booking)

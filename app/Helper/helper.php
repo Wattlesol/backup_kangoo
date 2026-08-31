@@ -1029,20 +1029,22 @@ function getTimeZone(){
 }
 
 function get_plan_expiration_date($plan_start_date = '',$plan_type = '',$left_days = 0, $plan_duration = 1){
-    $start_at = new \Carbon\Carbon( $plan_start_date);
+    $start_at = new \Carbon\Carbon( $plan_start_date ?: now());
     $end_date = '';
+    $plan_duration = max(1, (int)$plan_duration);
+    $left_days = (int)$left_days;
 
     if($plan_type === 'weekly'){
-       $getdays = App\Models\Plans::where('identifier','free')->first();
-       $getdays = $getdays->trial_period;
-       $days = $left_days + $getdays;
-       $end_date =  $start_at->addDays($days);
+       $end_date = $start_at->copy()->addWeeks($plan_duration)->addDays($left_days);
     }
     if($plan_type === 'monthly'){
-        $end_date =  $start_at->addMonths($plan_duration)->addDays($left_days);
+        $end_date =  $start_at->copy()->addMonths($plan_duration)->addDays($left_days);
     }
     if($plan_type === 'yearly'){
-        $end_date =  $start_at->addYears($plan_duration)->addDays($left_days);
+        $end_date =  $start_at->copy()->addYears($plan_duration)->addDays($left_days);
+    }
+    if(empty($end_date)){
+        $end_date = $start_at->copy()->addMonths($plan_duration)->addDays($left_days);
     }
     return $end_date->format('Y-m-d H:i:s');
 }

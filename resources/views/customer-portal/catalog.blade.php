@@ -3,7 +3,7 @@
     <div class="sanad-header">
         <div>
             <h1 class="sanad-title">{{ app()->getLocale() === "ar" ? "دليل الخدمات" : "Service Catalog" }}</h1>
-            <div class="sanad-muted">{{ app()->getLocale() === "ar" ? "تصفح خدمات كويك الحكومية والتجارية والباقات المجمعة والاشتراكات الشهرية." : "Browse Quick government, business, bundled packages, and monthly recurring services." }}</div>
+            <div class="sanad-muted">{{ app()->getLocale() === "ar" ? "تصفح خدمات كويك الحكومية والتجارية والباقات المجمعة." : "Browse Quick government, business, and bundled package services." }}</div>
         </div>
         <div class="sanad-actions">
             <a class="sanad-btn" href="{{ route('customer-portal.requests.create') }}"><i class="fas fa-plus-circle"></i> {{ app()->getLocale() === "ar" ? "بدء الخدمة" : "Start Service" }}</a>
@@ -11,12 +11,10 @@
         </div>
     </div>
 
-    <!-- Catalog Type Tabs (Single vs Bundles vs Recurring) -->
-    <div class="btn-group mb-3 flex-wrap">
-        <a href="{{ route('customer-portal.catalog', ['type' => 'all']) }}" class="btn {{ request('type', 'all') === 'all' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ $isAr ? 'كل الخدمات' : 'All Services' }}</a>
-        <a href="{{ route('customer-portal.catalog', ['type' => 'single']) }}" class="btn {{ request('type') === 'single' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ $isAr ? 'الخدمات الفردية' : 'Single Services' }}</a>
-        <a href="{{ route('customer-portal.catalog', ['type' => 'bundle']) }}" class="btn {{ request('type') === 'bundle' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ $isAr ? 'الباقات المجمعة' : 'Bundles & Packages' }}</a>
-        <a href="{{ route('customer-portal.catalog', ['type' => 'recurring']) }}" class="btn {{ request('type') === 'recurring' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ $isAr ? 'الخدمات الدورية والاشتراكات' : 'Recurring Services' }}</a>
+    <div class="quick-catalog-tabs mb-3">
+        <a href="{{ route('customer-portal.catalog', ['type' => 'all']) }}" class="quick-catalog-tab {{ request('type', 'all') === 'all' ? 'active' : '' }}">{{ $isAr ? 'كل الخدمات' : 'All Services' }}</a>
+        <a href="{{ route('customer-portal.catalog', ['type' => 'single']) }}" class="quick-catalog-tab {{ request('type') === 'single' ? 'active' : '' }}">{{ $isAr ? 'الخدمات الفردية' : 'Single Services' }}</a>
+        <a href="{{ route('customer-portal.catalog', ['type' => 'bundle']) }}" class="quick-catalog-tab {{ request('type') === 'bundle' ? 'active' : '' }}">{{ $isAr ? 'الباقات المجمعة' : 'Bundles & Packages' }}</a>
     </div>
 
     <form class="sanad-card mb-3" method="get">
@@ -39,17 +37,11 @@
 
     <div class="sanad-grid">
         @foreach($services as $service)
-            @php
-                $isRecurring = Str::contains(Str::lower($service->name . ' ' . $service->name_en), ['monthly', 'payroll', 'accounting', 'retainer', 'شهري', 'محاسبة', 'رواتب']);
-            @endphp
             <div class="sanad-card">
                 <div class="sanad-card-body d-flex flex-column justify-content-between h-100">
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="sanad-badge">{{ localized_model_name($service->category, 'Quick') }}</span>
-                            @if($isRecurring)
-                                <span class="badge badge-info"><i class="fas fa-sync-alt mr-1"></i> {{ $isAr ? 'اشتراك دوري' : 'Recurring' }}</span>
-                            @endif
                         </div>
                         <h5 class="mt-2 font-weight-bold">{{ localized_model_name($service) }}</h5>
                         <p class="sanad-muted">{{ Str::limit(strip_tags($service->description), 120) }}</p>
@@ -59,7 +51,7 @@
                     </div>
                     <div class="sanad-actions mt-3">
                         <a class="sanad-btn" href="{{ route('customer-portal.requests.create', ['service_id' => $service->id]) }}">
-                            {{ $isRecurring ? ($isAr ? 'اشتراك / طلب مجدداً' : 'Subscribe / Order Again') : ($isAr ? 'بدء الخدمة' : 'Start Service') }}
+                            {{ $isAr ? 'بدء الخدمة' : 'Start Service' }}
                         </a>
                         <a class="sanad-btn secondary" href="{{ route('customer-portal.catalog.show', $service->id) }}">{{ app()->getLocale() === "ar" ? "التفاصيل" : "Details" }}</a>
                     </div>

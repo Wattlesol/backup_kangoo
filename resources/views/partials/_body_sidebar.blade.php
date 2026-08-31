@@ -32,22 +32,15 @@
 
     <nav class="quick-sidebar-scroll">
         @if(in_array($userType, ['admin', 'demo_admin']))
-            <!-- 1. Overview -->
-            <details {{ in_array($currentRoute, ['sanad.dashboard', 'home']) ? 'open' : '' }}>
-                <summary>
-                    <span>{{ $isAr ? 'نظرة عامة' : 'Overview' }}</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </summary>
-                <div class="quick-sidebar-group">
-                    <a href="{{ route('sanad.dashboard') }}" class="{{ in_array($currentRoute, ['sanad.dashboard', 'home']) ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                        <span>{{ $isAr ? 'لوحة العمليات' : 'Operations dashboard' }}</span>
-                        @if(in_array($currentRoute, ['sanad.dashboard', 'home']))
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
-                        @endif
-                    </a>
-                </div>
-            </details>
+            <div class="quick-sidebar-group quick-sidebar-primary">
+                <a href="{{ route('sanad.dashboard') }}" class="{{ in_array($currentRoute, ['sanad.dashboard', 'home']) ? 'active' : '' }}">
+                    <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span>{{ $isAr ? 'لوحة العمليات' : 'Dashboard' }}</span>
+                    @if(in_array($currentRoute, ['sanad.dashboard', 'home']))
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
+                    @endif
+                </a>
+            </div>
 
             <!-- 2. Service Management -->
             <details {{ in_array($currentRoute, ['category.index', 'subcategory.index', 'service.index', 'servicepackage.index', 'serviceaddon.index']) ? 'open' : '' }}>
@@ -110,16 +103,13 @@
             </details>
 
             <!-- 4. AI & Knowledge -->
-            <details {{ in_array($currentRoute, ['sanad.ai.index', 'sanad.knowledge.index', 'sanad.ai.escalations.index', 'sanad.chat.workspace']) ? 'open' : '' }}>
+            <details {{ in_array($currentRoute, ['sanad.knowledge.index', 'sanad.ai.escalations.index', 'sanad.chat.workspace']) ? 'open' : '' }}>
                 <summary>
                     <span>{{ $isAr ? 'الذكاء والمعرفة' : 'AI & knowledge' }}</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                 </summary>
                 <div class="quick-sidebar-group">
-                    <a href="{{ route('sanad.ai.index') }}" class="{{ $currentRoute === 'sanad.ai.index' ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="M2 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="M12 22v-4"/><path d="m19.07 19.07-2.83-2.83"/><path d="M22 12h-4"/><path d="m19.07 4.93-2.83 2.83"/><circle cx="12" cy="12" r="4"/></svg>
-                        <span>{{ $isAr ? 'لوحة تحكم الذكاء' : 'AI operations console' }}</span>
-                    </a>
+
                     <a href="{{ route('sanad.knowledge.index') }}" class="{{ $currentRoute === 'sanad.knowledge.index' ? 'active' : '' }}">
                         <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
                         <span>{{ $isAr ? 'قاعدة المعرفة' : 'Knowledge base' }}</span>
@@ -276,7 +266,7 @@
             </details>
 
             <!-- 11. System & Operations Settings -->
-            <details {{ in_array($currentRoute, ['plans.index', 'document.index', 'slider.index', 'pushNotification.index', 'setting.index']) ? 'open' : '' }}>
+            <details {{ in_array($currentRoute, ['plans.index', 'document.index', 'slider.index', 'pushNotification.index']) ? 'open' : '' }}>
                 <summary>
                     <span>{{ $isAr ? 'النظام والإعدادات' : 'System & settings' }}</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -298,29 +288,18 @@
                         <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                         <span>{{ $isAr ? 'إشعارات النظام' : 'Push notifications' }}</span>
                     </a>
-                    <a href="{{ route('setting.index') }}" class="{{ $currentRoute === 'setting.index' ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                        <span>{{ $isAr ? 'إعدادات النظام' : 'System settings' }}</span>
-                    </a>
                 </div>
             </details>
         @elseif($userType === 'provider')
-            <!-- 1. Main -->
-            <details {{ in_array($currentRoute, ['provider.dashboard', 'home']) ? 'open' : '' }}>
-                <summary>
-                    <span>{{ $isAr ? 'الرئيسية' : 'Main' }}</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </summary>
-                <div class="quick-sidebar-group">
-                    <a href="{{ route('provider.dashboard') }}" class="{{ in_array($currentRoute, ['provider.dashboard', 'home']) ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                        <span>{{ $isAr ? 'لوحة التحكم' : 'Dashboard' }}</span>
-                        @if(in_array($currentRoute, ['provider.dashboard', 'home']))
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
-                        @endif
-                    </a>
-                </div>
-            </details>
+            <div class="quick-sidebar-group quick-sidebar-primary">
+                <a href="{{ route('provider.dashboard') }}" class="{{ in_array($currentRoute, ['provider.dashboard', 'home']) ? 'active' : '' }}">
+                    <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span>{{ $isAr ? 'لوحة التحكم' : 'Dashboard' }}</span>
+                    @if(in_array($currentRoute, ['provider.dashboard', 'home']))
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
+                    @endif
+                </a>
+            </div>
 
             <!-- 2. Operations -->
             <details {{ in_array($currentRoute, ['provider.order.index', 'provider.order.show', 'sanad.chat.workspace', 'provider.kanban.index']) ? 'open' : '' }}>
@@ -399,22 +378,15 @@
             $canViewTeam = !$authUser || empty($authUser->provider_id) || $authUser->hasSanadModulePermission('team_employees', 'read');
         @endphp
         @elseif($userType === 'handyman')
-            <!-- 1. Main -->
-            <details {{ in_array($currentRoute, ['home']) ? 'open' : '' }}>
-                <summary>
-                    <span>{{ $isAr ? 'الرئيسية' : 'Main' }}</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </summary>
-                <div class="quick-sidebar-group">
-                    <a href="{{ route('home') }}" class="{{ in_array($currentRoute, ['home']) ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                        <span>{{ $isAr ? 'لوحة الموظف' : 'Employee Dashboard' }}</span>
-                        @if(in_array($currentRoute, ['home']))
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
-                        @endif
-                    </a>
-                </div>
-            </details>
+            <div class="quick-sidebar-group quick-sidebar-primary">
+                <a href="{{ route('home') }}" class="{{ in_array($currentRoute, ['home']) ? 'active' : '' }}">
+                    <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span>{{ $isAr ? 'لوحة الموظف' : 'Dashboard' }}</span>
+                    @if(in_array($currentRoute, ['home']))
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
+                    @endif
+                </a>
+            </div>
 
             <!-- 2. Employee Operations -->
             <details {{ in_array($currentRoute, ['sanad.requests.index', 'sanad.requests.show', 'sanad.documents.queue', 'sanad.chat.workspace', 'payment.index', 'handyman.index']) ? 'open' : '' }}>
@@ -450,22 +422,15 @@
                 </div>
             </details>
         @else
-            <!-- 1. Main -->
-            <details {{ in_array($currentRoute, ['customer-portal.dashboard']) ? 'open' : '' }}>
-                <summary>
-                    <span>{{ $isAr ? 'الرئيسية' : 'Main' }}</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                </summary>
-                <div class="quick-sidebar-group">
-                    <a href="{{ route('customer-portal.dashboard') }}" class="{{ $currentRoute === 'customer-portal.dashboard' ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                        <span>{{ $isAr ? 'لوحة العميل' : 'Customer Dashboard' }}</span>
-                        @if($currentRoute === 'customer-portal.dashboard')
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
-                        @endif
-                    </a>
-                </div>
-            </details>
+            <div class="quick-sidebar-group quick-sidebar-primary">
+                <a href="{{ route('customer-portal.dashboard') }}" class="{{ $currentRoute === 'customer-portal.dashboard' ? 'active' : '' }}">
+                    <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span>{{ $isAr ? 'لوحة العميل' : 'Dashboard' }}</span>
+                    @if($currentRoute === 'customer-portal.dashboard')
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;"><polyline points="{{ $isAr ? '15 18 9 12 15 6' : '9 18 15 12 9 6' }}"/></svg>
+                    @endif
+                </a>
+            </div>
 
             <!-- 2. Services & Requests -->
             <details {{ in_array($currentRoute, ['customer-portal.catalog', 'customer-portal.catalog.show', 'customer-portal.requests.create', 'customer-portal.requests.index', 'customer-portal.requests.show', 'customer-portal.vault']) ? 'open' : '' }}>

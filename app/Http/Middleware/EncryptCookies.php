@@ -12,6 +12,9 @@ class EncryptCookies extends Middleware
      * @var array
      */
     protected $except = [
-        //
+        // These non-sensitive UI preferences are written by browser JavaScript
+        // and must remain readable by the language/theme middleware.
+        'quick_locale',
+        'quick_theme',
     ];
 }

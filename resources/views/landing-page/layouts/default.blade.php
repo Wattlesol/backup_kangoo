@@ -1,11 +1,15 @@
 <!DOCTYPE html>
 @php
-    // Determine theme mode from various sources
-    $themeMode = 'light'; // default
-    if (request()->cookie('data-bs-theme')) {
+    // Use the same persisted preference as the authenticated Quick shell.
+    $themeMode = 'light';
+    if (in_array(request()->cookie('quick_theme'), ['light', 'dark'], true)) {
+        $themeMode = request()->cookie('quick_theme');
+    } elseif (request()->cookie('data-bs-theme')) {
         $themeMode = request()->cookie('data-bs-theme');
     } elseif (request()->cookie('theme_mode')) {
         $themeMode = request()->cookie('theme_mode');
+    } elseif (session('quick_theme')) {
+        $themeMode = session('quick_theme');
     } elseif (session('theme_mode')) {
         $themeMode = session('theme_mode');
     }
@@ -14,7 +18,7 @@
     $currentLocale = app()->getLocale();
     $isRtl = in_array($currentLocale, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']);
 @endphp
-<html lang="{{ $currentLocale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" data-bs-theme="{{ $themeMode }}">
+<html lang="{{ $currentLocale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" data-bs-theme="{{ $themeMode }}" data-quick-theme="{{ $themeMode }}">
 <head>
     @yield('before_head')
     @include('landing-page.partials._head')

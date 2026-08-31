@@ -1,101 +1,258 @@
-<x-master-layout>
-<head>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"></script>
-  </head>
-    <div class="container-fluid">
-        <div class="row">
-            @include('handyman.partials.sanad-employee-management-summary')
-            <div class="col-lg-12">
-                <div class="card card-block card-stretch">
-                    <div class="card-body p-0">
-                        <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
-                            @if($list_status != 'unassigned' && $list_status !='request')
-                            @if($auth_user->can('handyman add'))
-                            <a href="{{ route('handyman.create') }}" class="float-right mr-1 btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> {{ __('messages.add_form_title',['form' => __('messages.handyman')  ]) }}</a>
-                            @endif
-                            @endif
-                        </div>
+@php
+    $locale = app()->getLocale();
+    $isAr = in_array($locale, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']) || session('dir') === 'rtl';
+    $summary = $sanadEmployeeSummary ?? [];
+    $totalEmployees = $summary['total_employees'] ?? 0;
+    $activeEmployees = $summary['active_employees'] ?? 0;
+    $pendingEmployees = $summary['pending_employees'] ?? 0;
+    $activeRate = $totalEmployees > 0 ? (int) round(($activeEmployees / $totalEmployees) * 100) : 0;
+@endphp
 
+<x-master-layout>
+    <head>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script type="text/javascript" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.min.js"></script>
+    </head>
+
+    <div class="quick-handyman-page" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
+
+        <!-- 1. Hero Banner Card -->
+        <div class="quick-admin-hero">
+            <div class="quick-admin-hero-content">
+                <div class="quick-admin-hero-eyebrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>{{ $isAr ? 'إدارة الموظفين وفرق التنفيذ' : 'Staff & Field Operations Management' }}</span>
+                </div>
+                <h1>{{ $pageTitle ?? ($isAr ? 'دليل وسجل الموظفين' : 'Employee Directory') }}</h1>
+                <p>{{ $isAr ? 'متابعة حسابات الموظفين، التراخيص، المهام المسندة، السعة التشغيلية، ومؤشرات الإنجاز.' : 'Manage employee profiles, credentials, assigned service tasks, operating capacity, and execution tracking.' }}</p>
+            </div>
+
+            <div class="quick-admin-hero-actions">
+                @if($list_status != 'unassigned' && $list_status != 'request')
+                    @if($auth_user->can('handyman add'))
+                        <a href="{{ route('handyman.create') }}" class="quick-admin-hero-btn quick-admin-hero-btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                            <span>{{ $isAr ? 'إضافة موظف' : 'Add Employee' }}</span>
+                        </a>
+                    @endif
+                @endif
+                <a href="{{ route('handymantype.index') }}" class="quick-admin-hero-btn quick-admin-hero-btn-secondary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>{{ $isAr ? 'أنواع الموظفين' : 'Employee Types' }}</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 2. KPI Summary Strip -->
+        @if(auth()->user()->hasAnyRole(['admin', 'demo_admin', 'provider']))
+            <div class="quick-kpi-grid">
+                <!-- Metric 1: Total Employees -->
+                <div class="quick-kpi-card">
+                    <div class="quick-kpi-header">
+                        <span>{{ $isAr ? 'إجمالي الموظفين' : 'Total Employees' }}</span>
+                        <div class="quick-kpi-icon" style="background: rgba(31,107,255,.1); color: #1f6bff;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
+                    </div>
+                    <div class="quick-kpi-value">{{ $totalEmployees }}</div>
+                    <div class="quick-kpi-sub">
+                        <b class="quick-trend-up">{{ $activeRate }}%</b>
+                        <span>{{ $isAr ? 'نسبة الموظفين النشطين' : 'active readiness' }}</span>
+                    </div>
+                </div>
+
+                <!-- Metric 2: Active Employees -->
+                <div class="quick-kpi-card">
+                    <div class="quick-kpi-header">
+                        <span>{{ $isAr ? 'الموظفون النشطون' : 'Active Employees' }}</span>
+                        <div class="quick-kpi-icon" style="background: rgba(16,185,129,.1); color: #10b981;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        </div>
+                    </div>
+                    <div class="quick-kpi-value">{{ $activeEmployees }}</div>
+                    <div class="quick-kpi-sub">
+                        <b class="quick-trend-up">{{ $activeEmployees }}</b>
+                        <span>{{ $isAr ? 'جاهزون لتنفيذ المعاملات' : 'ready for task execution' }}</span>
+                    </div>
+                </div>
+
+                <!-- Metric 3: Assigned Tasks -->
+                <div class="quick-kpi-card">
+                    <div class="quick-kpi-header">
+                        <span>{{ $isAr ? 'المهام المسندة' : 'Assigned Tasks' }}</span>
+                        <div class="quick-kpi-icon" style="background: rgba(139,92,246,.1); color: #8b5cf6;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </div>
+                    </div>
+                    <div class="quick-kpi-value">{{ $summary['assigned_tasks'] ?? 0 }}</div>
+                    <div class="quick-kpi-sub">
+                        <b class="quick-trend-up">{{ $summary['assigned_tasks'] ?? 0 }}</b>
+                        <span>{{ $isAr ? 'مهمة قيد التنفيذ' : 'in progress tasks' }}</span>
+                    </div>
+                </div>
+
+                <!-- Metric 4: Needs Employee -->
+                <div class="quick-kpi-card">
+                    <div class="quick-kpi-header">
+                        <span>{{ $isAr ? 'بحاجة إلى موظف' : 'Needs Assignment' }}</span>
+                        <div class="quick-kpi-icon" style="background: rgba(245,158,11,.1); color: #f59e0b;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        </div>
+                    </div>
+                    <div class="quick-kpi-value">{{ $summary['unassigned_tasks'] ?? 0 }}</div>
+                    <div class="quick-kpi-sub">
+                        <b style="color: #f59e0b;">{{ $summary['unassigned_tasks'] ?? 0 }}</b>
+                        <span>{{ $isAr ? 'بانتظار الإسناد' : 'awaiting assignment' }}</span>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="card">
-        <div class="card-body">
-        <div class="row justify-content-between">
-            <div>
-                <div class="col-md-12">
-                  <form action="{{ route('handyman.bulk-action') }}" id="quick-action-form" class="form-disabled d-flex gap-3 align-items-center">
-                    @csrf
-                  <select name="action_type" class="form-control select2" id="quick-action-type" style="width:100%" disabled>
-                      <option value="">{{__('messages.no_action')}}</option>
-                      <option value="change-status">{{__('messages.status')}}</option>
-                      <option value="delete">{{__('messages.delete')}}</option>
-                      <option value="restore">{{ __('messages.restore') }}</option>
-                      <option value="permanently-delete">{{ __('messages.permanent_dlt') }}</option>
-                  </select>
+        @endif
 
-                <div class="select-status d-none quick-action-field" id="change-status-action" style="width:100%">
-                    <select name="status" class="form-control select2" id="status" style="width:100%">
-                      <option value="1">{{__('messages.active')}}</option>
-                      <option value="0">{{__('messages.inactive')}}</option>
-                    </select>
+        <!-- 3. Table Card -->
+        <div class="quick-card">
+            <!-- Header with Title, Pills, Search -->
+            <div class="quick-card-header">
+                <div>
+                    <h3 class="quick-card-title">{{ $isAr ? 'سجل ودليل الموظفين' : 'Official Employee Directory' }}</h3>
+                    <div class="quick-card-sub">{{ $isAr ? 'عرض وتعديل وتصفية الموظفين ومتابعة حالة الإسناد والملفات الشخصية' : 'View, edit, filter, and perform bulk operations on employees' }}</div>
                 </div>
-                <button id="quick-action-apply" class="btn btn-primary" data-ajax="true"
-                data--submit="{{ route('handyman.bulk-action') }}"
-                data-datatable="reload" data-confirmation='true'
-                data-title="{{ __('handyman',['form'=>  __('handyman') ]) }}"
-                title="{{ __('handyman',['form'=>  __('handyman') ]) }}"
-                data-message='{{ __("Do you want to perform this action?") }}' disabled>{{__('messages.apply')}}</button>
+
+                <div class="quick-provider-toolbar-actions">
+                    <!-- Status Filter Pills -->
+                    <div class="quick-filter-pills" role="tablist">
+                        <button type="button" class="{{ $filter['status'] === '' || $filter['status'] === null ? 'active' : '' }}" onclick="filterHandymanStatus('', this)">{{ $isAr ? 'الكل' : 'All' }}</button>
+                        <button type="button" class="{{ (string) $filter['status'] === '1' ? 'active' : '' }}" onclick="filterHandymanStatus('1', this)">{{ $isAr ? 'النشطون' : 'Active' }}</button>
+                        <button type="button" class="{{ (string) $filter['status'] === '0' ? 'active' : '' }}" onclick="filterHandymanStatus('0', this)">{{ $isAr ? 'غير النشطين' : 'Inactive' }}</button>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="quick-search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="quick-search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" class="quick-search-input dt-search" placeholder="{{ $isAr ? 'بحث في الموظفين...' : 'Search employees...' }}" aria-label="Search employees">
+                    </div>
+                </div>
             </div>
 
-            </form>
-          </div>
-              <div class="d-flex justify-content-end">
-                <!-- <div class="datatable-filter ml-auto">
-                  <select name="column_status" id="column_status" class="select2 form-control" data-filter="select" style="width: 100%">
-                    <option value="">{{__('messages.all')}}</option>
-                    <option value="0" {{$filter['status'] == '0' ? "selected" : ''}}>{{__('messages.inactive')}}</option>
-                    <option value="1" {{$filter['status'] == '1' ? "selected" : ''}}>{{__('messages.active')}}</option>
-                  </select>
-                </div> -->
-                <div class="input-group ml-2">
-                    <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control dt-search" placeholder="{{ __("messages.search") }}..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
-                  </div>
-              </div>
+            <!-- Bulk Action Form Bar -->
+            <div class="quick-bulk-bar">
+                <form action="{{ route('handyman.bulk-action') }}" id="quick-action-form" class="quick-bulk-form form-disabled">
+                    @csrf
+                    <div class="quick-bulk-group">
+                        <span class="quick-bulk-label">{{ $isAr ? 'إجراء جماعي:' : 'Bulk action:' }}</span>
+                        <select name="action_type" class="quick-bulk-select" id="quick-action-type" disabled>
+                            <option value="">{{ __('messages.no_action') }}</option>
+                            <option value="change-status">{{ __('messages.status') }}</option>
+                            <option value="delete">{{ __('messages.delete') }}</option>
+                            <option value="restore">{{ __('messages.restore') }}</option>
+                            <option value="permanently-delete">{{ __('messages.permanent_dlt') }}</option>
+                        </select>
+                    </div>
 
-              <div class="table-responsive">
-                <table id="datatable" class="table table-striped border">
+                    <div class="quick-bulk-target d-none quick-action-field" id="change-status-action">
+                        <select name="status" class="quick-bulk-select" id="status">
+                            <option value="1">{{ __('messages.active') }}</option>
+                            <option value="0">{{ __('messages.inactive') }}</option>
+                        </select>
+                    </div>
 
+                    <button id="quick-action-apply" class="quick-bulk-apply-btn" data-ajax="true"
+                        data--submit="{{ route('handyman.bulk-action') }}"
+                        data-datatable="reload" data-confirmation="true"
+                        data-title="{{ __('handyman',['form'=> __('handyman') ]) }}"
+                        title="{{ __('handyman',['form'=> __('handyman') ]) }}"
+                        data-message='{{ __("Do you want to perform this action?") }}' disabled>
+                        {{ __('messages.apply') }}
+                    </button>
+                </form>
+            </div>
+
+            <!-- Hidden input for column status filter -->
+            <input type="hidden" id="column_status" value="{{ $filter['status'] ?? '' }}">
+
+            <!-- Responsive Data Table -->
+            <div class="quick-table-responsive">
+                <table id="datatable" class="quick-table">
                 </table>
-              </div>
             </div>
         </div>
     </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', (event) => {
 
-        window.renderedDataTable = $('#datatable').DataTable({
+    @once
+    <style>
+        .quick-handyman-page {
+            width: 100%;
+        }
+
+        .quick-provider-toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .quick-search-box {
+            position: relative;
+            min-width: 240px;
+        }
+
+        .quick-search-icon {
+            position: absolute;
+            inset-inline-start: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--quick-shell-muted);
+            pointer-events: none;
+        }
+
+        .quick-search-input {
+            width: 100%;
+            height: 38px;
+            border-radius: 11px;
+            border: 1px solid var(--quick-shell-line);
+            background: var(--quick-shell-surface);
+            color: var(--quick-shell-ink);
+            padding-inline-start: 36px;
+            padding-inline-end: 14px;
+            font-size: 13px;
+            outline: none;
+            transition: all .15s ease;
+        }
+
+        .quick-search-input:focus {
+            border-color: var(--quick-blue);
+            box-shadow: 0 0 0 3px rgba(31,107,255,.15);
+        }
+
+        table#datatable.quick-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            margin: 0 !important;
+        }
+    </style>
+    @endonce
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            window.renderedDataTable = $('#datatable').DataTable({
                 processing: true,
                 serverSide: true,
                 autoWidth: false,
-                responsive: true,
-                dom: '<"row align-items-center"><"table-responsive my-3" rt><"row align-items-center" <"col-md-6" l><"col-md-6" p>><"clear">',
+                responsive: false,
+                scrollX: true,
+                dom: '<"quick-table-controls" rt><"row align-items-center justify-content-between p-3"<"col-md-6" i><"col-md-6" p>>',
                 ajax: {
-                  "type"   : "GET",
-                  "url"    : '{{ route("handyman.index_data",["list_status" => $list_status]) }}',
-                  "data"   : function( d ) {
-                    d.search = {
-                      value: $('.dt-search').val()
-                    };
-                    d.filter = {
-                      column_status: $('#column_status').val()
+                    type: "GET",
+                    url: '{{ route("handyman.index_data", ["list_status" => $list_status]) }}',
+                    data: function (d) {
+                        d.search = {
+                            value: $('.dt-search').val()
+                        };
+                        d.filter = {
+                            column_status: $('#column_status').val()
+                        };
                     }
-                  },
                 },
                 columns: [
                     {
@@ -105,100 +262,138 @@
                         exportable: false,
                         orderable: false,
                         searchable: false,
+                        width: '52px',
+                        className: 'text-center'
                     },
                     {
                         data: 'display_name',
                         name: 'display_name',
-                        title: "{{__('messages.name')}}",
-                         orderable: false,
+                        title: "{{ __('messages.name') }}",
+                        orderable: false,
+                        width: '240px'
                     },
                     {
                         data: 'id',
                         name: 'id',
-                        title: "#id",
-                         orderable: false,
+                        title: "#ID",
+                        orderable: false,
+                        width: '60px',
+                        className: 'text-center'
                     },
                     {
                         data: 'provider_id',
                         name: 'provider_id',
-                        title: "{{__('messages.provider')}}"
+                        title: "{{ __('messages.provider') }}",
+                        width: '160px'
                     },
                     {
                         data: 'contact_number',
                         name: 'contact_number',
-                        title: "{{__('messages.contact_number')}}"
+                        title: "{{ __('messages.contact_number') }}",
+                        width: '130px'
                     },
                     {
                         data: 'sanad_profile',
                         name: 'sanad_profile',
-                        title: "{{ __("messages.employee_profile") }}",
+                        title: "{{ __('messages.employee_profile') }}",
                         orderable: false,
                         searchable: false,
+                        width: '130px'
                     },
                     {
                         data: 'status',
                         name: 'status',
-                        title: "{{__('messages.status')}}"
+                        title: "{{ __('messages.status') }}",
+                        width: '90px',
+                        className: 'text-center'
                     },
                     {
                         data: 'action',
                         name: 'action',
                         orderable: false,
                         searchable: false,
-                        title: "{{__('messages.action')}}"
+                        title: "{{ __('messages.action') }}",
+                        width: '100px',
+                        className: 'text-center'
                     }
-
-                ]
-
+                ],
+                language: {
+                    search: "",
+                    searchPlaceholder: "{{ $isAr ? 'بحث...' : 'Search...' }}",
+                    processing: "{{ $isAr ? 'جاري التحميل...' : 'Loading...' }}",
+                    info: "{{ $isAr ? 'عرض _START_ إلى _END_ من أصل _TOTAL_ موظف' : 'Showing _START_ to _END_ of _TOTAL_ entries' }}",
+                    infoEmpty: "{{ $isAr ? 'عرض 0 إلى 0 من أصل 0' : 'Showing 0 to 0 of 0 entries' }}",
+                    infoFiltered: "{{ $isAr ? '(تمت التصفية من أصل _MAX_ إجمالي)' : '(filtered from _MAX_ total entries)' }}",
+                    lengthMenu: "{{ $isAr ? 'عرض _MENU_ سجلات' : 'Show _MENU_ entries' }}",
+                    zeroRecords: "{{ $isAr ? 'لم يتم العثور على نتائج مطابقة' : 'No matching records found' }}",
+                    paginate: {
+                        first: "{{ $isAr ? 'الأول' : 'First' }}",
+                        last: "{{ $isAr ? 'الأخير' : 'Last' }}",
+                        next: "{{ $isAr ? 'التالي' : 'Next' }}",
+                        previous: "{{ $isAr ? 'السابق' : 'Previous' }}"
+                    }
+                }
             });
-      });
 
-    function resetQuickAction () {
-    const actionValue = $('#quick-action-type').val();
-    console.log(actionValue)
-    if (actionValue != '') {
-        $('#quick-action-apply').removeAttr('disabled');
+            // Live search with debounce
+            let searchTimeout;
+            $('.dt-search').on('keyup input', function () {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function () {
+                    window.renderedDataTable.draw();
+                }, 250);
+            });
+        });
 
-        if (actionValue == 'change-status') {
-            $('.quick-action-field').addClass('d-none');
-            $('#change-status-action').removeClass('d-none');
-        } else {
-            $('.quick-action-field').addClass('d-none');
+        function filterHandymanStatus(status, btn) {
+            $('#column_status').val(status);
+            document.querySelectorAll('.quick-filter-pills button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            window.renderedDataTable.draw();
         }
-    } else {
-        $('#quick-action-apply').attr('disabled', true);
-        $('.quick-action-field').addClass('d-none');
-    }
-  }
 
-  $('#quick-action-type').change(function () {
-    resetQuickAction()
-  });
+        function resetQuickAction() {
+            const actionValue = $('#quick-action-type').val();
+            if (actionValue !== '') {
+                $('#quick-action-apply').removeAttr('disabled');
 
-  $(document).on('update_quick_action', function() {
-  })
+                if (actionValue === 'change-status') {
+                    $('.quick-action-field').addClass('d-none');
+                    $('#change-status-action').removeClass('d-none');
+                } else {
+                    $('.quick-action-field').addClass('d-none');
+                }
+            } else {
+                $('#quick-action-apply').attr('disabled', true);
+                $('.quick-action-field').addClass('d-none');
+            }
+        }
 
-    $(document).on('click', '[data-ajax="true"]', function (e) {
-      e.preventDefault();
-      const button = $(this);
-      const confirmation = button.data('confirmation');
+        $('#quick-action-type').change(function () {
+            resetQuickAction();
+        });
 
-      if (confirmation === 'true') {
-          const message = button.data('message');
-          if (confirm(message)) {
-              const submitUrl = button.data('submit');
-              const form = button.closest('form');
-              form.attr('action', submitUrl);
-              form.submit();
-          }
-      } else {
-          const submitUrl = button.data('submit');
-          const form = button.closest('form');
-          form.attr('action', submitUrl);
-          form.submit();
-      }
-  });
+        $(document).on('click', '[data-ajax="true"]', function (e) {
+            e.preventDefault();
+            const button = $(this);
+            const confirmation = button.data('confirmation');
 
+            if (confirmation === 'true') {
+                const message = button.data('message');
+                if (confirm(message)) {
+                    const submitUrl = button.data('submit');
+                    const form = button.closest('form');
+                    form.attr('action', submitUrl);
+                    form.submit();
+                }
+            } else {
+                const submitUrl = button.data('submit');
+                const form = button.closest('form');
+                form.attr('action', submitUrl);
+                form.submit();
+            }
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
 </x-master-layout>
+

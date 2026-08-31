@@ -48,7 +48,7 @@
     <div class="sanad-card shadow-sm">
         <div class="sanad-card-header font-weight-bold"><i class="fas fa-folder mr-2 text-warning"></i> {{ $isAr ? "مستنداتك المحفوظة في الخزينة" : "Your Saved Vault Documents" }}</div>
         <div class="sanad-card-body table-responsive">
-            <table class="sanad-table table align-middle">
+            <table class="sanad-table table align-middle quick-vault-table">
                 <thead>
                     <tr>
                         <th>{{ $isAr ? "نوع المستند" : "Document Type" }}</th>
@@ -193,9 +193,11 @@
     </div>
 </div>
 <style>
-    .vault-file-picker { display: flex; align-items: center; gap: 10px; border: 1px solid #dce3ee; border-radius: 8px; min-height: 48px; padding: 6px 10px; background: #fff; }
+    .quick-vault-table thead th { background: #1769ff; color: #fff; border-color: #1769ff; }
+    .quick-vault-table tbody td { color: var(--quick-shell-ink, #0a1626); }
+    .vault-file-picker { display: flex; align-items: center; gap: 10px; border: 1px solid var(--quick-shell-line, #dce3ee); border-radius: 8px; min-height: 48px; padding: 6px 10px; background: var(--quick-shell-surface, #fff); color: var(--quick-shell-ink, #0a1626); }
     .vault-file-icon { width: 38px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; margin: 0; background: #f2f4f7; color: #4f46e5; cursor: pointer; flex-shrink: 0; }
-    .vault-file-name { min-width: 0; flex: 1; color: #667085; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vault-file-name { min-width: 0; flex: 1; color: var(--quick-shell-muted, #667085); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .vault-file-picker input[type="file"] { display: none; }
     .vault-upload-button { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
     .vault-upload-button .vault-upload-busy { display: none; align-items: center; justify-content: center; }
@@ -230,6 +232,26 @@
     .vault-edit-form label { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .vault-edit-form label span { font-size: 12px; color: #667085; font-weight: 700; }
     .vault-edit-form .vault-toggle { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 7px; }
+    body.quick-theme-dark .quick-vault-table thead th,
+    [data-quick-theme="dark"] .quick-vault-table thead th { background: #1769ff; color: #fff; border-color: #1769ff; }
+    body.quick-theme-dark .quick-vault-table tbody td,
+    [data-quick-theme="dark"] .quick-vault-table tbody td { color: #eaf3ff; }
+    body.quick-theme-dark .quick-vault-table strong,
+    [data-quick-theme="dark"] .quick-vault-table strong { color: #fff; }
+    body.quick-theme-dark .quick-vault-table .text-muted,
+    [data-quick-theme="dark"] .quick-vault-table .text-muted { color: #a8bad0 !important; }
+    body.quick-theme-dark .vault-file-picker,
+    [data-quick-theme="dark"] .vault-file-picker { border-color: #294563; background: #0a1c2e; color: #f4f8ff; }
+    body.quick-theme-dark .vault-file-icon,
+    [data-quick-theme="dark"] .vault-file-icon { background: #10283f; color: #7fb1ff; }
+    body.quick-theme-dark .vault-file-name,
+    [data-quick-theme="dark"] .vault-file-name { color: #dbe8f7; }
+    body.quick-theme-dark .vault-edit-row td,
+    [data-quick-theme="dark"] .vault-edit-row td { background: #09192a; }
+    body.quick-theme-dark .vault-edit-form .form-control,
+    [data-quick-theme="dark"] .vault-edit-form .form-control { border-color: #294563; background: #0a1c2e; color: #f4f8ff; }
+    body.quick-theme-dark .vault-edit-form label span,
+    [data-quick-theme="dark"] .vault-edit-form label span { color: #a8bad0; }
     @media (max-width: 900px) {
         .vault-edit-form { grid-template-columns: 1fr; }
         .vault-edit-form .vault-toggle { padding-bottom: 0; }

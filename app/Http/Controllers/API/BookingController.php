@@ -141,6 +141,32 @@ class BookingController extends Controller
         }
 
         $booking_activity = BookingActivity::where('booking_id',$id)->orderBy('id', 'asc')->get();
+        if ($booking_activity->isEmpty()) {
+            $actions = $booking_data->sanadRequestActions()->orderBy('created_at', 'asc')->get();
+            if ($actions->isNotEmpty()) {
+                $booking_activity = $actions->map(function ($a) use ($id) {
+                    return (object) [
+                        'id' => $a->id,
+                        'booking_id' => $id,
+                        'datetime' => optional($a->created_at)->toDateTimeString(),
+                        'activity_type' => $a->action ?: 'status_update',
+                        'title' => \Illuminate\Support\Str::headline($a->action ?: 'Update'),
+                        'activity_message' => $a->note ?: ($a->reason ?: 'Request status updated.'),
+                    ];
+                });
+            } else {
+                $booking_activity = collect([
+                    (object) [
+                        'id' => 1,
+                        'booking_id' => $id,
+                        'datetime' => optional($booking_data->created_at)->toDateTimeString(),
+                        'activity_type' => 'request_created',
+                        'title' => 'Request Created',
+                        'activity_message' => 'Your request has been submitted.',
+                    ]
+                ]);
+            }
+        }
         $serviceProof = ServiceProofResource::collection(ServiceProof::with('service','handyman','booking')->where('booking_id',$id)->get());
         $post_job_object = null;
         if($booking_data->type == 'user_post_job'){

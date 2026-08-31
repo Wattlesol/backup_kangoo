@@ -99,9 +99,11 @@ assert_contains_either "$detail_text" "Request Information" "معلومات ال
 assert_contains_either "$detail_text" "Quick team" "فريق كويك" "customer request detail"
 assert_contains_either "$detail_text" "Progress" "نسبة التقدم" "customer request detail"
 assert_contains_either "$detail_text" "Timeline" "المراحل والجدول الزمني" "customer request detail"
-assert_contains_either "$detail_text" "Secure Chat" "المحادثة الآمنة" "customer request detail"
+assert_contains_either "$detail_text" "Talk to Quick" "تحدث إلى كويك" "customer request detail"
 assert_contains_either "$detail_text" "Required Documents" "المستندات المطلوبة" "customer request detail"
 assert_contains_either "$detail_text" "Document Requests" "طلبات المستندات" "customer request detail"
+assert_contains "$detail_html" 'name="document_selection"' "customer request detail"
+assert_not_contains "$detail_text" "Customer Rating" "customer request detail"
 
 assert_not_contains "$detail_text" "Kangoo" "customer request detail"
 assert_not_contains "$detail_text" "Provider Demo" "customer request detail"

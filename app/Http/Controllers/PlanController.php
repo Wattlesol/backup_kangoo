@@ -56,6 +56,15 @@ class PlanController extends Controller
                 }
                 return $link;
             })
+            ->editColumn('type', function ($query){
+                $type = strtolower($query->type ?? 'monthly');
+                $label = ucfirst($type);
+                if ($type === 'weekly') $label = __('messages.weekly');
+                if ($type === 'monthly') $label = __('messages.monthly');
+                if ($type === 'yearly') $label = __('messages.yearly');
+                $colorClass = $type === 'weekly' ? 'badge-primary' : ($type === 'yearly' ? 'badge-success' : 'badge-info');
+                return '<span class="badge '.$colorClass.'" style="border-radius:6px; font-weight:700; padding:5px 10px; font-size:12px;">'.$label.'</span>';
+            })
 
 
             ->editColumn('status' , function ($query){
@@ -150,10 +159,10 @@ class PlanController extends Controller
             'title' => $requestData['title'],
             'amount' => $requestData['amount'],
             'status' => $requestData['status'],
-            'duration' => $requestData['duration'],
-            'description' => $requestData['description'],
-            'plan_type' => $requestData['plan_type'],
-            'type'=> $requestData['type']
+            'duration' => $requestData['duration'] ?? 1,
+            'description' => $requestData['description'] ?? null,
+            'plan_type' => $requestData['plan_type'] ?? 'unlimited',
+            'type'=> in_array($requestData['type'] ?? '', ['weekly', 'monthly', 'yearly']) ? $requestData['type'] : 'monthly'
         ];
         if(empty($request->id) && $request->id == null){
             $planData['identifier'] = strtolower($requestData['title']);
@@ -164,11 +173,13 @@ class PlanController extends Controller
             {
                 $result->planlimit()->delete();
             }
-            $limitdata = [
-                'plan_id' =>  $result->id,
-                'plan_limitation' => $requestData['plan_limitation']
-            ];
-            PlanLimit::updateOrCreate(['id' => $requestData['id'] ],$limitdata);            
+            if (!empty($requestData['plan_limitation'])) {
+                $limitdata = [
+                    'plan_id' =>  $result->id,
+                    'plan_limitation' => $requestData['plan_limitation']
+                ];
+                PlanLimit::updateOrCreate(['id' => $requestData['id'] ],$limitdata);
+            }
         }
         
         $message = trans('messages.update_form',['form' => trans('messages.plan')]);

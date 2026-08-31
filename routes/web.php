@@ -135,7 +135,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('sanad/dashboard', [SanadWebController::class, 'dashboard'])->name('sanad.dashboard');
     Route::get('sanad/partner-performance', [SanadWebController::class, 'partnerPerformance'])->name('sanad.partner-performance');
-    Route::get('sanad/ai', [SanadWebController::class, 'aiConsole'])->name('sanad.ai.index');
+    Route::get('sanad/ai', fn () => redirect()->route('sanad.knowledge.index'))->name('sanad.ai.index');
     Route::get('sanad/knowledge-base', [SanadWebController::class, 'aiConsole'])->name('sanad.knowledge.index');
     Route::get('sanad/ai/escalations', [SanadWebController::class, 'aiEscalations'])->name('sanad.ai.escalations.index');
     Route::post('sanad/ai/escalations/{id}/review', [SanadWebController::class, 'reviewAiEscalation'])->name('sanad.ai.escalations.review');
@@ -378,6 +378,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 
     // Setting
     Route::get('setting/{page?}',[ SettingController::class, 'settings'])->name('setting.index')->middleware('sanad.module:settings,read');
+    Route::post('setting/mobile-hero', [ SettingController::class, 'saveMobileHero'])->name('setting.mobile-hero.save')->middleware('sanad.module:settings,write');
     Route::post('/layout-page',[ SettingController::class, 'layoutPage'])->name('layout_page')->middleware('sanad.module:settings,write');
 
     // Route::post('settings/save',[ SettingController::class , 'settingsUpdates'])->name('settingsUpdates');

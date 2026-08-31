@@ -90,18 +90,33 @@ class ServiceController extends Controller
             })
 
             ->editColumn('name', function($query){
+                $image = getSingleMedia($query, 'service_attachment', null) ?: getSingleMedia($query, 'service_image', null);
+                $nameEn = $query->name_en ?: $query->name;
+                $nameAr = $query->name_ar ?: '';
+
+                $thumb = $image 
+                    ? '<img src="'.$image.'" alt="'.e($nameEn).'" class="quick-category-avatar" style="width:38px;height:38px;object-fit:cover;border-radius:10px;border:1px solid var(--quick-shell-line);flex-shrink:0;background:var(--quick-shell-surface);">'
+                    : '<div class="quick-category-avatar-placeholder" style="width:38px;height:38px;border-radius:10px;background:rgba(31,107,255,.09);color:var(--quick-blue);display:grid;place-items:center;font-weight:900;font-size:14px;border:1px solid rgba(31,107,255,.15);flex-shrink:0;">'.mb_substr($nameEn, 0, 1).'</div>';
+
                 if (auth()->user()->can('service edit')) {
-                    $link =  '<a class="btn-link btn-link-hover" href='.route('service.create', ['id' => $query->id]).'>'.($query->name_en ?: $query->name).'</a>';
+                    $link = '<a class="quick-category-title-link" style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);text-decoration:none;" href="'.route('service.create', ['id' => $query->id]).'">'.e($nameEn).'</a>';
                 } else {
-                    $link = $query->name_en ?: $query->name;
+                    $link = '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">'.e($nameEn).'</span>';
                 }
-                return $link;
+
+                $subtext = $nameAr ? '<span style="display:block;font-size:11px;color:var(--quick-shell-muted);margin-top:2px;">'.e($nameAr).'</span>' : '';
+
+                return '<div style="display:flex;align-items:center;gap:12px;">'.$thumb.'<div style="min-width:0;">'.$link.$subtext.'</div></div>';
             })
             ->editColumn('name_ar', function($query){
-                return $query->name_ar ?: '-';
+                return '<span style="font-weight:700;font-size:13px;color:var(--quick-shell-ink);">'.e($query->name_ar ?: '-').'</span>';
             })
             ->editColumn('category_id' , function ($query){
-                return ($query->category_id != null && isset($query->category)) ? $query->category->name : '-';
+                if ($query->category_id != null && isset($query->category)) {
+                    $catName = app()->getLocale() === 'ar' && !empty($query->category->name_ar) ? $query->category->name_ar : ($query->category->name_en ?: $query->category->name);
+                    return '<span class="quick-order-badge" style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:8px;background:rgba(31,107,255,.08);color:var(--quick-blue);font-weight:700;font-size:12px;border:1px solid rgba(31,107,255,.14);">'.e($catName).'</span>';
+                }
+                return '<span style="color:var(--quick-shell-muted);">-</span>';
             })
             ->filterColumn('category_id',function($query,$keyword){
                 $query->whereHas('category',function ($q) use($keyword){
@@ -118,7 +133,7 @@ class ServiceController extends Controller
                 });
             })
             ->editColumn('price' , function ($query){
-                return getPriceFormat($query->price).'-'.ucFirst($query->type);
+                return '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">' . getPriceFormat($query->price) . '</span> <small style="color:var(--quick-shell-muted);font-weight:600;">/ ' . ucfirst($query->type) . '</small>';
             })
 
             ->editColumn('discount' , function ($query){
@@ -144,7 +159,7 @@ class ServiceController extends Controller
                 </div>';
             })
             ->addColumn('action', function ($data) {
-                return view('service.action', compact('data'));
+                return view('service.action', compact('data'))->render();
             })
             ->editColumn('status' , function ($query){
                 $disabled = $query->trashed() ? 'disabled': '';
@@ -156,7 +171,7 @@ class ServiceController extends Controller
                 </div>';
             })
 
-            ->rawColumns(['action', 'status', 'check','name','is_featured'])
+            ->rawColumns(['action', 'status', 'check','name','name_ar','category_id','price','is_featured'])
             ->toJson();
     }
 

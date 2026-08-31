@@ -36,6 +36,19 @@
     .sanad-page .pagination { flex-wrap:wrap; gap:4px; }
     .sanad-page .page-link { min-width:38px; min-height:38px; display:grid; place-items:center; border-radius:9px!important; border-color:var(--quick-shell-line,#d8e4f2); background:var(--quick-shell-surface,#fff); color:var(--quick-shell-ink,#0a1626); }
     .sanad-page .page-item.active .page-link { border-color:#1769ff; background:#1769ff; color:#fff; }
+    .quick-catalog-tabs { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .quick-catalog-tab { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:10px 18px; border:1px solid transparent; border-radius:10px; color:#6f8098; font-size:13px; font-weight:800; text-decoration:none; text-transform:uppercase; transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease; }
+    .quick-catalog-tab:hover,
+    .quick-catalog-tab:focus { border-color:#b8d1ff; background:#edf4ff; color:#155ee9; box-shadow:0 8px 18px rgba(23,105,255,.08); text-decoration:none; }
+    .quick-catalog-tab.active,
+    .quick-catalog-tab.active:hover,
+    .quick-catalog-tab.active:focus { border-color:#1769ff; background:#1769ff; color:#fff; box-shadow:0 8px 18px rgba(23,105,255,.18); }
+    .quick-vault-picker h5 { margin-bottom:12px; }
+    .quick-vault-selected { display:grid; gap:8px; }
+    .quick-vault-row { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--quick-shell-line,#d8e4f2); border-radius:10px; padding:10px 12px; background:#f8fbff; }
+    .quick-vault-row strong,
+    .quick-vault-row span { display:block; }
+    .quick-vault-row span { color:#6a7c93; font-size:12px; margin-top:2px; }
     .sanad-progress { height:8px; background:#e5edf7; border-radius:999px; overflow:hidden; }
     .sanad-progress span { display:block; height:100%; background:linear-gradient(90deg,#1769ff,#20c5e8); }
     .sanad-timeline { border-inline-start:2px solid #1769ff; padding-inline-start:16px; }
@@ -109,6 +122,16 @@
     [data-quick-theme="dark"] .sanad-form-control { border-color:#294563; background:#0a1c2e; color:#f4f8ff; }
     body.quick-theme-dark .sanad-card label,
     [data-quick-theme="dark"] .sanad-card label { color:#dbe8f7; }
+    body.quick-theme-dark .quick-catalog-tab,
+    [data-quick-theme="dark"] .quick-catalog-tab { color:#a8bad0; }
+    body.quick-theme-dark .quick-catalog-tab:hover,
+    body.quick-theme-dark .quick-catalog-tab:focus,
+    [data-quick-theme="dark"] .quick-catalog-tab:hover,
+    [data-quick-theme="dark"] .quick-catalog-tab:focus { border-color:#294563; background:#10283f; color:#f4f8ff; }
+    body.quick-theme-dark .quick-vault-row,
+    [data-quick-theme="dark"] .quick-vault-row { border-color:#294563; background:#09192a; }
+    body.quick-theme-dark .quick-vault-row span,
+    [data-quick-theme="dark"] .quick-vault-row span { color:#a8bad0; }
 
     @media (max-width:767.98px) {
         .sanad-page { padding-inline:0; }

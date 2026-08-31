@@ -3,67 +3,27 @@
     $isAr = app()->getLocale() === 'ar';
     $stageLabelsAr = ['submitted'=>'تم التقديم','pending_review'=>'قيد المراجعة','assigned_to_partner'=>'مُسند إلى الشريك','assigned_to_employee'=>'مُسند إلى الموظف','in_progress'=>'قيد التنفيذ','awaiting_customer_action'=>'بانتظار إجراء العميل','awaiting_quality_review'=>'بانتظار مراجعة الجودة','ready_for_delivery'=>'جاهز للتسليم','completed'=>'مكتمل','closed'=>'مغلق','escalated'=>'تم التصعيد','cancelled'=>'ملغي'];
     $localizedStage = fn ($value) => $isAr ? ($stageLabelsAr[Str::snake((string) $value)] ?? Str::headline($value)) : Str::headline($value);
-@endphp<script>
-    window.quickCustomerPortalIsArabic = @json($isAr);
-    window.syncCustomerPortalDocumentChoice = function (selectElem) {
-        var form = selectElem ? selectElem.closest('.customer-document-submit') : null;
-        if (!form) return;
-
-        var hasVault = !!selectElem.value;
-        var uploadRow = form.querySelector('.customer-upload-row');
-        var fileInput = form.querySelector('input[type="file"]');
-
-        if (uploadRow) uploadRow.classList.toggle('is-disabled', hasVault);
-        if (fileInput) {
-            if (hasVault) fileInput.value = '';
-            fileInput.disabled = hasVault;
-        }
-    };
-
-    window.validateCustomerPortalDocumentSubmit = function (form) {
-        var vaultSelect = form.querySelector('select[name="vault_document_id"]');
-        var fileInput = form.querySelector('input[type="file"]');
-        var hasVault = vaultSelect && vaultSelect.value;
-        var hasFile = fileInput && !fileInput.disabled && fileInput.files && fileInput.files.length > 0;
-
-        if (!hasVault && !hasFile) {
-            alert(window.quickCustomerPortalIsArabic ? 'اختر مستنداً من الخزنة أو أرفق ملفاً أولاً.' : 'Choose a vault document or attach a file first.');
-            return false;
-        }
-
-        return true;
-    };
-
-    window.syncCustomerPortalDocumentFileName = function (input) {
-        var form = input ? input.closest('.customer-document-submit') : null;
-        var fileName = form ? form.querySelector('.customer-file-name') : null;
-        if (!fileName) return;
-
-        fileName.textContent = input.files && input.files[0] ? input.files[0].name : (window.quickCustomerPortalIsArabic ? 'لم يتم اختيار ملف' : 'No file selected');
-    };
-</script>
+    $pendingDocumentRequests = $booking->sanadDocumentRequests
+        ->whereIn('requested_from', ['customer', 'user'])
+        ->whereIn('status', ['pending', 'rejected', 'replacement_requested']);
+@endphp
 <style>
-    .customer-upload-row.is-disabled { opacity: .48; pointer-events: none; }
-    .customer-upload-icon { width: 42px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
-    .customer-attach-icon { width: 42px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
-    .customer-file-input { display: none !important; }
-    .customer-file-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .quick-inline-buzz { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .quick-inline-buzz-message { min-width:0; line-height:1.55; }
+    .quick-chat-cta { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+    @media (max-width: 575px) { .quick-inline-buzz,.quick-chat-cta { align-items:stretch; flex-direction:column; } }
 </style>
 <div class="container-fluid sanad-page">
     <div class="sanad-header">
         <div><h1 class="sanad-title">{{ $isAr ? 'الطلب' : 'Request' }} {{ $booking->quick_reference }}</h1><div class="sanad-muted">{{ localized_model_name($booking->service) }}</div></div>
         <a class="sanad-btn secondary" href="{{ route('customer-portal.requests.index') }}">{{ $isAr ? 'رجوع' : 'Back' }}</a>
     </div>
-    @foreach($booking->sanadBuzzAlerts->where('status', 'unread') as $buzz)
+    @foreach($openBuzzAlerts as $buzz)
         <div class="alert alert-danger" id="buzz-{{ $buzz->id }}">
-            <strong>Buzz:</strong> {{ $buzz->message }}
-            <form class="mt-2" method="post" action="{{ route('customer-portal.requests.buzz.reply', [$booking->id, $buzz->id]) }}">
-                @csrf
-                <div class="row">
-                    <div class="col-md-9"><input class="sanad-form-control" name="message" placeholder="{{ $isAr ? 'الرد على هذا الطلب العاجل' : 'Reply to this urgent request' }}" required></div>
-                    <div class="col-md-3"><button class="sanad-btn w-100">{{ $isAr ? 'رد' : 'Reply' }}</button></div>
-                </div>
-            </form>
+            <div class="quick-inline-buzz">
+                <div class="quick-inline-buzz-message"><strong>{{ $isAr ? 'تنبيه عاجل:' : 'Urgent Buzz:' }}</strong> {{ $buzz->message }}</div>
+                <a class="sanad-btn text-nowrap" href="{{ route('customer-portal.messages', ['booking_id' => $booking->id, 'buzz_id' => $buzz->id]) }}#buzz-{{ $buzz->id }}">{{ $isAr ? 'تحدث إلى كويك' : 'Talk to Quick' }}</a>
+            </div>
         </div>
     @endforeach
     <div class="row">
@@ -94,37 +54,12 @@
                 </div>
             </div>
             <div class="sanad-card mb-3">
-                <div class="sanad-card-header">{{ $isAr ? "المحادثة الآمنة" : "Secure Chat" }}</div>
+                <div class="sanad-card-header">{{ $isAr ? 'تواصل مع كويك' : 'Quick Support' }}</div>
                 <div class="sanad-card-body">
-                    <div class="sanad-chat-box mb-3">
-                        @forelse($thread->messages as $message)
-                            <div class="sanad-chat-message"><strong>{{ optional($message->sender)->display_name ?? Str::headline($message->sender_role) }}</strong> <small class="sanad-muted">{{ optional($message->created_at)->format('Y-m-d H:i') }}</small><div>{{ $message->message }}</div>@if($message->getFirstMediaUrl('sanad_chat_attachment'))<a href="{{ $message->getFirstMediaUrl('sanad_chat_attachment') }}" target="_blank">{{ $isAr ? "المرفقات" : "Attachment" }}</a>@endif</div>
-                        @empty
-                            <p class="sanad-muted mb-0">{{ $isAr ? 'لا توجد رسائل حتى الآن.' : 'No messages yet.' }}</p>
-                        @endforelse
+                    <div class="quick-chat-cta">
+                        <div><strong>{{ $isAr ? 'هل تحتاج إلى مساعدة بخصوص هذا الطلب؟' : 'Need help with this request?' }}</strong><div class="sanad-muted">{{ $isAr ? 'افتح المحادثة المخصصة لهذا الطلب مع فريق كويك.' : 'Open this request’s dedicated conversation with the Quick team.' }}</div></div>
+                        <a class="sanad-btn text-nowrap" href="{{ route('customer-portal.messages', ['booking_id' => $booking->id]) }}">{{ $isAr ? 'تحدث إلى كويك' : 'Talk to Quick' }}</a>
                     </div>
-                    <form method="post" action="{{ route('customer-portal.requests.messages.store', $booking->id) }}" enctype="multipart/form-data">
-                        @csrf
-                        @if(request('buzz_id'))
-                            <input type="hidden" name="buzz_alert_id" value="{{ request('buzz_id') }}">
-                        @endif
-                        <div class="row">
-                            <div class="col-md-8"><input class="sanad-form-control" name="message" placeholder="{{ request('buzz_id') ? ($isAr ? 'الرد على التنبيه المحدد' : 'Reply to selected Buzz') : ($isAr ? 'اكتب رسالة إلى فريق كويك' : 'Message Quick team') }}"></div>
-                            <div class="col-md-2"><input class="sanad-form-control" type="file" name="attachment"></div>
-                            <div class="col-md-2"><button class="sanad-btn w-100">{{ $isAr ? "إرسال" : "Send" }}</button></div>
-                        </div>
-                        <small class="sanad-muted">{{ $isAr ? 'تُزال أرقام الهواتف والبريد الإلكتروني والروابط وبيانات التواصل الخارجية تلقائياً.' : 'Phone numbers, emails, URLs, and external contact details are removed automatically.' }}</small>
-                    </form>
-                </div>
-            </div>
-            <div class="sanad-card">
-                <div class="sanad-card-header">{{ $isAr ? "تقييم العميل" : "Customer Rating" }}</div>
-                <div class="sanad-card-body">
-                    @if(in_array($stage, ['completed','closed']))
-                        <form method="post" action="{{ route('save-booking-rating') }}">@csrf<input type="hidden" name="booking_id" value="{{ $booking->id }}"><input type="hidden" name="service_id" value="{{ $booking->service_id }}"><div class="row"><div class="col-md-3"><input class="sanad-form-control" name="rating" type="number" min="1" max="5" placeholder="Overall"></div><div class="col-md-7"><input class="sanad-form-control" name="review" placeholder="Comments"></div><div class="col-md-2"><button class="sanad-btn w-100">{{ $isAr ? "تقييم" : "Rate" }}</button></div></div></form>
-                    @else
-                        <p class="sanad-muted mb-0">{{ $isAr ? 'يتاح التقييم بعد اكتمال الطلب.' : 'Rating is available after completion.' }}</p>
-                    @endif
                 </div>
             </div>
         </div>
@@ -138,56 +73,55 @@
                     @empty
                         <p class="sanad-muted">{{ $isAr ? 'لم يتم إعداد قائمة المستندات المطلوبة.' : 'No required document list configured.' }}</p>
                     @endforelse
-                    <form class="mt-3" method="post" action="{{ route('customer-portal.requests.documents.store', $booking->id) }}" enctype="multipart/form-data">@csrf<input class="sanad-form-control mb-2" name="document_type" placeholder="{{ $isAr ? 'نوع مستند مخصص' : 'Custom document type' }}" required><input class="sanad-form-control mb-2" name="file" type="file" required><button class="sanad-btn">{{ $isAr ? "رفع مستند" : "Upload Document" }}</button></form>
+                    @if($documentChoices->isNotEmpty())
+                        <form class="mt-3" method="post" action="{{ route('customer-portal.requests.documents.store', $booking->id) }}" enctype="multipart/form-data">
+                            @csrf
+                            <label class="d-block mb-1 font-weight-bold" for="request-document-selection">{{ $isAr ? 'نوع المستند المطلوب' : 'Required document type' }}</label>
+                            <select id="request-document-selection" class="sanad-form-control mb-2" name="document_selection" required>
+                                <option value="">{{ $isAr ? 'اختر نوع المستند' : 'Select document type' }}</option>
+                                @foreach($documentChoices as $choiceKey => $choice)
+                                    <option value="{{ $choiceKey }}">{{ $choice['label'] }}</option>
+                                @endforeach
+                            </select>
+                            <label class="d-block mb-1 font-weight-bold" for="request-document-file">{{ $isAr ? 'اختر الملف' : 'Select file' }}</label>
+                            <input id="request-document-file" class="sanad-form-control mb-2" name="file" type="file" required>
+                            <button class="sanad-btn">{{ $isAr ? "رفع مستند" : "Upload Document" }}</button>
+                        </form>
+                    @else
+                        <p class="sanad-muted mt-3 mb-0">{{ $isAr ? 'لا توجد مستندات مطلوبة للرفع حالياً.' : 'There are no requested documents to upload right now.' }}</p>
+                    @endif
                 </div>
             </div>
             <div class="sanad-card mb-3">
                 <div class="sanad-card-header">{{ $isAr ? "طلبات المستندات" : "Document Requests" }}</div>
                 <div class="sanad-card-body">
-                    @forelse($booking->sanadDocumentRequests->where('requested_from', 'customer') as $docRequest)
-                        <div class="border-bottom py-2">
+                    @foreach($pendingDocumentRequests as $docRequest)
+                        <a class="d-block border-bottom py-2 text-decoration-none text-reset" href="{{ route('customer-portal.messages', ['booking_id' => $booking->id]) }}">
                             <strong>{{ $docRequest->document_name }}</strong>
                             <div class="sanad-muted">{{ $docRequest->instructions ?? $docRequest->reason }}</div>
                             <span class="sanad-badge">{{ quick_status_label($docRequest->status) }}</span>
-                            @if(in_array($docRequest->status, ['pending','rejected','replacement_requested']))
-                                <form class="customer-document-submit mt-2" method="post" action="{{ route('customer-portal.requests.document-requests.upload', [$booking->id, $docRequest->id]) }}" enctype="multipart/form-data" onsubmit="return window.validateCustomerPortalDocumentSubmit(this)">
-                                    @csrf
-                                    @if(!empty($vaultDocuments) && $vaultDocuments->isNotEmpty())
-                                        <div class="d-flex gap-2 align-items-center mb-2">
-                                            <select name="vault_document_id" class="sanad-form-control" onchange="window.syncCustomerPortalDocumentChoice(this)">
-                                                <option value="">{{ $isAr ? '-- إرفاق من خزنة المستندات --' : '-- Attach from Document Vault --' }}</option>
-                                                @foreach($vaultDocuments as $vDoc)
-                                                    <option value="{{ $vDoc->id }}">📁 {{ $vDoc->document_type }} ({{ $vDoc->file_name }})</option>
-                                                @endforeach
-                                            </select>
-                                            <button class="sanad-btn" type="submit"><i class="fas fa-check mr-1"></i> {{ $isAr ? 'إرسال مستند الخزنة' : 'Submit Vault Doc' }}</button>
-                                        </div>
-                                        <div class="sanad-muted small text-center mb-2">{{ $isAr ? '- أو ارفع ملفاً جديداً -' : '- OR Upload New File -' }}</div>
-                                    @endif
-                                    <div class="customer-upload-row d-flex gap-2 align-items-center">
-                                        <label class="sanad-btn secondary customer-attach-icon mb-0" title="Choose file" aria-label="Choose file">
-                                            <i class="fas fa-paperclip"></i>
-                                            <input class="customer-file-input" type="file" name="file" onchange="window.syncCustomerPortalDocumentFileName(this)">
-                                        </label>
-                                        <span class="customer-file-name sanad-muted small">{{ $isAr ? "لم يتم اختيار ملف" : "No file selected" }}</span>
-                                        <button class="sanad-btn customer-upload-icon" type="submit" title="Upload file" aria-label="Upload file"><i class="fas fa-upload"></i></button>
-                                    </div>
-                                </form>
-                            @endif
-                        </div>
-                    @empty
+                        </a>
+                    @endforeach
+                    @foreach($openBuzzAlerts as $buzz)
+                        <a class="d-block border-bottom py-2 text-decoration-none text-reset" href="{{ route('customer-portal.messages', ['booking_id' => $booking->id, 'buzz_id' => $buzz->id]) }}#buzz-{{ $buzz->id }}">
+                            <strong>{{ $isAr ? 'تنبيه كويك عاجل' : 'Pending Quick Buzz' }}</strong>
+                            <div class="sanad-muted">{{ Str::limit($buzz->message, 120) }}</div>
+                            <span class="sanad-badge">{{ $isAr ? 'فتح المحادثة' : 'Open conversation' }}</span>
+                        </a>
+                    @endforeach
+                    @if($pendingDocumentRequests->isEmpty() && $openBuzzAlerts->isEmpty())
                         <p class="sanad-muted">{{ $isAr ? 'لا توجد طلبات مستندات مفتوحة.' : 'No open document requests.' }}</p>
-                    @endforelse
+                    @endif
                 </div>
             </div>
             <div class="sanad-card mb-3">
-                <div class="sanad-card-header">{{ $isAr ? "المستندات المرسلة" : "Submitted Documents" }}</div>
+                <div class="sanad-card-header">{{ $isAr ? 'المستندات الموثقة' : 'Verified Documents' }}</div>
                 <div class="sanad-card-body">
-                    @forelse($booking->sanadDocuments as $document)
+                    @forelse($verifiedDocuments as $document)
                         @php $documentUrl = $document->publicDocumentUrl(); @endphp
-                        <div class="border-bottom py-2"><strong>{{ $document->document_type }}</strong><div><span class="sanad-badge">{{ quick_status_label($document->verification_status) }}</span></div>@if($documentUrl)<a href="{{ $documentUrl }}" target="_blank">{{ $isAr ? 'معاينة / تحميل' : 'Preview / Download' }}</a>@endif</div>
+                        <div class="border-bottom py-2"><strong>{{ $document->document_type }}</strong><div><span class="sanad-badge">{{ $isAr ? 'موثق' : 'Verified' }}</span>@if($document->approved_at)<small class="sanad-muted ml-2">{{ $document->approved_at->format('Y-m-d H:i') }}</small>@endif</div>@if($documentUrl)<a href="{{ $documentUrl }}" target="_blank">{{ $isAr ? 'معاينة / تحميل' : 'Preview / Download' }}</a>@endif</div>
                     @empty
-                        <p class="sanad-muted">{{ $isAr ? 'لا توجد مستندات مرسلة.' : 'No submitted documents.' }}</p>
+                        <p class="sanad-muted">{{ $isAr ? 'لا توجد مستندات موثقة حتى الآن.' : 'No verified documents yet.' }}</p>
                     @endforelse
                 </div>
             </div>

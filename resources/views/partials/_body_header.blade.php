@@ -17,7 +17,7 @@
         'sanad.dashboard' => $isAr ? 'لوحة العمليات' : 'Operations dashboard',
         'sanad.requests.index' => $isAr ? 'طابور الطلبات' : 'Request queue',
         'sanad.requests.show' => $isAr ? 'تفاصيل الطلب' : 'Request detail',
-        'sanad.assignments.index' => $isAr ? 'مساحة الإسناد' : 'Assignment hub',
+        'sanad.assignments.index' => $isAr ? 'الإسناد والتوزيع' : 'Assignments',
         'sanad.documents.queue' => $isAr ? 'طابور المستندات' : 'Document queue',
         'sanad.chat.workspace' => $isAr ? 'مساحة المحادثات' : 'Chat workspace',
         'sanad.ai.index' => $isAr ? 'عمليات الذكاء الاصطناعي' : 'AI operations',
@@ -90,7 +90,7 @@
                     'message' => $buzz->message,
                     'created_at' => $buzz->created_at,
                     'unread' => $buzz->status === 'unread',
-                    'url' => route('customer-portal.requests.show', ['id' => $buzz->booking_id, 'buzz_id' => $buzz->id]).'#buzz-'.$buzz->id,
+                    'url' => route('customer-portal.messages', ['booking_id' => $buzz->booking_id, 'buzz_id' => $buzz->id]).'#buzz-'.$buzz->id,
                     'urgent' => true,
                 ];
             });

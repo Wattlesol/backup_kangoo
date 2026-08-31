@@ -31,13 +31,42 @@ class SettingController extends Controller
 
         if ($page == '') {
             if ($auth_user->hasAnyRole(['admin', 'demo_admin'])) {
-                $page = 'general-setting';
+                $page = 'mobile-hero';
             } else {
                 $page = 'profile_form';
             }
         }
 
-        return view('setting.index', compact('page', 'pageTitle', 'auth_user'));
+        $heroSlider = \App\Models\Slider::firstOrNew([]);
+        $services = \App\Models\Service::where('status', 1)->where('service_type', 'service')->pluck('name', 'id');
+
+        return view('setting.index', compact('page', 'pageTitle', 'auth_user', 'heroSlider', 'services'));
+    }
+
+    public function saveMobileHero(Request $request)
+    {
+        if (demoUserPermission()) {
+            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        }
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'hero_image' => 'nullable|image|mimes:jpg,jpeg,png,webp,svg|max:10240',
+        ]);
+
+        $slider = \App\Models\Slider::firstOrNew(['id' => $request->id]);
+        $slider->title = $request->title;
+        $slider->type = 'service';
+        $slider->type_id = $request->type_id ?? (\App\Models\Service::where('status', 1)->value('id') ?? 1);
+        $slider->status = (int) ($request->status ?? 1);
+        $slider->description = $request->description;
+        $slider->save();
+
+        if ($request->hasFile('hero_image')) {
+            storeMediaFile($slider, $request->file('hero_image'), 'slider_image');
+        }
+
+        return redirect()->route('setting.index')->withSuccess(app()->getLocale() === 'ar' ? 'تم تحديث الصورة البارزة لتطبيق الجوال بنجاح' : 'Mobile app hero image and banner updated successfully.');
     }
 
     /*ajax show layout data*/

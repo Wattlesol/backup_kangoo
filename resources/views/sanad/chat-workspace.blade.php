@@ -410,7 +410,7 @@
                                     @forelse($buzz->replies as $reply)
                                         <div><strong>{{ optional($reply->sender)->display_name ?: $roleLabel($reply->sender_role) }}</strong>{{ $reply->message }}</div>
                                     @empty
-                                        <small>No reply yet.</small>
+                                        <small>{{ $isAr ? 'لم يتم الرد بعد.' : 'No reply yet.' }}</small>
                                     @endforelse
                                 </div>
                                 @if(!$isCustomer && $buzz->action_type === 'chat_assignment_accept' && $buzz->status === 'unread' && (int) $buzz->recipient_id === (int) auth()->id())
@@ -419,11 +419,11 @@
                                         <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check mr-1"></i> Accept</button>
                                     </form>
                                 @endif
-                                @if($isCustomer && $buzz->status === 'unread')
-                                    <form method="POST" action="{{ route('customer-portal.requests.buzz.reply', [$selectedBooking->id, $buzz->id]) }}" class="mt-2 d-flex gap-2 align-items-center">
+                                @if($isCustomer && $buzz->replies->isEmpty())
+                                    <form method="POST" action="{{ route('customer-portal.requests.buzz.reply', [$selectedBooking->id, $buzz->id]) }}" class="buzz-reply-form mt-2 d-flex gap-2 align-items-center">
                                         @csrf
-                                        <input name="message" class="form-control form-control-sm" placeholder="Reply to this buzz..." required>
-                                        <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-reply mr-1"></i> Reply</button>
+                                        <input name="message" class="form-control form-control-sm" placeholder="{{ $isAr ? 'اكتب ردك على التنبيه...' : 'Reply to this Buzz...' }}" maxlength="3000" required>
+                                        <button type="submit" class="btn btn-sm btn-danger text-nowrap"><i class="fas fa-reply mr-1"></i>{{ $isAr ? 'رد' : 'Reply' }}</button>
                                     </form>
                                 @endif
                             </article>
@@ -744,6 +744,8 @@
             .message-links { display: flex; gap: 6px; margin-top: 6px; font-size: 11px; opacity: .78; }
             .event-card { align-self: center; width: min(620px, 88%); background: #fff; border: 1px solid #e5e9f2; border-left: 3px solid #64748b; border-radius: 10px; padding: 9px 11px; font-size: 13px; }
             .event-card.buzz { border-left-color: #ef4444; }
+            .event-card.buzz > p { padding: 8px 10px; border-radius: 8px; background: #fff7ed; color: #7c2d12; font-weight: 600; line-height: 1.55; }
+            .buzz-reply-form input { min-width: 0; }
             .event-card.document { border-left-color: #0ea5e9; }
             .event-card.ai-handover { border-left-color: #6366f1; background: #f8faff; }
             .document-deadline { display: inline-flex; align-items: center; gap: 3px; color: #b42318; background: #fff1f3; border: 1px solid #ffd5da; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 700; }
@@ -1132,15 +1134,20 @@
                         if (items && items.length) {
                             items.forEach(function (item) {
                                 if (item.type === 'buzz') {
-                                    html += '<article class="event-card buzz" data-event-type="buzz"><div class="event-head"><strong>' + escapeHtml(item.priority) + ' Buzz</strong><span>Target: ' + escapeHtml(item.recipient_role) + ' · ' + escapeHtml(item.status) + '</span></div><p>' + escapeHtml(item.message) + '</p><div class="event-replies">';
+                                    var buzzNumericId = String(item.id || '').replace('buzz-', '');
+                                    var highlightedBuzz = new URL(window.location.href).searchParams.get('buzz_id');
+                                    html += '<article id="' + escapeHtml(item.id || '') + '" class="event-card buzz' + (highlightedBuzz === buzzNumericId ? ' highlight' : '') + '" data-event-type="buzz"><div class="event-head"><strong>' + escapeHtml(item.priority) + ' Buzz</strong><span>Target: ' + escapeHtml(item.recipient_role) + ' · ' + escapeHtml(item.status) + '</span></div><p>' + escapeHtml(item.message) + '</p><div class="event-replies">';
                                     if (item.replies && item.replies.length) {
                                         item.replies.forEach(function (reply) { html += '<div><strong>' + escapeHtml(reply.sender) + '</strong>' + escapeHtml(reply.message) + '</div>'; });
                                     } else {
-                                        html += '<small>No reply yet.</small>';
+                                        html += '<small>' + (isArabic ? 'لم يتم الرد بعد.' : 'No reply yet.') + '</small>';
                                     }
                                     html += '</div>';
                                     if (item.can_accept && item.accept_url) {
                                         html += '<form class="buzz-accept-form mt-2" action="' + escapeHtml(item.accept_url) + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check mr-1"></i> Accept</button></form>';
+                                    }
+                                    if (composer && composer.dataset.isCustomer === '1' && item.can_reply && item.reply_url) {
+                                        html += '<form method="POST" action="' + escapeHtml(item.reply_url) + '" class="buzz-reply-form mt-2 d-flex gap-2 align-items-center"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input name="message" class="form-control form-control-sm" maxlength="3000" placeholder="' + (isArabic ? 'اكتب ردك على التنبيه...' : 'Reply to this Buzz...') + '" required><button type="submit" class="btn btn-sm btn-danger text-nowrap"><i class="fas fa-reply mr-1"></i>' + (isArabic ? 'رد' : 'Reply') + '</button></form>';
                                     }
                                     html += '</article>';
                                 } else if (item.type === 'document') {
@@ -1168,9 +1175,12 @@
                         } else {
                             if (snapshot.buzz_alerts && snapshot.buzz_alerts.length) {
                                 snapshot.buzz_alerts.forEach(function (buzz) {
-                                    html += '<article class="event-card buzz" data-event-type="buzz"><div class="event-head"><strong>' + escapeHtml(buzz.priority) + ' Buzz</strong><span>' + escapeHtml(buzz.recipient_role) + ' · ' + escapeHtml(buzz.status) + '</span></div><p>' + escapeHtml(buzz.message) + '</p>';
+                                    html += '<article id="buzz-' + escapeHtml(buzz.id) + '" class="event-card buzz" data-event-type="buzz"><div class="event-head"><strong>' + escapeHtml(buzz.priority) + ' Buzz</strong><span>' + escapeHtml(buzz.recipient_role) + ' · ' + escapeHtml(buzz.status) + '</span></div><p>' + escapeHtml(buzz.message) + '</p>';
                                     if (buzz.can_accept && buzz.accept_url) {
                                         html += '<form class="buzz-accept-form mt-2" action="' + escapeHtml(buzz.accept_url) + '"><input type="hidden" name="_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check mr-1"></i> Accept</button></form>';
+                                    }
+                                    if (composer && composer.dataset.isCustomer === '1' && buzz.can_reply && buzz.reply_url) {
+                                        html += '<form method="POST" action="' + escapeHtml(buzz.reply_url) + '" class="buzz-reply-form mt-2 d-flex gap-2 align-items-center"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input name="message" class="form-control form-control-sm" maxlength="3000" placeholder="' + (isArabic ? 'اكتب ردك على التنبيه...' : 'Reply to this Buzz...') + '" required><button type="submit" class="btn btn-sm btn-danger text-nowrap"><i class="fas fa-reply mr-1"></i>' + (isArabic ? 'رد' : 'Reply') + '</button></form>';
                                     }
                                     html += '</article>';
                                 });
@@ -1226,7 +1236,7 @@
                         var url = new URL(shell.dataset.snapshotUrl, window.location.origin);
                         url.searchParams.set('booking_id', bookingId);
                         var currentUrl = new URL(window.location.href);
-                        ['action_state', 'search'].forEach(function (key) {
+                        ['action_state', 'search', 'buzz_id'].forEach(function (key) {
                             if (currentUrl.searchParams.has(key)) url.searchParams.set(key, currentUrl.searchParams.get(key));
                         });
                         return url.toString();
