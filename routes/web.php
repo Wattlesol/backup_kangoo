@@ -85,7 +85,6 @@ Route::group(['prefix' => 'auth'], function() {
 
 // General logout routes for direct access (both GET and POST)
 Route::match(['get', 'post'], '/logout-direct', [AuthenticatedSessionController::class, 'destroy'])
-    ->middleware('auth')
     ->name('logout.direct');
 
 Route::get('lang/{locale}', [HomeController::class,'lang'])->name('switch-language');

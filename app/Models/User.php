@@ -30,7 +30,7 @@ class User extends Authenticatable implements HasMedia
         'social_image','is_available','designation','last_online_time',
         'known_languages','skills','description','why_choose_me','is_email_verified','language','language_option',
         'sanad_job_title','sanad_department','sanad_employee_status','sanad_permissions','sanad_permission_matrix',
-        'sanad_working_hours','sanad_daily_capacity','sanad_quality_score','sanad_sla_compliance_rate','sanad_acceptance_rate','sanad_cancellation_rate','sanad_average_completion_minutes'
+        'sanad_working_hours','sanad_work_schedule','sanad_daily_capacity','sanad_quality_score','sanad_sla_compliance_rate','sanad_acceptance_rate','sanad_cancellation_rate','sanad_average_completion_minutes'
     ];
 
     /**
@@ -66,6 +66,7 @@ class User extends Authenticatable implements HasMedia
         'is_email_verified'    => 'integer',
         'sanad_permissions'    => 'array',
         'sanad_permission_matrix' => 'array',
+        'sanad_work_schedule' => 'array',
         'sanad_daily_capacity' => 'integer',
         'sanad_quality_score' => 'decimal:2',
         'sanad_sla_compliance_rate' => 'decimal:2',
@@ -73,6 +74,70 @@ class User extends Authenticatable implements HasMedia
         'sanad_cancellation_rate' => 'decimal:2',
         'sanad_average_completion_minutes' => 'decimal:2',
     ];
+
+    public function isScheduledToWorkAt($dateTime = null): bool
+    {
+        $schedule = $this->sanad_work_schedule;
+        if (empty($schedule)) {
+            return true;
+        }
+
+        $moment = $dateTime instanceof \Carbon\CarbonInterface
+            ? $dateTime->copy()
+            : \Carbon\Carbon::parse($dateTime ?: 'now');
+        $day = (int) $moment->dayOfWeek;
+        $startDay = (int) ($schedule['start_day'] ?? 0);
+        $endDay = (int) ($schedule['end_day'] ?? 4);
+        $worksToday = $startDay <= $endDay
+            ? $day >= $startDay && $day <= $endDay
+            : $day >= $startDay || $day <= $endDay;
+
+        if (!$worksToday) {
+            return false;
+        }
+
+        $startTime = $schedule['start_time'] ?? '09:00';
+        $endTime = $schedule['end_time'] ?? '17:00';
+        $shiftStart = $moment->copy()->setTimeFromTimeString($startTime);
+        $shiftEnd = $moment->copy()->setTimeFromTimeString($endTime);
+
+        return $moment->betweenIncluded($shiftStart, $shiftEnd);
+    }
+
+    public function scheduledDailyHours(): float
+    {
+        $schedule = $this->sanad_work_schedule;
+        if (empty($schedule)) {
+            return 0;
+        }
+
+        $start = \Carbon\Carbon::createFromFormat('H:i', $schedule['start_time'] ?? '09:00');
+        $end = \Carbon\Carbon::createFromFormat('H:i', $schedule['end_time'] ?? '17:00');
+
+        return max(0, round($start->diffInMinutes($end) / 60, 2));
+    }
+
+    public function dailyAvailableCapacity($dateTime = null): int
+    {
+        $moment = $dateTime instanceof \Carbon\CarbonInterface
+            ? $dateTime->copy()
+            : \Carbon\Carbon::parse($dateTime ?: 'now');
+
+        if (!$this->isScheduledToWorkAt($moment) || $this->sanad_employee_status !== 'available') {
+            return 0;
+        }
+
+        $capacity = max((int) ($this->sanad_daily_capacity ?: 1), 1);
+        $assignedToday = Booking::whereHas('handymanAdded', function ($query) {
+                $query->where('handyman_id', $this->id);
+            })
+            ->whereDate('assigned_at', $moment->toDateString())
+            ->whereNotIn('sanad_stage', ['completed', 'closed'])
+            ->where('status', '!=', 'cancelled')
+            ->count();
+
+        return max(0, $capacity - $assignedToday);
+    }
 
     protected static function boot(){
         parent::boot();

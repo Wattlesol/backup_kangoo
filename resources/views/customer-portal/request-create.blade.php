@@ -21,7 +21,7 @@
                     @endif
                 </div>
                 <div class="col-md-6 form-group"><label>{{ app()->getLocale() === "ar" ? "الوقت المتوقع للإنجاز" : "Estimated Completion" }}</label><input class="sanad-form-control" value="{{ optional($selectedService)->estimated_completion_time ?? '-' }}" disabled></div>
-                <div class="col-md-12 form-group"><label>{{ app()->getLocale() === "ar" ? "المعلومات المطلوبة" : "Required Information" }}</label><textarea class="sanad-form-control" name="description" rows="4" placeholder="{{ app()->getLocale() === "ar" ? "أضف أي تفاصيل أو متطلبات خاصة بهذه الخدمة" : "Add information required for this service" }}"></textarea></div>
+                <div class="col-md-12 form-group"><label>{{ app()->getLocale() === "ar" ? "معلومات إضافية (اختياري)" : "Additional Information (Optional)" }}</label><textarea class="sanad-form-control" name="description" rows="4" placeholder="{{ app()->getLocale() === "ar" ? "أضف أي تعليمات أو ملاحظات ترغب في مشاركتها حول طلبك" : "Add any instructions or notes you would like to share about your request" }}"></textarea></div>
             </div>
             <h5 class="mt-3">{{ app()->getLocale() === "ar" ? "رفع المستندات المطلوبة" : "Upload Required Documents" }}</h5>
             <div class="row">

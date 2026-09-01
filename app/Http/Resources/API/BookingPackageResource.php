@@ -15,6 +15,9 @@ class BookingPackageResource extends JsonResource
      */
     public function toArray($request)
     {
+        if (!$this->resource) {
+            return [];
+        }
         $service_id = PackageServiceMapping::where('service_package_id',$this->service_package_id)->pluck('service_id');
         return [
             'id'=> $this->id,

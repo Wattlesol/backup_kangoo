@@ -239,10 +239,12 @@ class ServiceAddonController extends Controller
      * @param  \App\Models\ServiceAddon  $serviceAddon
      * @return \Illuminate\Http\Response
      */
-    public function edit(ServiceAddon $serviceAddon)
+    public function edit($id)
     {
         $this->ensureSanadCatalogAdmin(request());
-        return redirect()->route('serviceaddon.create', ['id' => $serviceAddon->id]);
+        ServiceAddon::findOrFail($id);
+
+        return $this->create(request()->merge(['id' => $id]));
     }
 
     /**

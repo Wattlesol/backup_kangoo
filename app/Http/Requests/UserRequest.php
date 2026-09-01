@@ -9,6 +9,22 @@ use Illuminate\Support\Facades\DB;
 
 class UserRequest extends FormRequest
 {
+    protected function prepareForValidation()
+    {
+        if ($this->input('user_type') !== 'handyman' || $this->filled('country_id')) {
+            return;
+        }
+
+        $saudiCountryId = DB::table('countries')
+            ->where('code', 'SA')
+            ->orWhere('name', 'Saudi Arabia')
+            ->value('id');
+
+        if ($saudiCountryId) {
+            $this->merge(['country_id' => $saudiCountryId]);
+        }
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -72,6 +88,11 @@ class UserRequest extends FormRequest
                 'module_permissions' => 'nullable|array',
                 'module_permissions.*' => 'nullable|array',
                 'sanad_working_hours' => 'nullable|string|max:255',
+                'sanad_work_schedule' => 'required_if:user_type,handyman|array',
+                'sanad_work_schedule.start_day' => 'required_if:user_type,handyman|integer|between:0,6',
+                'sanad_work_schedule.end_day' => 'required_if:user_type,handyman|integer|between:0,6',
+                'sanad_work_schedule.start_time' => 'required_if:user_type,handyman|date_format:H:i',
+                'sanad_work_schedule.end_time' => 'required_if:user_type,handyman|date_format:H:i|after:sanad_work_schedule.start_time',
                 'sanad_daily_capacity' => 'nullable|integer|min:0|max:100',
                 'skills' => 'nullable|string',
                 'partner_verification_document_ids' => 'nullable|array',

@@ -4,7 +4,7 @@
 {{ Form::open(['route' => ['serviceaddon.destroy', $serviceaddon->id], 'method' => 'delete', 'data--submit'=>'serviceaddon'.$serviceaddon->id, 'style' => 'margin:0;display:inline;']) }}
 @if(auth()->user()->hasAnyRole(['admin','provider','demo_admin']))
 <div class="quick-table-actions" style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
-    <a href="{{ route('serviceaddon.create', ['id' => $serviceaddon->id]) }}" 
+    <a href="{{ route('serviceaddon.edit', $serviceaddon->id) }}"
        class="quick-action-btn quick-action-btn-edit" 
        title="{{ __('messages.update_form_title',['form'=> __('messages.service_addon')]) }}"
        style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--quick-shell-line); color: var(--quick-blue); background: var(--quick-shell-surface); text-decoration: none; transition: all .15s ease;">

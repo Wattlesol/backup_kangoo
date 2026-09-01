@@ -38,24 +38,34 @@
                                 <small class="help-block with-errors text-danger"></small>
                             </div>
 
-                           <div class="form-group col-md-6">
-                                {{ Form::label('category_ids', $isAr ? 'عرض حسب الفئات' : 'Show For Categories', ['class' => 'form-control-label']) }}
-                               {{ Form::select('category_ids[]', $categories, $selectedCategoryIds, [
-                                   'class' => 'form-control select2js',
-                                   'multiple' => 'multiple',
-                                    'data-placeholder' => $isAr ? 'اختر فئة واحدة أو أكثر' : 'Select one or more categories',
-                               ]) }}
-                                <small class="help-block text-muted">{{ $isAr ? 'اتركه فارغاً ليظهر لجميع الفئات.' : 'Leave empty to avoid category targeting.' }}</small>
-                           </div>
+                           <div class="col-12 mb-3">
+                               <section class="quick-addon-availability" aria-labelledby="addon-availability-title">
+                                   <div class="quick-addon-availability-copy">
+                                       <strong id="addon-availability-title">{{ $isAr ? 'توفر الخدمة الإضافية' : 'Add-on availability' }}</strong>
+                                       <span>{{ $isAr ? 'تظهر الخدمة الإضافية فقط أثناء طلب خدمة مؤهلة، ولا تظهر أبداً كمنتج مستقل للعميل.' : 'This add-on is shown only while a customer orders an eligible service. It is never offered as a standalone product.' }}</span>
+                                   </div>
+                                   <div class="row">
+                                       <div class="form-group col-md-6 mb-md-0">
+                                           {{ Form::label('service_ids', $isAr ? 'الخدمات المرتبطة' : 'Linked services', ['class' => 'form-control-label']) }}
+                                           {{ Form::select('service_ids[]', $services, old('service_ids', $selectedServiceIds), [
+                                               'class' => 'form-control select2js',
+                                               'multiple' => 'multiple',
+                                               'data-placeholder' => $isAr ? 'اختر الخدمات التي يمكنها عرض هذه الإضافة' : 'Select services that can offer this add-on',
+                                           ]) }}
+                                           <small class="help-block text-muted">{{ $isAr ? 'يمكنك تغيير الخدمات المرتبطة في أي وقت. اتركها فارغة فقط إذا كانت الإضافة متاحة مع كل الخدمات.' : 'Change these links at any time. Leave empty only when the add-on is valid with every service.' }}</small>
+                                       </div>
 
-                           <div class="form-group col-md-6">
-                                {{ Form::label('service_ids', $isAr ? 'عرض حسب الخدمات' : 'Show For Services', ['class' => 'form-control-label']) }}
-                               {{ Form::select('service_ids[]', $services, $selectedServiceIds, [
-                                   'class' => 'form-control select2js',
-                                   'multiple' => 'multiple',
-                                    'data-placeholder' => $isAr ? 'اختر خدمة واحدة أو أكثر' : 'Select one or more services',
-                               ]) }}
-                                <small class="help-block text-muted">{{ $isAr ? 'إذا كان كلا الحقلين فارغين، فستظهر هذه الخدمة الإضافية لجميع الخدمات.' : 'If both fields are empty, this add-on appears for all services.' }}</small>
+                                       <div class="form-group col-md-6 mb-0">
+                                           {{ Form::label('category_ids', $isAr ? 'فئات الخدمات المرتبطة (اختياري)' : 'Linked service categories (optional)', ['class' => 'form-control-label']) }}
+                                           {{ Form::select('category_ids[]', $categories, old('category_ids', $selectedCategoryIds), [
+                                               'class' => 'form-control select2js',
+                                               'multiple' => 'multiple',
+                                               'data-placeholder' => $isAr ? 'اختر فئات الخدمات المؤهلة' : 'Select eligible service categories',
+                                           ]) }}
+                                           <small class="help-block text-muted">{{ $isAr ? 'استخدم هذا الخيار لإتاحة الإضافة لجميع الخدمات ضمن فئات محددة.' : 'Use this to offer the add-on with every service inside selected categories.' }}</small>
+                                       </div>
+                                   </div>
+                               </section>
                            </div>
 
                             <div class="form-group col-md-4">
@@ -103,5 +113,24 @@
     </div>
 </div>
 
+
+@push('styles')
+<style>
+    .quick-addon-availability {
+        border: 1px solid var(--quick-shell-line);
+        border-radius: 16px;
+        padding: 18px;
+        background: color-mix(in srgb, var(--quick-blue) 4%, var(--quick-shell-surface));
+    }
+    .quick-addon-availability-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 16px;
+    }
+    .quick-addon-availability-copy strong { color: var(--quick-shell-ink); font-size: 15px; }
+    .quick-addon-availability-copy span { color: var(--quick-shell-muted); font-size: 12px; line-height: 1.6; }
+</style>
+@endpush
 
 </x-master-layout>

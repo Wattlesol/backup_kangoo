@@ -1,5 +1,6 @@
 /* Quick Portal Shell & Dashboard Design System */
-:root {
+:root,
+html[data-quick-theme="light"] {
   --quick-header: 76px;
   --quick-sidebar: 284px;
   --quick-sidebar-collapsed: 78px;
@@ -12,8 +13,7 @@
   --quick-navy: #0f2933;
 }
 
-[data-quick-theme="dark"],
-.quick-theme-dark {
+html[data-quick-theme="dark"] {
   --quick-shell-bg: #07111f;
   --quick-shell-surface: #0a1626;
   --quick-shell-ink: #f8fbff;
@@ -59,6 +59,9 @@ body.quick-shell-active #loading {
 .quick-shell-brand {
   width: 250px;
   flex: 0 0 auto;
+}
+.quick-shell-brand .quick-brand-copy {
+  color: var(--quick-shell-ink);
 }
 .quick-shell-context {
   display: flex;
@@ -1381,4 +1384,3 @@ body.quick-shell-active .table-responsive {
 .quick-bulk-apply-btn:not(:disabled):hover {
   background: #1455d9;
 }
-

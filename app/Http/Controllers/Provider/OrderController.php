@@ -147,7 +147,10 @@ class OrderController extends Controller
             ->findOrFail($id);
 
         $pageTitle = (app()->getLocale() === 'ar' ? 'طلب مسند #' : 'Assigned Order #') . $booking->quick_reference;
-        $employees = $this->employeesQuery()->get();
+        $currentlyAssignedIds = $booking->handymanAdded->pluck('handyman_id')->map(fn ($id) => (int) $id);
+        $employees = $this->employeesQuery()->get()->filter(function ($employee) use ($currentlyAssignedIds) {
+            return $employee->isScheduledToWorkAt(now()) || $currentlyAssignedIds->contains((int) $employee->id);
+        })->values();
         $recommendations = $this->employeeRecommendations($booking, $employees);
         $workflowTemplates = SanadPartnerWorkflowTemplate::with(['steps', 'serviceLinks.service'])
             ->where('provider_id', auth()->id())
@@ -225,7 +228,9 @@ class OrderController extends Controller
             'workflow_template_id' => 'nullable|integer',
         ]);
 
-        $allowed = $this->employeesQuery()->pluck('id')->map(fn ($id) => (int) $id);
+        $allowed = $this->employeesQuery()->get()
+            ->filter(fn ($employee) => $employee->dailyAvailableCapacity(now()) > 0)
+            ->pluck('id')->map(fn ($id) => (int) $id);
         $employeeIds = collect($request->handyman_id ?: [])->map(fn ($id) => (int) $id)->filter()->unique()->values();
         if ($employeeIds->diff($allowed)->isNotEmpty()) {
             return redirect()->back()->withErrors('One or more selected employees cannot be assigned to this order.');
@@ -619,14 +624,14 @@ class OrderController extends Controller
     private function employeeRecommendations(Booking $booking, $employees)
     {
         return $employees->map(function ($employee) use ($booking) {
-            $active = Booking::whereHas('handymanAdded', fn ($query) => $query->where('handyman_id', $employee->id))
-                ->whereNotIn('sanad_stage', ['completed', 'closed'])
-                ->count();
             $capacity = max((int) ($employee->sanad_daily_capacity ?: 1), 1);
+            $availableCapacity = $employee->dailyAvailableCapacity(now());
+            $active = max(0, $capacity - $availableCapacity);
             $skills = collect(json_decode($employee->skills ?: '[]', true) ?: []);
             $serviceSkills = collect(optional($booking->service)->required_employee_skills ?: []);
             $skillScore = $serviceSkills->isEmpty() ? 20 : $serviceSkills->intersect($skills)->count() * 20;
-            $availabilityScore = ($employee->sanad_employee_status === 'available' || $employee->is_available) ? 20 : 0;
+            $isOnShift = $employee->isScheduledToWorkAt(now());
+            $availabilityScore = $isOnShift && ($employee->sanad_employee_status === 'available' || $employee->is_available) ? 20 : 0;
             $workloadScore = max(0, 20 - (($active / $capacity) * 20));
             $qualityScore = min(20, ((float) $employee->sanad_quality_score / 100) * 20);
             $slaScore = min(20, ((float) $employee->sanad_sla_compliance_rate / 100) * 20);
@@ -635,6 +640,9 @@ class OrderController extends Controller
             $employee->recommendation_breakdown = [
                 'skills' => round($skillScore, 2),
                 'availability' => round($availabilityScore, 2),
+                'is_on_shift' => $isOnShift,
+                'scheduled_daily_hours' => $employee->scheduledDailyHours(),
+                'available_capacity_today' => $availableCapacity,
                 'workload' => round($workloadScore, 2),
                 'quality' => round($qualityScore, 2),
                 'sla' => round($slaScore, 2),

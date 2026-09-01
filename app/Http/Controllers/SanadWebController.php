@@ -2739,15 +2739,21 @@ class SanadWebController extends Controller
                 });
             }
 
-            return $query->get();
+            return $query->get()->filter(function ($employee) use ($assignedEmployeeIds) {
+                return $employee->dailyAvailableCapacity(now()) > 0 || in_array($employee->id, $assignedEmployeeIds);
+            })->values();
         }
 
         if ($user->hasRole('provider')) {
-            return $query->where('provider_id', $user->id)->get();
+            return $query->where('provider_id', $user->id)->get()
+                ->filter(fn ($employee) => $employee->dailyAvailableCapacity(now()) > 0 || in_array($employee->id, $assignedEmployeeIds))
+                ->values();
         }
 
         if ($user->hasRole('handyman')) {
-            return $query->where('id', $user->id)->get();
+            return $query->where('id', $user->id)->get()
+                ->filter(fn ($employee) => $employee->dailyAvailableCapacity(now()) > 0)
+                ->values();
         }
 
         return collect();
@@ -2772,7 +2778,9 @@ class SanadWebController extends Controller
             })
             ->orderBy('display_name')
             ->orderBy('email')
-            ->get();
+            ->get()
+            ->filter(fn ($employee) => $employee->dailyAvailableCapacity(now()) > 0)
+            ->values();
     }
 
     public function assignableChatTargets(Booking $booking)

@@ -241,6 +241,22 @@ class HandymanController extends Controller
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $saudiCountryId = \App\Models\Country::where('code', 'SA')->orWhere('name', 'Saudi Arabia')->value('id');
+        if ($saudiCountryId) {
+            $data['country_id'] = $saudiCountryId;
+        }
+        $workSchedule = $request->input('sanad_work_schedule', []);
+        if (!empty($workSchedule)) {
+            $dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            $data['sanad_work_schedule'] = $workSchedule;
+            $data['sanad_working_hours'] = sprintf(
+                '%s-%s, %s-%s',
+                $dayLabels[(int) $workSchedule['start_day']] ?? 'Sun',
+                $dayLabels[(int) $workSchedule['end_day']] ?? 'Thu',
+                \Carbon\Carbon::createFromFormat('H:i', $workSchedule['start_time'])->format('g:i A'),
+                \Carbon\Carbon::createFromFormat('H:i', $workSchedule['end_time'])->format('g:i A')
+            );
+        }
         $data['skills'] = $this->linesToString($request->skills);
         $data['sanad_employee_status'] = $request->sanad_employee_status ?: 'available';
         if (!$request->filled('designation') && $request->filled('sanad_job_title')) {

@@ -39,21 +39,37 @@
 
 <script>
     // Theme Management
+    let quickThemeIsSyncing = false;
+
     function applyQuickTheme(theme) {
         theme = theme === 'dark' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-quick-theme', theme);
-        document.documentElement.setAttribute('data-bs-theme', theme);
+        const root = document.documentElement;
+        quickThemeIsSyncing = true;
+        root.setAttribute('data-quick-theme', theme);
+        root.setAttribute('data-bs-theme', theme);
+        root.classList.toggle('quick-theme-dark', theme === 'dark');
+        root.classList.toggle('quick-theme-light', theme === 'light');
         const body = document.body;
-        if (theme === 'dark') {
-            body.classList.add('quick-theme-dark');
-            body.classList.remove('quick-theme-light');
-        } else {
-            body.classList.remove('quick-theme-dark');
-            body.classList.add('quick-theme-light');
-        }
+        body.classList.toggle('quick-theme-dark', theme === 'dark');
+        body.classList.toggle('quick-theme-light', theme === 'light');
+        // Keep the legacy theme manager classes in lockstep. Several older
+        // dashboard styles still use these selectors for inherited text color.
+        body.classList.toggle('dark', theme === 'dark');
+        body.classList.toggle('dark-theme', theme === 'dark');
+        body.classList.toggle('light-theme', theme === 'light');
         localStorage.setItem('quick_theme', theme);
         localStorage.setItem('data-bs-theme', theme);
         document.cookie = 'quick_theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
+        document.cookie = 'data-bs-theme=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
+        document.cookie = 'theme_mode=' + theme + '; path=/; max-age=31536000; SameSite=Lax';
+
+        // The legacy manager owns the role-specific dynamic stylesheet. Update
+        // its internal state too so it cannot restore the previous mode later.
+        if (window.themeManager && window.themeManager.currentMode !== theme) {
+            window.themeManager.currentMode = theme;
+            window.themeManager.loadThemeCSS();
+            window.themeManager.applyThemeClasses();
+        }
         const sun = document.getElementById('quick-theme-sun');
         const moon = document.getElementById('quick-theme-moon');
         if (sun && moon) {
@@ -65,10 +81,14 @@
                 moon.style.display = 'block';
             }
         }
+        document.dispatchEvent(new CustomEvent('quick-theme-changed', {
+            detail: { mode: theme }
+        }));
+        requestAnimationFrame(function () { quickThemeIsSyncing = false; });
     }
 
     function toggleQuickTheme() {
-        const isDark = document.body.classList.contains('quick-theme-dark');
+        const isDark = document.documentElement.getAttribute('data-quick-theme') === 'dark';
         applyQuickTheme(isDark ? 'light' : 'dark');
     }
 
@@ -91,6 +111,32 @@
     // Initialize saved settings
     const savedTheme = localStorage.getItem('quick_theme') || localStorage.getItem('data-bs-theme') || @json($quickTheme);
     applyQuickTheme(savedTheme);
+
+    // Some legacy dashboard scripts update Bootstrap's theme attribute directly.
+    // Keep the Quick shell palette and body classes synchronized with those changes.
+    const quickThemeObserver = new MutationObserver(function (mutations) {
+        if (quickThemeIsSyncing) return;
+        for (const mutation of mutations) {
+            if (mutation.attributeName === 'data-bs-theme') {
+                const nextTheme = document.documentElement.getAttribute('data-bs-theme');
+                if (nextTheme === 'light' || nextTheme === 'dark') {
+                    applyQuickTheme(nextTheme);
+                }
+                break;
+            }
+        }
+    });
+    quickThemeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-bs-theme']
+    });
+
+    window.addEventListener('storage', function (event) {
+        if ((event.key === 'quick_theme' || event.key === 'data-bs-theme') &&
+            (event.newValue === 'light' || event.newValue === 'dark')) {
+            applyQuickTheme(event.newValue);
+        }
+    });
 
     if (localStorage.getItem('quick_sidebar_collapsed') === 'true') {
         document.body.classList.add('is-collapsed');

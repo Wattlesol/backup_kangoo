@@ -50,7 +50,7 @@
                         {{ Form::hidden('type', old('type', $servicedata->type ?: 'fixed')) }}
                         {{ Form::hidden('price', old('price', $servicedata->price ?: $servicedata->service_fee ?: 0), ['id' => 'price']) }}
                         <div class="row">
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-4 service-attachment-field">
                                 {{ Form::label('name_en', __('messages.english_name') . ' <span class="text-danger">*</span>', ['class' => 'form-control-label'], false) }}
                                 {{ Form::text('name_en', old('name_en', $servicedata->name_en ?: $servicedata->name), array_merge(['placeholder' => $isAr ? 'اسم الخدمة بالإنجليزية' : 'Service name in English', 'class' => 'form-control', 'required'], $sanadReadOnly)) }}
                                 <small class="help-block with-errors text-danger"></small>
@@ -387,10 +387,12 @@
     @section('bottom_script')
     <style>
         .sanad-service-master-data {
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
-            background: #f8f9fb;
-            padding: 16px;
+            border: 1px solid var(--quick-shell-line, rgba(0, 0, 0, 0.08));
+            border-radius: 12px;
+            background: var(--quick-shell-bg, #f8f9fb);
+            color: var(--quick-shell-ink, #0a1626);
+            padding: 18px;
+            transition: background-color .2s ease, border-color .2s ease, color .2s ease;
         }
         .sanad-service-master-data .gap-2 {
             gap: 8px;
@@ -412,6 +414,92 @@
         }
         .sanad-service-instructions textarea {
             min-height: 72px;
+        }
+        .service-attachment-field .custom-file-label {
+            overflow: hidden;
+            border-color: var(--quick-shell-line, #d8e4f2);
+            background: var(--quick-shell-surface, #fff);
+            color: var(--quick-shell-muted, #6a7c93);
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .service-attachment-field .custom-file-label::after {
+            border-inline-start: 1px solid var(--quick-shell-line, #d8e4f2);
+            background: var(--quick-shell-bg, #f5f8fc);
+            color: var(--quick-shell-ink, #0a1626);
+        }
+        .quick-theme-dark .service-attachment-field .custom-file-label {
+            border-color: #34506a !important;
+            background: #0b1f31 !important;
+            color: #b7c6d8 !important;
+        }
+        .quick-theme-dark .service-attachment-field .custom-file-label::after {
+            border-color: #34506a !important;
+            background: #163149 !important;
+            color: #f3f7fc !important;
+        }
+        .quick-theme-dark .sanad-service-master-data {
+            border-color: #29465f;
+            background: #102638;
+            color: #f3f7fc;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+        }
+        .quick-theme-dark .sanad-service-master-data h5,
+        .quick-theme-dark .sanad-service-master-data .form-control-label,
+        .quick-theme-dark .sanad-service-master-data th {
+            color: #f3f7fc !important;
+        }
+        .quick-theme-dark .sanad-service-master-data .text-muted,
+        .quick-theme-dark .sanad-service-master-data small {
+            color: #9fb1c5 !important;
+        }
+        .quick-theme-dark .sanad-service-master-data .badge-light {
+            border: 1px solid #3a5771;
+            background: #18354d;
+            color: #dce8f4;
+        }
+        .quick-theme-dark .sanad-service-master-data .table-responsive {
+            border: 1px solid #29465f;
+            border-radius: 10px;
+            background: #0b1f31;
+        }
+        .quick-theme-dark .sanad-service-master-data .table {
+            color: #dce8f4 !important;
+            background: transparent !important;
+        }
+        .quick-theme-dark .sanad-service-master-data .table thead th {
+            border-color: #34506a !important;
+            background: #173149 !important;
+        }
+        .quick-theme-dark .sanad-service-master-data .table td {
+            border-color: #29465f !important;
+            background: transparent !important;
+        }
+        .quick-theme-dark .sanad-service-master-data .form-control,
+        .quick-theme-dark .sanad-service-master-data select,
+        .quick-theme-dark .sanad-service-master-data textarea {
+            border-color: #34506a !important;
+            background: #0a1c2b !important;
+            color: #eef5fc !important;
+        }
+        .quick-theme-dark .sanad-service-master-data .form-control::placeholder,
+        .quick-theme-dark .sanad-service-master-data textarea::placeholder {
+            color: #71879d !important;
+            opacity: 1;
+        }
+        .quick-theme-dark .sanad-service-master-data .form-control:focus,
+        .quick-theme-dark .sanad-service-master-data select:focus,
+        .quick-theme-dark .sanad-service-master-data textarea:focus {
+            border-color: #4f8cff !important;
+            box-shadow: 0 0 0 3px rgba(79, 140, 255, .16) !important;
+        }
+        .quick-theme-dark .sanad-service-master-data .form-control[readonly],
+        .quick-theme-dark .sanad-service-master-data .form-control:disabled,
+        .quick-theme-dark .sanad-service-master-data select:disabled,
+        .quick-theme-dark .sanad-service-master-data textarea[readonly] {
+            background: #142b3d !important;
+            color: #94a8bb !important;
+            opacity: 1;
         }
     </style>
     <script type="text/javascript">

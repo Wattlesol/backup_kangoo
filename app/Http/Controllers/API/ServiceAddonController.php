@@ -12,13 +12,13 @@ class ServiceAddonController extends Controller
 {
     //
     public function getServiceAddonList(Request $request){
+        $request->validate([
+            'service_id' => 'required|integer|exists:services,id',
+        ]);
 
         $serviceaddon = ServiceAddon::with(['media', 'categories', 'services'])->ServiceAddon();
-
-        if ($request->filled('service_id')) {
-            $service = Service::findOrFail($request->service_id);
-            $serviceaddon->forService($service);
-        }
+        $service = Service::findOrFail($request->service_id);
+        $serviceaddon->forService($service);
 
         $per_page = config('constant.PER_PAGE_LIMIT');
         if( $request->has('per_page') && !empty($request->per_page)){

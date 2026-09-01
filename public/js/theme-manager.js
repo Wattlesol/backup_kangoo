@@ -166,6 +166,23 @@ class ThemeManager {
         document.addEventListener('theme-update-available', () => {
             this.handleThemeUpdate();
         });
+
+        // The authenticated Quick shell is the canonical theme controller.
+        // Mirror its changes so navigation and delayed script initialization
+        // cannot restore a stale legacy mode or stylesheet.
+        document.addEventListener('quick-theme-changed', (event) => {
+            const mode = event.detail?.mode;
+            if ((mode !== 'light' && mode !== 'dark') || mode === this.currentMode) {
+                return;
+            }
+
+            this.currentMode = mode;
+            document.body.classList.toggle('dark', mode === 'dark');
+            this.loadThemeCSS();
+            this.applyThemeClasses();
+            this.setCookie('data-bs-theme', mode, 365);
+            this.setCookie('theme_mode', mode, 365);
+        });
     }
 
     /**

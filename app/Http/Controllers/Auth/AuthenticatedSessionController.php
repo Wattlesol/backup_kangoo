@@ -65,7 +65,13 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request)
     {
-        Auth::guard('web')->logout();
+        try {
+            Auth::guard('web')->logout();
+        } catch (\Throwable $exception) {
+            // Logging out must remain available during a transient database outage.
+            // Invalidating the session below removes the authenticated session key.
+            report($exception);
+        }
 
         $request->session()->invalidate();
 

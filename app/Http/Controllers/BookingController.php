@@ -55,12 +55,10 @@ class BookingController extends Controller
             ->whereIn('status', ['pending', 'accept', 'accepted', 'in_progress', 'assigned_to_partner', 'assigned_to_employee'])
             ->firstOrFail();
 
-        $addon = ServiceAddon::where('id', $request->service_addon_id)
-            ->where('status', 1)
-            ->where(function ($query) use ($booking) {
-                $query->whereNull('service_id')
-                    ->orWhere('service_id', $booking->service_id);
-            })
+        $service = Service::findOrFail($booking->service_id);
+        $addon = ServiceAddon::query()
+            ->where('id', $request->service_addon_id)
+            ->forService($service)
             ->firstOrFail();
 
         $mapping = BookingServiceAddonMapping::firstOrCreate(
@@ -326,6 +324,8 @@ class BookingController extends Controller
             'address' => 'nullable|string|max:2000',
             'description' => 'nullable|string|max:4000',
             'sanad_priority' => 'nullable|in:normal,high,urgent',
+            'service_addon_id' => 'nullable|array',
+            'service_addon_id.*' => 'integer|distinct|exists:service_addons,id',
         ]);
 
         $data = $request->all();
@@ -347,6 +347,23 @@ class BookingController extends Controller
             $data['date'] = isset($request->date) ? date('Y-m-d H:i:s',strtotime($request->date)) : date('Y-m-d H:i:s');
         }
         $service_data = Service::find($data['service_id']);
+        $requestedAddonIds = collect($request->input('service_addon_id', []))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        if ($requestedAddonIds->isNotEmpty()) {
+            $eligibleAddonIds = ServiceAddon::query()
+                ->forService($service_data)
+                ->whereIn('id', $requestedAddonIds)
+                ->pluck('id');
+
+            if ($eligibleAddonIds->count() !== $requestedAddonIds->count()) {
+                throw ValidationException::withMessages([
+                    'service_addon_id' => 'One or more selected add-ons are not available for this service.',
+                ]);
+            }
+        }
         $customer = $this->resolveBookingCustomer($request);
         $plainPassword = $customer->wasRecentlyCreated ? $customer->plain_password_for_admin ?? null : null;
         $data['customer_id'] = $customer->id;
@@ -420,9 +437,9 @@ class BookingController extends Controller
             $result->addressAdded()->create($booking_address_data);
         }
 
-        if ($request->has('service_addon_id') && is_array($request->service_addon_id) != null) {
-            foreach ($request->service_addon_id as $serviceaddon) {
-                $booking_serviceaddon_mapping = ServiceAddon::find($serviceaddon);
+        if ($requestedAddonIds->isNotEmpty()) {
+            foreach ($requestedAddonIds as $serviceaddon) {
+                $booking_serviceaddon_mapping = ServiceAddon::query()->forService($service_data)->find($serviceaddon);
                 if ($booking_serviceaddon_mapping) {
                     $booking_serviceaddon_data = [
                         'booking_id' => $result->id,
