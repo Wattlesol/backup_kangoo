@@ -25,9 +25,7 @@ php artisan view:clear >/dev/null 2>&1 || true
 
 kangoo-restore-database
 
-if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
-  php artisan migrate --force
-fi
+php artisan migrate --force >/dev/null 2>&1 || true
 
 if [ "${RUN_SEEDERS:-false}" = "true" ]; then
   php artisan db:seed --force

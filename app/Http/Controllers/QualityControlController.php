@@ -61,9 +61,9 @@ class QualityControlController extends Controller
             ];
         }
 
-        $title = "مراقبه الجوده";
-        $route = route('time.create');
-        $providers = User::where('user_type', 'provider')->orderBy('display_name')->get();
+       $title = "مراقبه الجوده";
+        $route = '#';
+       $providers = User::where('user_type', 'provider')->orderBy('display_name')->get();
         return view('QualityControl.index',compact('data','title','route', 'sanadComplaints', 'sanadComplaintStats', 'providers'));
     }
 
