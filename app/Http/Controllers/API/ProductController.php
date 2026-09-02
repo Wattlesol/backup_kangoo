@@ -95,25 +95,17 @@ class ProductController extends Controller
             $latitude = $request->get('latitude');
             $longitude = $request->get('longitude');
 
-            $product = Product::with(['category', 'creator', 'variants', 'storeProducts.store'])
+            $product = Product::with(['category', 'creator', 'provider', 'variants'])
                              ->active()
                              ->findOrFail($id);
 
+            // In single store architecture, get the main store
+            $mainStore = Store::where('store_type', 'main')->active()->first();
+
             // Get available stores for this product
-            $availableStores = collect();
-            
-            if ($latitude && $longitude) {
-                $availableStores = Store::nearby($latitude, $longitude, 50)
-                                       ->approved()
-                                       ->active()
-                                       ->whereHas('storeProducts', function($q) use ($id) {
-                                           $q->where('product_id', $id)
-                                             ->where('is_available', true);
-                                       })
-                                       ->with(['storeProducts' => function($q) use ($id) {
-                                           $q->where('product_id', $id);
-                                       }])
-                                       ->get();
+            $availableStores = [];
+            if ($mainStore) {
+                $availableStores = [$mainStore];
             }
 
             $response = [
@@ -191,20 +183,11 @@ class ProductController extends Controller
                 $query->byCategory($categoryId);
             }
 
-            // Location-based filtering
+            // In single store architecture, location filtering is simplified
+            // All products are available in the main store
             if ($latitude && $longitude) {
-                $nearbyStores = Store::nearby($latitude, $longitude, 50)
-                                   ->approved()
-                                   ->active()
-                                   ->pluck('id');
-
-                $query->where(function($q) use ($nearbyStores) {
-                    $q->where('created_by_type', 'admin')
-                      ->orWhereHas('storeProducts', function($sq) use ($nearbyStores) {
-                          $sq->whereIn('store_id', $nearbyStores)
-                             ->where('is_available', true);
-                      });
-                });
+                // Could add provider location filtering here if needed
+                // For now, all products are available regardless of location
             }
 
             $products = $query->orderBy('name')
@@ -264,6 +247,72 @@ class ProductController extends Controller
 
         } catch (\Exception $e) {
             return comman_message_response(__('messages.failed'));
+        }
+    }
+
+    /**
+     * Get products for authenticated provider (mobile-optimized)
+     */
+    public function providerProducts(Request $request)
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user || $user->user_type !== 'provider') {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Unauthorized access'
+                ], 403);
+            }
+
+            $perPage = $request->get('per_page', 15);
+            $categoryId = $request->get('category_id');
+            $status = $request->get('status');
+            $search = $request->get('search');
+
+            $query = Product::with(['category', 'variants'])
+                           ->where('created_by', $user->id)
+                           ->where('created_by_type', 'provider');
+
+            // Apply filters
+            if ($categoryId) {
+                $query->byCategory($categoryId);
+            }
+
+            if ($status !== null) {
+                $query->where('status', $status);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
+
+            $products = $query->orderBy('created_at', 'desc')
+                            ->paginate($perPage);
+
+            $response = [
+                'status' => true,
+                'data' => ProductResource::collection($products),
+                'message' => 'Provider products retrieved successfully'
+            ];
+
+            return comman_custom_response($response);
+
+        } catch (\Exception $e) {
+            \Log::error('Provider products API error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'user_id' => auth()->id()
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed to retrieve products'
+            ], 500);
         }
     }
 }

@@ -1,6 +1,8 @@
 <x-master-layout>
     <div class="container-fluid">
         <div class="row">
+            @include('dashboard.partials.sanad-operations')
+            @include('dashboard.partials.sanad-customer-overview')
             <div class="col-lg-12 col-md-12">
               <div class="card">
                 <div class="card-body">
@@ -85,4 +87,3 @@
 </script>
     @endsection
 </x-master-layout>
-

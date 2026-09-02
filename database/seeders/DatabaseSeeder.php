@@ -39,6 +39,7 @@ class DatabaseSeeder extends Seeder
             SlidersTableSeeder::class,
             PostRequestStatusesTableSeeder::class,
             NotificationTemplateSeeder::class,
+            EcommerceNotificationSeeder::class,
             BookingsTableSeeder::class,
             BookingRatingsTableSeeder::class,
             BookingActivitiesTableSeeder::class,

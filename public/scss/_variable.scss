@@ -98,6 +98,30 @@ $purple-800:  #550495 !default;
 
 $skyblue-300:    #aad7ff !default;
 $skyblue:        #158df7 !default;
+
+// Brand Colors - Light Theme
+$brand-yellow-light: #F0B521 !default;
+$brand-red-light:    #EF5535 !default;
+$brand-green-light:  #2DB665 !default;
+$brand-blue-light:   #4A75FB !default;
+
+// Brand Colors - Dark Theme
+$brand-yellow-dark:  #8D6710 !default;
+$brand-red-dark:     #9B1F0B !default;
+$brand-green-dark:   #005F2D !default;
+$brand-blue-dark:    #004CB2 !default;
+
+// Role-based Primary Colors - Light Theme
+$customer-primary-light:  $brand-blue-light !default;
+$admin-primary-light:     $primary !default; // Keep current purple
+$handyman-primary-light:  $brand-green-light !default;
+$provider-primary-light:  $brand-red-light !default;
+
+// Role-based Primary Colors - Dark Theme
+$customer-primary-dark:   $brand-blue-dark !default;
+$admin-primary-dark:      #4153b3 !default; // Keep current purple dark
+$handyman-primary-dark:   $brand-green-dark !default;
+$provider-primary-dark:   $brand-red-dark !default;
 $skyblue-800:    #117ede !default;
 
 $pinkdark-300:    #FFCCEF !default;

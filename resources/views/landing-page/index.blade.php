@@ -1,8 +1,108 @@
 @extends('landing-page.layouts.default')
 @section('content')
+@php
+    $isArabic = app()->getLocale() === 'ar';
+    $landingText = [
+        'section_1.title' => 'منصتك الفورية لإنجاز خدمات كويك',
+        'section_1.description' => 'أنجز معاملاتك وخدماتك الحكومية والتجارية بثقة. كويك يربطك بشركاء وموظفين مختصين لمتابعة الطلبات وتنفيذها بكفاءة.',
+        'section_2.title' => 'التصنيفات الأكثر طلبًا',
+        'section_3.title' => 'الخدمات الأعلى تقييمًا',
+        'section_4.title' => 'الخدمات المميزة',
+        'section_5.title' => 'انضم إلى شبكة شركاء كويك',
+        'section_5.description' => 'وسع أعمالك مع كويك وقدم خدمات موثوقة للعملاء من خلال منصة منظمة وآمنة لإدارة الطلبات والتنفيذ.',
+        'section_6.title' => 'تابع خدماتك عبر تطبيق كويك',
+        'section_6.description' => 'استعرض الخدمات، تابع حالة الطلبات، واستقبل التحديثات المهمة مباشرة من التطبيق.',
+        'section_7.title' => 'تشغيل منظم وتجربة تنفيذ احترافية',
+        'section_7.description' => 'تدفق عمل واضح يجمع التخطيط، الإسناد، المتابعة، والتحديثات الفورية لضمان تنفيذ الطلبات بجودة عالية.',
+        'section_8.title' => 'مشاهداتك الأخيرة وما يناسبك',
+        'section_8.description' => 'ارجع بسرعة إلى الخدمات التي اطلعت عليها وتابع الخيارات الأنسب لاحتياجك.',
+        'section_9.title' => 'عملاؤنا يثقون بنا',
+        'section_9.description' => 'ثقة مستمرة من العملاء بفضل متابعة دقيقة، تنفيذ موثوق، وتجربة خدمة واضحة من البداية إلى النهاية.',
+        'package_list' => 'باقات الخدمات',
+        'special_offer' => 'عرض خاص',
+        'buy_now' => 'اشترِ الآن',
+        'top_rated_services_section' => 'قسم الخدمات الأعلى تقييمًا',
+        'featured_services_section' => 'قسم الخدمات المميزة',
+        'recently_viewed_services_section' => 'قسم الخدمات التي شاهدتها مؤخرًا',
+        'rating' => 'التقييم',
+        'or' => 'أو',
+    ];
+
+    $landingValue = function (string $section, string $field) use ($sectionData, $isArabic, $landingText) {
+        if ($isArabic) {
+            return data_get($sectionData, "$section.{$field}_ar")
+                ?? $landingText["$section.$field"]
+                ?? data_get($sectionData, "$section.$field");
+        }
+
+        return data_get($sectionData, "$section.$field");
+    };
+
+    $landingLabel = fn (string $key) => $isArabic ? ($landingText[$key] ?? $key) : null;
+@endphp
 
 <!-- Banner -->
-<div class="padding-top-bottom-90 bg-light">
+<section class="quick-landing-hero" id="home" aria-labelledby="quick-hero-title">
+    <div class="quick-hero-orbit" aria-hidden="true"></div>
+    <div class="quick-hero-copy">
+        <div class="quick-hero-badge">
+            <x-quick-icon name="bot" :size="18" />
+            {{ $isArabic ? 'مساعد كويك • خدمات تفهمك' : 'Quick Assistant • Services that understand' }}
+        </div>
+        <h1 id="quick-hero-title">
+            {{ $isArabic ? 'المعاملة الأذكى.' : 'The smarter service.' }}
+            <span>{{ $isArabic ? 'تبدأ بسؤال.' : 'Starts with a question.' }}</span>
+        </h1>
+        <form class="quick-hero-search" action="{{ route('service.list') }}" method="get">
+            <x-quick-icon name="search" :size="18" />
+            <input type="search" name="search" aria-label="{{ $isArabic ? 'ابحث عن خدمة' : 'Search services' }}" placeholder="{{ $isArabic ? 'ما الخدمة التي تريد إنجازها؟' : 'What service do you need?' }}">
+            <button type="submit">{{ $isArabic ? 'بحث' : 'Search' }}</button>
+        </form>
+        <p>{{ $isArabic ? 'مساعد ذكي يفهم احتياجك، يجهّز خطواتك، ويتابع معاملتك حتى الإنجاز — بسرعة ووضوح.' : 'An intelligent assistant that understands your need, prepares the steps, and follows the request through to completion.' }}</p>
+        <div class="quick-store-buttons" dir="ltr">
+            <a href="#app" aria-label="Download on the App Store"><x-quick-icon name="apple" :size="25" /><span><small>Download on the</small><strong>App Store</strong></span></a>
+            <a href="#app" aria-label="Get it on Google Play"><x-quick-icon name="play" :size="24" /><span><small>GET IT ON</small><strong>Google Play</strong></span></a>
+        </div>
+        <div class="quick-app-proof">
+            <span><strong>4.9</strong> {{ $isArabic ? 'تقييم التطبيق' : 'app rating' }}</span><i></i>
+            <span><strong>+12K</strong> {{ $isArabic ? 'معاملة منجزة' : 'completed' }}</span><i></i>
+            <span><strong>24/7</strong> {{ $isArabic ? 'متابعة فورية' : 'live updates' }}</span>
+        </div>
+    </div>
+    <div class="quick-device-stage" aria-label="{{ $isArabic ? 'تطبيق كويك على ثلاث شاشات' : 'Quick app shown on three devices' }}">
+        <div class="quick-phone quick-phone-side quick-phone-service">
+            <div class="quick-phone-island"></div><small>9:41</small>
+            <div class="quick-phone-card"><x-quick-icon name="car" :size="44" /></div>
+            <span>{{ $isArabic ? 'خدمة موثّقة' : 'Verified service' }}</span>
+            <h3>{{ $isArabic ? 'تجديد رخصة القيادة' : 'Driving licence renewal' }}</h3>
+            <p>{{ $isArabic ? 'ننجز إجراءات التجديد ونتابع الطلب.' : 'We manage renewal through issuance.' }}</p>
+            <button type="button">{{ $isArabic ? 'ابدأ الخدمة' : 'Start service' }}</button>
+        </div>
+        <div class="quick-phone quick-phone-main">
+            <div class="quick-phone-island"></div><small>9:41</small>
+            <div class="quick-phone-greeting">{{ $isArabic ? 'مرحباً، فيصل' : 'Hello, Faisal' }} <x-quick-icon name="check" :size="15" /></div>
+            <div class="quick-phone-feature"><span>{{ $isArabic ? 'أنجزها مع كويك' : 'Get it done with Quick' }}</span><strong>{{ $isArabic ? 'كل خدماتك في مكان واحد' : 'All your services in one place' }}</strong><x-quick-icon name="bot" :size="31" /></div>
+            <div class="quick-phone-search">{{ $isArabic ? 'ابحث عن خدمة…' : 'Find a service…' }} <x-quick-icon name="search" :size="14" /></div>
+            <h3>{{ $isArabic ? 'خدمات كويك' : 'Quick services' }}</h3>
+            <div class="quick-phone-tiles"><span><x-quick-icon name="car" :size="18" /></span><span><x-quick-icon name="file" :size="18" /></span><span><x-quick-icon name="shield" :size="18" /></span></div>
+        </div>
+        <div class="quick-phone quick-phone-side quick-phone-track">
+            <div class="quick-phone-island"></div><small>9:41</small>
+            <div class="quick-track-icon"><x-quick-icon name="bot" :size="25" /></div>
+            <span>{{ $isArabic ? 'مساعد كويك يتابع طلبك' : 'Quick Assistant is following up' }}</span>
+            <h3>{{ $isArabic ? 'متوقع الإنجاز غداً' : 'Expected tomorrow' }}</h3>
+            <p>#QK-2841</p>
+            <ol><li>{{ $isArabic ? 'تم استلام الطلب' : 'Request received' }}</li><li>{{ $isArabic ? 'مراجعة المستندات' : 'Document review' }}</li><li>{{ $isArabic ? 'الإصدار والتسليم' : 'Issuance and delivery' }}</li></ol>
+        </div>
+    </div>
+</section>
+
+@include('landing-page.partials._quick_sections')
+
+{{-- Retained temporarily for administrative content migration; superseded by the approved Quick composition. --}}
+@if(false)
+
+<div class="padding-top-bottom-90 bg-light d-none legacy-landing-banner" aria-hidden="true">
     <div class="container-fluid">
        <div class="row align-items-center">
           <div class="col-xl-6">
@@ -11,7 +111,7 @@
                 <div class="iq-title-box mb-5">
                     <div class="iq-title-box">
                         <h2 class="text-capitalize line-count-3">
-                            {{ $sectionData['section_1']['title']}}
+                            {{ $landingValue('section_1', 'title') }}
                             <!-- Your Instant Connection to Right -->
                             <span class="highlighted-text">
                             <span class="highlighted-text-swipe"></span>
@@ -29,11 +129,11 @@
                             </span>
                         </h2>
                         <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">
-                            {{ $sectionData['section_1']['description']}}
+                            {{ $landingValue('section_1', 'description') }}
                         </p>
                     </div>
                 </div>
-                <location-search :user_id="{{json_encode($auth_user_id)}}" :postjobservice="{{$postjobservice}}"></location-search>
+                <location-search :user_id="{{json_encode($auth_user_id)}}" :postjobservice="{{json_encode($postjobservice)}}"></location-search>
                @endif
 
              </div>
@@ -44,8 +144,8 @@
                <div class="swiper-wrapper">
                      @foreach(($sectionData['section_1']['provider_id'] ?? []) as $providerId)
                      @php
-                        $user = App\Models\User::with('getServiceRating')->where('user_type', 'provider')->where('id',$providerId)->where('status',1)->first();
-                        $providers_service_rating = (isset($user->getServiceRating) && count($user->getServiceRating) > 0 ) ? (float) number_format(max($user->getServiceRating->avg('rating'),0), 2) : 0;
+                        $user = App\Models\User::where('user_type', 'provider')->where('id',$providerId)->where('status',1)->first();
+                        $providers_service_rating = 0; // Simplified to avoid complex queries
                      @endphp
                      @if($user)
                      <div class="swiper-slide">
@@ -60,7 +160,8 @@
                                                 <span class="desc text-white d-flex align-items-center justify-content-center mt-2">
                                                    <div class="d-flex align-items-center gap-1 flex-wrap">
                                                          <div class="star-rating">
-                                                            <rating-component :readonly="true" :showrating="false" :ratingvalue="{{ $providers_service_rating }}" />
+                                                            {{-- <rating-component :readonly="true" :showrating="false" :ratingvalue="{{json_encode($providers_service_rating)}}" /> --}}
+                                                            <span>{{ $isArabic ? $landingText['rating'] : 'Rating' }}: {{ round($providers_service_rating,1) }}</span>
                                                          </div>
                                                          <h6 class="m-0 font-size-12 rating-text lh-1">({{ round($providers_service_rating,1) }})</h6>
                                                    </div>
@@ -89,7 +190,7 @@
     <div class="container">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="iq-title-box mb-0">
-                <h3 class="text-capitalize line-count-1">{{ $sectionData['section_2']['title'] }}
+                <h3 class="text-capitalize line-count-1">{{ $landingValue('section_2', 'title') }}
                     <div class="highlighted-text">
                         <span class="highlighted-text-swipe"></span>
                         <span class="highlighted-image">
@@ -103,7 +204,7 @@
                 </h3>
             </div>
             <a href="{{ route('category.list') }}"
-                class="btn btn-link p-0 text-capitalize flex-shrink-0 font-size-14">{{__('messages.view_all')}}</a>
+                class="btn btn-link p-0 text-capitalize flex-shrink-0 font-size-14">{{ $isArabic ? 'عرض الكل' : 'View All' }}</a>
         </div>
         <category-section></category-section>
     </div>
@@ -117,7 +218,7 @@
             <div>
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="iq-title-box mb-0">
-                    <h3 class="text-capitalize line-count-1">{{ $sectionData['section_3']['title'] }}
+                    <h3 class="text-capitalize line-count-1">{{ $landingValue('section_3', 'title') }}
                     <div class="highlighted-text">
                         <span class="highlighted-text-swipe"></span>
                         <span class="highlighted-image">
@@ -130,10 +231,11 @@
                     </div>
                     </h3>
                 </div>
-                <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{__('messages.view_all')}}</a>
+                <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{ $isArabic ? 'عرض الكل' : 'View All' }}</a>
             </div>
 
-            <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'ac'"/>
+            {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'ac'"/> --}}
+            <div class="text-center p-4">{{ $isArabic ? $landingText['top_rated_services_section'] : 'Top Rated Services Section' }}</div>
             </div>
         @endif
 
@@ -142,7 +244,7 @@
                         <div>
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                 <div class="iq-title-box mb-0">
-                                    <h3 class="text-capitalize line-count-1">Packagee List
+                                    <h3 class="text-capitalize line-count-1">{{ $isArabic ? 'باقات الخدمات' : 'Service Bundles' }}
                                         <div class="highlighted-text">
                                             <span class="highlighted-text-swipe"></span>
                                             <span class="highlighted-image">
@@ -168,12 +270,18 @@
                                 <div class="card text-center iq-rmb-30">
                                     <div class="card-body position-relative">
                                         <!-- Special Offer Badge -->
-                                        <span class="badge bg-danger position-absolute top-0 start-0 m-2">Special Offer</span>
+                                        <span class="badge bg-danger position-absolute top-0 start-0 m-2">{{ $isArabic ? $landingText['special_offer'] : 'Special Offer' }}</span>
 
                                         <!-- Card Content -->
-                                        <h5 class="card-title">{{ $vaule->name }}</h5>
+                                        <h5 class="card-title">{{ $isArabic && $vaule->name_ar ? $vaule->name_ar : $vaule->name }}</h5>
                                         <p class="card-text">{{ $vaule->description }}</p>
-                                        <a href="{{ route('service-package.detail', $vaule->id) }}" class="btn btn-primary">Buy Now</a>
+                                        <div class="mb-3">
+                                            @if($vaule->original_price > $vaule->price)
+                                                <span class="text-muted text-decoration-line-through me-2">{{ getPriceFormat($vaule->original_price) }}</span>
+                                            @endif
+                                            <strong class="text-primary">{{ getPriceFormat($vaule->price) }}</strong>
+                                        </div>
+                                        <a href="{{ route('service-package.detail', $vaule->id) }}" class="btn btn-primary">{{ $isArabic ? $landingText['buy_now'] : 'Buy Now' }}</a>
                                     </div>
                                 </div>
                             </div>
@@ -190,7 +298,7 @@
             <div class="mt-5">
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div class="iq-title-box mb-0">
-                    <h3 class="text-capitalize line-count-1">{{ $sectionData['section_4']['title'] }}
+                    <h3 class="text-capitalize line-count-1">{{ $landingValue('section_4', 'title') }}
                         <div class="highlighted-text"><div class="swiper-pagination"></div>
                             <span class="highlighted-text-swipe"></span>
                             <span class="highlighted-image">
@@ -203,9 +311,10 @@
                         </div>
                     </h3>
                     </div>
-                    <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{__('messages.view_all')}}</a>
+                    <a href="{{ route('service.list') }}" class="btn btn-link p-0 flex-shrink-0">{{ $isArabic ? 'عرض الكل' : 'View All' }}</a>
                 </div>
-                <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'cleaning'"/>
+                {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'cleaning'"/> --}}
+                <div class="text-center p-4">{{ $isArabic ? $landingText['featured_services_section'] : 'Featured Services Section' }}</div>
             </div>
         @endif
     </div>
@@ -225,7 +334,7 @@
                         <div class="col-lg-2 col-md-none"></div>
                         <div class="col-lg-8 col-md-12">
                             <div class="iq-title-box text-center center">
-                                <h3 class="text-capitalize line-count-1">{{ $sectionData['title'] }}
+                                <h3 class="text-capitalize line-count-1">{{ $landingValue('section_8', 'title') }}
                                 <span class="highlighted-text">
                                     <span class="highlighted-text-swipe"></span>
                                     <span class="highlighted-image">
@@ -237,7 +346,7 @@
                                     </span>
                                 </span>
                                 </h3>
-                                <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $sectionData['section_8']['description'] }}</p>
+                                <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $landingValue('section_8', 'description') }}</p>
 
                             </div>
                         </div>
@@ -246,7 +355,8 @@
 
                     <div class="row">
                         <div class="col-12">
-                        <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'recently_view'"/>
+                        {{-- <service-slider-section :user_id="{{json_encode($auth_user_id)}}" :favourite="{{json_encode($favourite)}}" :type="'recently_view'"/> --}}
+                        <div class="text-center p-4">{{ $isArabic ? $landingText['recently_viewed_services_section'] : 'Recently Viewed Services Section' }}</div>
                         </div>
                     </div>
                 </div>
@@ -280,13 +390,13 @@
             <div class="col-md-2"></div>
                 <div class="col-lg-8 col-md-12">
                     <div class="iq-title-box mb-5 text-center px-3">
-                            <h2 class="text-capitalize line-count-2">{{ $sectionData['section_5']['title'] }}</h2>
-                            <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $sectionData['section_5']['description'] }}</p>
+                            <h2 class="text-capitalize line-count-2">{{ $landingValue('section_5', 'title') }}</h2>
+                            <p class="iq-title-desc line-count-3 text-body mt-3 mb-0">{{ $landingValue('section_5', 'description') }}</p>
                     </div>
                     <div class="text-center d-flex justify-content-center align-items-center pt-3 flex-column flex-md-row px-3">
                             <a class="bg-primary py-3 px-5 fw-bolder text-white rounded-3 letter-spacing-64"
                                 href="mailto:{{ $sectionData['section_5']['email'] }}">{{ $sectionData['section_5']['email'] }}</a>
-                            <span class="px-3">Or</span>
+                            <span class="px-3">{{ $isArabic ? $landingText['or'] : 'Or' }}</span>
                             <a href="tel:{{ $sectionData['section_5']['contact_number'] }}">
                                 <h6 class="text-decoration-underline">{{ $sectionData['section_5']['contact_number'] }}</h6>
                             </a>
@@ -322,7 +432,7 @@
        <div class="row">
             <div class="col-12">
                 <div class="iq-title-box text-center center mb-2">
-                    <h3 class="text-capitalize line-count-1">{{ $sectionData['section_9']['title'] }}
+                    <h3 class="text-capitalize line-count-1">{{ $landingValue('section_9', 'title') }}
                     <span class="highlighted-text">
                         <!-- <span class="highlighted-text-swipe">our trusted clients</span> -->
                         <span class="highlighted-image">
@@ -340,7 +450,8 @@
                 <div class="text-center mb-5">
                     <div class="d-inline-flex align-items-center flex-sm-row flex-column bg-body py-3 px-5 rounded-5 gap-2">
                         <div class="vertical-center lh-1">
-                            <rating-component :readonly="true" :showrating="false" :ratingvalue="{{$totalRating}}" />
+                            {{-- <rating-component :readonly="true" :showrating="false" :ratingvalue="{{json_encode($totalRating)}}" /> --}}
+                            <span>{{ $isArabic ? $landingText['rating'] : 'Rating' }}: {{ round($totalRating,1) }}</span>
                             {{-- {{>components/widgets/filter-rating rating="4"}} --}}
                         </div>
                         @if (isset($sectionData['section_9']['overall_rating']) && $sectionData['section_9']['overall_rating'] == 'on')
@@ -348,7 +459,7 @@
                         <h6>{{__('landingpage.overall_rating')}}</h6>
                         @endif
                     </div>
-                    <h6 class="mt-4"> {{ $sectionData['section_9']['description'] }}</h6>
+                    <h6 class="mt-4"> {{ $landingValue('section_9', 'description') }}</h6>
                 </div>
             </div>
             <div class="col-12">
@@ -373,8 +484,8 @@
                       <div class="row align-items-center">
                          <div class="col-lg-6 position-relative my-5">
                             <div class="iq-title-box">
-                               <h2 class="text-capitalize text-white line-count-2">{{ $sectionData['section_6']['title'] }}</h2>
-                               <p class="mt-3 mb-0 text-white line-count-3">{{ $sectionData['section_6']['description'] }}
+                               <h2 class="text-capitalize text-white line-count-2">{{ $landingValue('section_6', 'title') }}</h2>
+                               <p class="mt-3 mb-0 text-white line-count-3">{{ $landingValue('section_6', 'description') }}
                                </p>
                             </div>
                             <div class="d-flex align-items-center gap-3 flex-wrap">
@@ -428,7 +539,7 @@
         <div class="row align-items-center">
             <div class="col-lg-5">
                 <div class="iq-title-box mb-0">
-                    <h3 class="text-capitalize line-count-2">{{ $sectionData['section_7']['title'] }}
+                    <h3 class="text-capitalize line-count-2">{{ $landingValue('section_7', 'title') }}
                     <span class="highlighted-text">
                         <span class="highlighted-text-swipe"></span>
                         <span class="highlighted-image">
@@ -443,7 +554,7 @@
                 </div>
             </div>
             <div class="col-lg-7 mt-lg-0 mt-3">
-                <p class="m-0 line-count-3">{{ $sectionData['section_7']['description'] }}</p>
+                <p class="m-0 line-count-3">{{ $landingValue('section_7', 'description') }}</p>
             </div>
         </div>
         @php
@@ -466,8 +577,16 @@
                         <div class="mb-4 pb-4 border-bottom">
                             @include('landing-page.components.widgets.icon-box', [
                                 'iconboxNumber' => $i + 1,
-                                'iconboxTitle' => $sectionData['section_7']['subtitle'][$i],
-                                'iconboxDescription' => $sectionData['section_7']['subdescription'][$i]
+                                'iconboxTitle' => $isArabic
+                                    ? (data_get($sectionData, "section_7.subtitle_ar.$i") ?? ['الإدارة إلى الشريك', 'الشريك إلى الموظف', 'الموظف إلى العميل'][$i] ?? $sectionData['section_7']['subtitle'][$i])
+                                    : $sectionData['section_7']['subtitle'][$i],
+                                'iconboxDescription' => $isArabic
+                                    ? (data_get($sectionData, "section_7.subdescription_ar.$i") ?? [
+                                        'تتابع الإدارة طلبات العملاء وتنسق مع الشركاء لضمان تنفيذ الخدمة بنجاح.',
+                                        'ينسق الشريك الطلب مع الموظف المناسب ويتابع جودة التنفيذ.',
+                                        'ينفذ الموظف الطلب ويحدث الحالة حتى اكتمال الخدمة.'
+                                    ][$i] ?? $sectionData['section_7']['subdescription'][$i])
+                                    : $sectionData['section_7']['subdescription'][$i]
                             ])
                         </div>
                     @endfor
@@ -479,6 +598,7 @@
 @endif
 
 
+@endif
 @endsection
 @section('bottom_script')
 <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
@@ -533,14 +653,18 @@
                spaceBetween: swSpace["1500"],
             },
             };
+            // Check if we have enough slides for loop mode (need at least 6 slides for 3 visible)
+            var slideCount = slider.find('.swiper-slide').length;
+            var enableLoop = slideCount >= 6;
+
             var sw_config = {
-            loop: true,
+            loop: enableLoop,
             speed: 1000,
-            loopedSlides: 3,
+            loopedSlides: enableLoop ? 3 : 0,
             spaceBetween: 30,
             slidesPerView: 3,
             centeredSlides: false,
-            autoplay: true,
+            autoplay: slideCount > 1,
             virtualTranslate: false,
             navigation: {
                nextEl: navNext,

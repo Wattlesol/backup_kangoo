@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
@@ -37,6 +38,8 @@ use App\Http\Controllers\PlanController;
 use App\Http\Controllers\BankController;
 use App\Http\Controllers\PostJobRequestController;
 use App\Http\Controllers\ServicePackageController;
+use App\Http\Controllers\SanadWebController;
+use App\Http\Controllers\SanadCustomerPortalController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\BookingRatingController;
 use App\Http\Controllers\HandymanRatingController;
@@ -52,11 +55,9 @@ use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\OrderController;
-use App\Http\Controllers\Provider\StoreController as ProviderStoreController;
 use App\Http\Controllers\Provider\ProductController as ProviderProductController;
 use App\Http\Controllers\Provider\OrderController as ProviderOrderController;
 use App\Http\Controllers\Frontend\ProductController as FrontendProductController;
-use App\Http\Controllers\DynamicPricingController;
 use App\Http\Controllers\QualityControlController;
 
 /*
@@ -70,25 +71,144 @@ use App\Http\Controllers\QualityControlController;
 |
 */
 
-
-
 require __DIR__.'/auth.php';
 require __DIR__.'/frontend.php';
 
 Route::group(['prefix' => 'auth'], function() {
     Route::get('login', [HomeController::class, 'authLogin'])->name('auth.login');
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])->name('auth.login.post');
     Route::get('register', [HomeController::class, 'authRegister'])->name('auth.register');
     Route::get('recover-password', [HomeController::class, 'authRecoverPassword'])->name('auth.recover-password');
     Route::get('confirm-email', [HomeController::class, 'authConfirmEmail'])->name('auth.confirm-email');
     Route::get('lock-screen', [HomeController::class, 'authlockScreen'])->name('auth.lock-screen');
 });
 
+// General logout routes for direct access (both GET and POST)
+Route::match(['get', 'post'], '/logout-direct', [AuthenticatedSessionController::class, 'destroy'])
+    ->name('logout.direct');
+
 Route::get('lang/{locale}', [HomeController::class,'lang'])->name('switch-language');
 Route::get('/verify/{id}', [VerificationController::class, 'verify'])->name('verify');
+
+// Dynamic CSS for theme colors (public routes)
+Route::get('css/theme-colors.css', [\App\Http\Controllers\DynamicCssController::class, 'generateThemeCss'])->name('theme.css');
+Route::get('css/landing-theme.css', [\App\Http\Controllers\DynamicCssController::class, 'generateLandingCss'])->name('landing.theme.css');
+
+// Test route for theme colors (development only)
+Route::get('test-theme-colors', function() {
+    return view('test-theme-colors');
+});
+
+// Frontend E-commerce Routes (MUST be before admin routes to avoid conflicts)
+// Main Store Route (Unified Store)
+Route::get('store', [FrontendProductController::class, 'unifiedStore'])->name('store.unified');
+
+// Individual product and store pages
+Route::get('product/{slug}', [FrontendProductController::class, 'show'])->name('products.show');
+Route::get('store/{slug}', [FrontendProductController::class, 'storeShow'])->name('stores.show');
+
+// Legacy routes (kept for backward compatibility)
+Route::get('products', [FrontendProductController::class, 'index'])->name('products.index');
+Route::get('products/search', [FrontendProductController::class, 'search'])->name('products.search');
+Route::get('products/category/{slug}', [FrontendProductController::class, 'category'])->name('products.category');
+Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores.index');
+
+// AJAX endpoints for frontend
+Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
+Route::get('api/store', [FrontendProductController::class, 'getStores'])->name('api.store');
+
+// Cart functionality handled by FrontendProductController
+Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.cart');
+
+// Authenticated frontend routes
+Route::middleware('auth')->group(function () {
+    Route::get('checkout', [FrontendProductController::class, 'checkout'])->name('products.checkout');
+    Route::post('orders', [FrontendProductController::class, 'storeOrder'])->name('orders.store');
+    Route::get('order-success', [FrontendProductController::class, 'orderSuccess'])->name('products.order-success');
+    Route::get('my-order/{id}', [FrontendProductController::class, 'showOrder'])->name('customer.order.show');
+    Route::post('my-order/{id}/cancel', [FrontendProductController::class, 'cancelOrder'])->name('customer.order.cancel');
+});
 
 Route::group(['middleware' => ['auth', 'verified']], function()
 {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('sanad/dashboard', [SanadWebController::class, 'dashboard'])->name('sanad.dashboard');
+    Route::get('sanad/partner-performance', [SanadWebController::class, 'partnerPerformance'])->name('sanad.partner-performance');
+    Route::get('sanad/ai', fn () => redirect()->route('sanad.knowledge.index'))->name('sanad.ai.index');
+    Route::get('sanad/knowledge-base', [SanadWebController::class, 'aiConsole'])->name('sanad.knowledge.index');
+    Route::get('sanad/ai/escalations', [SanadWebController::class, 'aiEscalations'])->name('sanad.ai.escalations.index');
+    Route::post('sanad/ai/escalations/{id}/review', [SanadWebController::class, 'reviewAiEscalation'])->name('sanad.ai.escalations.review');
+    Route::delete('sanad/ai/escalations/{id}', [SanadWebController::class, 'deleteAiEscalation'])->name('sanad.ai.escalations.delete');
+    Route::post('sanad/ai/ask', [SanadWebController::class, 'askAi'])->name('sanad.ai.ask');
+    Route::get('sanad/ai/knowledge', fn () => redirect()->route('sanad.knowledge.index'));
+    Route::post('sanad/ai/knowledge', [SanadWebController::class, 'storeAiKnowledge'])->name('sanad.ai.knowledge.store');
+    Route::post('sanad/ai/knowledge/scrape-async', [SanadWebController::class, 'scrapeKnowledgeAsync'])->name('sanad.ai.knowledge.scrape-async');
+    Route::post('sanad/ai/knowledge/{id}/run-scrape', [SanadWebController::class, 'runKnowledgeScrape'])->name('sanad.ai.knowledge.run-scrape');
+    Route::get('sanad/ai/knowledge/{id}/status', [SanadWebController::class, 'knowledgeScrapeStatus'])->name('sanad.ai.knowledge.status');
+    Route::get('sanad/ai/knowledge/{id}', fn () => redirect()->route('sanad.knowledge.index'));
+    Route::post('sanad/ai/knowledge/{id}', [SanadWebController::class, 'updateAiKnowledge'])->name('sanad.ai.knowledge.update');
+    Route::delete('sanad/ai/knowledge/{id}', [SanadWebController::class, 'deleteAiKnowledge'])->name('sanad.ai.knowledge.delete');
+    Route::get('sanad/chat-workspace', [SanadWebController::class, 'chatWorkspace'])->name('sanad.chat.workspace');
+    Route::get('sanad/chat-workspace/snapshot', [SanadWebController::class, 'chatWorkspaceSnapshot'])->name('sanad.chat.workspace.snapshot');
+    Route::post('sanad/ai/review-examples/{id}/promote', [SanadWebController::class, 'promoteAiReviewExample'])->name('sanad.ai.review-examples.promote');
+    Route::get('sanad/requests', [SanadWebController::class, 'indexRequests'])->name('sanad.requests.index');
+    Route::get('sanad/assignments', [SanadWebController::class, 'assignments'])->name('sanad.assignments.index');
+    Route::post('sanad/assignments/{id}/confirm', [SanadWebController::class, 'confirmAssignment'])->name('sanad.assignments.confirm');
+    Route::get('sanad/requests/{id}', [SanadWebController::class, 'showRequest'])->name('sanad.requests.show');
+    Route::get('sanad/request-documents', [SanadWebController::class, 'documentQueue'])->name('sanad.documents.queue');
+    Route::post('sanad/partner-documents/{documentId}/review', [SanadWebController::class, 'reviewPartnerDocument'])->name('sanad.partner-documents.review');
+    Route::post('sanad/requests/{id}/actions', [SanadWebController::class, 'storeRequestAction'])->name('sanad.requests.actions.store');
+    Route::post('sanad/requests/{id}/employees', [SanadWebController::class, 'assignEmployees'])->name('sanad.requests.employees.assign');
+    Route::post('sanad/requests/{id}/lifecycle', [SanadWebController::class, 'updateRequestLifecycle'])->name('sanad.requests.lifecycle.update');
+    Route::post('sanad/requests/{id}/payment-status', [SanadWebController::class, 'updatePaymentStatus'])->name('sanad.requests.payment.update');
+    Route::post('sanad/requests/{id}/documents', [SanadWebController::class, 'storeDocument'])->name('sanad.requests.documents.store');
+    Route::post('sanad/requests/{id}/customer-documents', [SanadWebController::class, 'storeCustomerDocument'])->name('sanad.requests.customer-documents.store');
+    Route::post('sanad/requests/{id}/documents/{documentId}/approve', [SanadWebController::class, 'approveDocument'])->name('sanad.requests.documents.approve');
+    Route::post('sanad/requests/{id}/documents/{documentId}/review', [SanadWebController::class, 'reviewDocument'])->name('sanad.requests.documents.review');
+    Route::post('sanad/requests/{id}/buzz', [SanadWebController::class, 'storeBuzz'])->name('sanad.requests.buzz.store');
+    Route::post('sanad/requests/{id}/buzz/{alertId}/acknowledge', [SanadWebController::class, 'acknowledgeBuzz'])->name('sanad.requests.buzz.acknowledge');
+    Route::post('sanad/requests/{id}/chat-messages', [SanadWebController::class, 'storeChatMessage'])->name('sanad.requests.chat.store');
+    Route::post('sanad/requests/{id}/ai-first-responder', [SanadWebController::class, 'toggleAiFirstResponder'])->name('sanad.requests.ai-first-responder');
+    Route::post('sanad/requests/{id}/chat-assignment', [SanadWebController::class, 'assignChat'])->name('sanad.requests.chat-assignment');
+    Route::post('sanad/requests/{id}/chat-threads/{threadId}/read', [SanadWebController::class, 'markChatRead'])->name('sanad.requests.chat.read');
+    Route::post('sanad/requests/{id}/document-requests', [SanadWebController::class, 'createDocumentRequest'])->name('sanad.requests.document-requests.store');
+    Route::post('sanad/requests/{id}/document-requests/{documentRequestId}/upload', [SanadWebController::class, 'uploadDocumentRequest'])->name('sanad.requests.document-requests.upload');
+    Route::post('sanad/requests/{id}/document-requests/{documentRequestId}/review', [SanadWebController::class, 'reviewDocumentRequest'])->name('sanad.requests.document-requests.review');
+
+    Route::prefix('customer-dashboard')->name('customer-portal.')->group(function () {
+        Route::get('/', [SanadCustomerPortalController::class, 'dashboard'])->name('dashboard');
+        Route::get('catalog', [SanadCustomerPortalController::class, 'catalog'])->name('catalog');
+        Route::get('catalog/{service}', [SanadCustomerPortalController::class, 'service'])->name('catalog.show');
+        Route::get('requests/create', [SanadCustomerPortalController::class, 'createRequest'])->name('requests.create');
+        Route::post('requests', [SanadCustomerPortalController::class, 'storeRequest'])->name('requests.store');
+        Route::get('requests', [SanadCustomerPortalController::class, 'requests'])->name('requests.index');
+        Route::get('requests/{id}', [SanadCustomerPortalController::class, 'showRequest'])->name('requests.show');
+        Route::post('requests/{id}/documents', [SanadCustomerPortalController::class, 'uploadRequestDocument'])->name('requests.documents.store');
+        Route::post('requests/{id}/document-requests/{documentRequestId}', [SanadCustomerPortalController::class, 'uploadDocumentRequest'])->name('requests.document-requests.upload');
+        Route::post('requests/{id}/messages', [SanadCustomerPortalController::class, 'sendMessage'])->name('requests.messages.store');
+        Route::post('requests/{id}/buzz/{buzzId}/reply', [SanadCustomerPortalController::class, 'replyToBuzz'])->name('requests.buzz.reply');
+        Route::get('document-vault', [SanadCustomerPortalController::class, 'vault'])->name('vault');
+        Route::post('document-vault', [SanadCustomerPortalController::class, 'storeVaultDocument'])->name('vault.store');
+        Route::post('document-vault/analyze', [SanadCustomerPortalController::class, 'analyzeVaultDocument'])->name('vault.analyze');
+        Route::post('document-vault/confirm', [SanadCustomerPortalController::class, 'confirmVaultDocument'])->name('vault.confirm');
+        Route::post('document-vault/cancel-upload', [SanadCustomerPortalController::class, 'cancelVaultDocumentUpload'])->name('vault.cancel-upload');
+        Route::post('document-vault/{id}', [SanadCustomerPortalController::class, 'updateVaultDocument'])->name('vault.update');
+        Route::post('document-vault/{id}/reminder', [SanadCustomerPortalController::class, 'updateVaultReminder'])->name('vault.reminder.update');
+        Route::post('document-vault/{id}/delete', [SanadCustomerPortalController::class, 'deleteVaultDocument'])->name('vault.delete');
+        Route::get('messages', [SanadCustomerPortalController::class, 'messages'])->name('messages');
+        Route::get('messages/snapshot', [SanadCustomerPortalController::class, 'messagesSnapshot'])->name('messages.snapshot');
+        Route::get('notifications', [SanadCustomerPortalController::class, 'notifications'])->name('notifications');
+        Route::get('billing', [SanadCustomerPortalController::class, 'billing'])->name('billing');
+        Route::get('support', [SanadCustomerPortalController::class, 'support'])->name('support');
+        Route::post('support', [SanadCustomerPortalController::class, 'storeComplaint'])->name('support.store');
+        Route::get('ai', [SanadCustomerPortalController::class, 'ai'])->name('ai');
+        Route::post('ai', [SanadCustomerPortalController::class, 'askAi'])->name('ai.ask');
+        Route::post('ai/interactions/{id}/handover', [SanadCustomerPortalController::class, 'handleAiHandover'])->name('ai.handover');
+        Route::get('profile', [SanadCustomerPortalController::class, 'profile'])->name('profile');
+        Route::post('profile', [SanadCustomerPortalController::class, 'updateProfile'])->name('profile.update');
+        Route::post('profile/password', [SanadCustomerPortalController::class, 'updatePassword'])->name('profile.password');
+    });
+
     Route::group(['namespace' => '', 'middleware' => ['permission:permission list']], function () {
         Route::resource('permission',PermissionController::class);
         Route::get('permission/add/{type}',[PermissionController::class,'addPermission'])->name('permission.add');
@@ -109,7 +229,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::get('index_data',[CategoryController::class,'index_data'])->name('category.index_data');
         Route::post('category-bulk-action', [CategoryController::class, 'bulk_action'])->name('category.bulk-action');
         Route::post('category-action',[CategoryController::class, 'action'])->name('category.action');
-        Route::post('category/{id}', [CategoryController::class, 'destroy'])->name('category.destroy');
+        Route::post('category/{id}', [CategoryController::class, 'destroy'])->name('category.delete');
         Route::post('check-in-trash', [CategoryController::class, 'check_in_trash'])->name('check-in-trash');
 
     });
@@ -158,7 +278,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('handyman-change-password', [ HandymanController::class , 'changePassword'])->name('handyman.changepassword');
     Route::group(['middleware' => ['permission:handyman list']], function () {
         Route::resource('handyman', HandymanController::class);
-        Route::get('handyman/list/{status?}', [HandymanController::class,'index'])->name('handyman.pending');
+        Route::get('handyman/list/{status}', [HandymanController::class,'index'])->where('status', 'pending')->name('handyman.pending');
         Route::get('handyman-index-data',[HandymanController::class,'index_data'])->name('handyman.index_data');
         Route::post('handyman-bulk-action', [HandymanController::class, 'bulk_action'])->name('handyman.bulk-action');
         Route::get('handyman/approve/{id}',[ProviderController::class, 'approve'])->name('handyman.approve');
@@ -177,6 +297,8 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     });
 
     Route::group(['middleware' => ['permission:booking list']], function () {
+        Route::get('booking/export/{format}',[BookingController::class,'export'])->name('booking.export');
+        Route::get('booking/customer/{id}', [BookingController::class, 'customerDetails'])->name('booking.customer-details');
         Route::resource('booking', BookingController::class);
         Route::get('booking-index-data',[BookingController::class,'index_data'])->name('booking.index_data');
         Route::post('booking-bulk-action', [BookingController::class, 'bulk_action'])->name('booking.bulk-action');
@@ -193,7 +315,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('booking_car_data/{car_id}/{package_id}/{service_id}', [BookingController::class, 'booking_car_data'])->name('booking.booking_car_data');
         Route::post('booking_breaks_data/{package_id}/{service_id}', [BookingController::class, 'booking_breaks_data'])->name('booking.booking_breaks_data');
         Route::get('booking_breaks_data_with_out_Data/{package_id}/{service_id}', [BookingController::class, 'booking_breaks_data_with_out_Data'])->name('booking.booking_breaks_data_with_out_Data');
-        Route::get('Handyman_booking',[ServicePackageController::class,'Handyman_booking'])->name('servicepackage.Handyman_booking');
+        Route::get('Handyman_booking',[ServicePackageController::class,'Handyman_booking'])->name('servicepackage.Handyman_booking')->middleware('sanad.module:orders,read');
         Route::post('servicepackage/rate/{service_id}', [ServicePackageController::class,'rate'])->name('servicepackage.rate');
         Route::get('booking/view/rate/{service_id}', [ServicePackageController::class,'view_rate'])->name('servicepackage.rate_view');
         Route::post('user_booking_service/rate/{service_id}', [ServicePackageController::class,'user_booking_service'])->name('servicepackage.user_booking_service');
@@ -211,15 +333,12 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('proiver_booking_servicepackage/AssignHandyman/{booking_id?}', [ServicePackageController::class,'AssignHandyman'])->name('proiver_booking_servicepackage.AssignHandyman');
         Route::post('/proof-image-comment', [ServicePackageController::class, 'storeProofImageComment'])->name('proof_image_comment.store');
 
-
-
-
         Route::get('provider/show/complaint', [ServicePackageController::class,'complaint_provider'])->name('users.complaint_provider');
         Route::get('provider/show/complaint/data/{complaint_id?}', [ServicePackageController::class,'complaint_show'])->name('users.complaint_show_provider');
 
     });
 
-    Route::group(['middleware' => ['permission:slider list']], function () {
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
         Route::resource('slider', SliderController::class);
         Route::get('slider-index-data',[SliderController::class,'index_data'])->name('slider.index_data');
         Route::post('slider-bulk-action', [SliderController::class, 'bulk_action'])->name('slider.bulk-action');
@@ -239,8 +358,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('save-payment',[App\Http\Controllers\API\PaymentController::class, 'savePayment'])->name('payment.save');
     Route::get('save-stripe-payment/{id}',[App\Http\Controllers\BookingController::class, 'saveStripePayment']);
 
-
-
     Route::get('user-change-password', [ CustomerController::class , 'getChangePassword'])->name('user.getchangepassword');
     Route::post('user-change-password', [ CustomerController::class , 'changePassword'])->name('user.changepassword');
     Route::group(['middleware' => ['permission:user list']], function () {
@@ -259,9 +376,9 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('comission/{id}',[SettingController::class,'comission'])->name('setting.comission');
     Route::get('details/{id}',[BookingController::class,'bookingDetailsData'])->name('booking.detailsdata');
 
-
     // Setting
     Route::get('setting/{page?}',[ SettingController::class, 'settings'])->name('setting.index');
+    Route::post('setting/mobile-hero', [ SettingController::class, 'saveMobileHero'])->name('setting.mobile-hero.save')->middleware('sanad.module:settings,write');
     Route::post('/layout-page',[ SettingController::class, 'layoutPage'])->name('layout_page');
 
     // Route::post('settings/save',[ SettingController::class , 'settingsUpdates'])->name('settingsUpdates');
@@ -270,20 +387,32 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     // Route::post('handyman-dashboard-setting',[ SettingController::class , 'handymandashboardtogglesetting'])->name('handymantogglesetting');
     // Route::post('config-save',[ SettingController::class , 'configUpdate'])->name('configUpdate');
 
-
-    Route::post('env-setting', [ SettingController::class , 'envChanges'])->name('envSetting');
+    Route::post('env-setting', [ SettingController::class , 'envChanges'])->name('envSetting')->middleware('sanad.module:settings,write');
     Route::post('update-profile', [ SettingController::class , 'updateProfile'])->name('updateProfile');
     Route::post('change-password', [ SettingController::class , 'changePassword'])->name('changePassword');
-
+    Route::post('setting/partner-documents/{id}', [ SettingController::class , 'uploadPartnerDocument'])->name('setting.partner-documents.upload');
+    Route::post('setting/partner-documents/{id}/delete', [ SettingController::class , 'deletePartnerDocument'])->name('setting.partner-documents.delete');
 
     //Frontend Setting
 
-    Route::middleware(['auth', 'role:admin|demo_admin'])->group(function () {
+    Route::middleware(['auth', 'role:admin|demo_admin', 'permission:sanad legacy system access'])->group(function () {
         Route::get('frontend-setting/{page?}', [FrontendSettingController::class, 'frontendSettings'])->name('frontend_setting.index');
         Route::post('/layout-frontend-page', [FrontendSettingController::class, 'layoutPage'])->name('layout_frontend_page');
         Route::post('/landing-page-settings-updates', [FrontendSettingController::class, 'landingpagesettingsUpdates'])->name('landing_page_settings_updates');
         Route::post('/landing-layout-page', [FrontendSettingController::class, 'landingLayoutPage'])->name('landing_layout_page');
         Route::post('/get-landing-layout-page-config', [FrontendSettingController::class , 'getLandingLayoutPageConfig'])->name('getLandingLayoutPageConfig');
+
+        // Theme Management Routes
+        Route::get('theme-colors', [\App\Http\Controllers\ThemeController::class, 'index'])->name('theme.colors');
+        Route::get('theme-colors/brand-colors', [\App\Http\Controllers\ThemeController::class, 'brandColors'])->name('theme.brand-colors');
+        Route::get('theme-colors/role-colors', [\App\Http\Controllers\ThemeController::class, 'roleColors'])->name('theme.role-colors');
+        Route::get('theme-colors/preview', [\App\Http\Controllers\ThemeController::class, 'previewTab'])->name('theme.preview');
+        Route::post('theme-colors/update', [\App\Http\Controllers\ThemeController::class, 'updateColors'])->name('theme.update-colors');
+        Route::post('theme-colors/add-brand-color', [\App\Http\Controllers\ThemeController::class, 'addBrandColor'])->name('theme.add-brand-color');
+        Route::post('theme-colors/delete-brand-color', [\App\Http\Controllers\ThemeController::class, 'deleteBrandColor'])->name('theme.delete-brand-color');
+        Route::post('theme-colors/create-defaults', [\App\Http\Controllers\ThemeController::class, 'createDefaults'])->name('theme.create-defaults');
+        Route::post('theme-colors/reset-defaults', [\App\Http\Controllers\ThemeController::class, 'resetToDefaults'])->name('theme.reset-colors');
+
         Route::post('/header-page-settings', [FrontendSettingController::class, 'headingpagesettings'])->name('heading_page_settings');
         Route::post('/footer-page-settings', [FrontendSettingController::class, 'footerpagesettings'])->name('footer_page_settings');
         Route::post('/login-register-page-settings', [FrontendSettingController::class, 'loginregisterpagesettings'])->name('login_register_page_settings');
@@ -298,45 +427,47 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('get-lang-file', [ App\Http\Controllers\LanguageController::class, 'getFile' ] )->name('getLangFile');
     Route::post('save-lang-file', [ App\Http\Controllers\LanguageController::class, 'saveFileContent' ] )->name('saveLangContent');
 
-    Route::group(['middleware' => ['permission:terms condition']], function () {
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
         Route::get('pages/term-condition',[ SettingController::class, 'termAndCondition'])->name('term-condition');
         Route::post('term-condition-save',[ SettingController::class, 'saveTermAndCondition'])->name('term-condition-save');
     });
 
-    Route::group(['middleware' => ['permission:privacy policy']], function () {
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
         Route::get('pages/privacy-policy',[ SettingController::class, 'privacyPolicy'])->name('privacy-policy');
         Route::post('privacy-policy-save',[ SettingController::class, 'savePrivacyPolicy'])->name('privacy-policy-save');
     });
 
-    Route::get('pages/help-support',[ SettingController::class, 'helpAndSupport'])->name('help-support');
-    Route::post('help-support-save',[ SettingController::class, 'saveHelpAndSupport'])->name('help-support-save');
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
+        Route::get('pages/help-support',[ SettingController::class, 'helpAndSupport'])->name('help-support');
+        Route::post('help-support-save',[ SettingController::class, 'saveHelpAndSupport'])->name('help-support-save');
 
-    Route::get('pages/refund-cancellation-policy',[ SettingController::class, 'refundCancellationPolicy'])->name('refund-cancellation-policy');
-    Route::post('refund-cancellation-policy-save',[ SettingController::class, 'saveRefundCancellationPolicy'])->name('refund-cancellation-policy-save');
-
-    Route::post('general-setting-save',[ SettingController::class, 'generalSetting'])->name('generalsetting');
-    Route::post('theme-setup-save',[ SettingController::class, 'themeSetup'])->name('themesetup');
-    Route::post('site-setup-save',[ SettingController::class, 'siteSetup'])->name('sitesetup');
-    Route::post('service-config-save',[ SettingController::class, 'serviceConfig'])->name('serviceConfig');
-    Route::post('social-media-save',[ SettingController::class, 'socialMedia'])->name('socialMedia');
-    route::post('role-permission',[RoleController::class,'rolePermission'])->name('role_layout_page');
-    Route::post('cookie-setup-save',[ SettingController::class, 'cookieSetup'])->name('cookiesetup');
-
-    Route::group(['middleware' => ['permission:document list|providerdocument list']], function () {
-        Route::resource('document', DocumentsController::class);
-        Route::get('document-index-data',[DocumentsController::class,'index_data'])->name('document.index_data');
-        Route::post('document-bulk-action', [DocumentsController::class, 'bulk_action'])->name('document.bulk-action');
-        Route::post('document-action',[DocumentsController::class, 'action'])->name('document.action');
-        Route::post('document/{id}', [DocumentsController::class, 'destroy'])->name('document.destroy');
+        Route::get('pages/refund-cancellation-policy',[ SettingController::class, 'refundCancellationPolicy'])->name('refund-cancellation-policy');
+        Route::post('refund-cancellation-policy-save',[ SettingController::class, 'saveRefundCancellationPolicy'])->name('refund-cancellation-policy-save');
     });
 
-    Route::group(['middleware' => ['permission:providerdocument list']], function () {
-        Route::resource('providerdocument', ProviderDocumentController::class);
-        Route::get('providerdocument-index-data',[ProviderDocumentController::class,'index_data'])->name('providerdocument.index_data');
-        Route::post('providerdocument-bulk-action', [ProviderDocumentController::class, 'bulk_action'])->name('providerdocument.bulk-action');
-        Route::post('providerdocument-action',[ProviderDocumentController::class, 'action'])->name('providerdocument.action');
-        Route::post('providerdocument/{id}', [ProviderDocumentController::class, 'destroy'])->name('providerdocument.destroy');
-    });
+    Route::post('general-setting-save',[ SettingController::class, 'generalSetting'])->name('generalsetting')->middleware('sanad.module:settings,write');
+    Route::post('theme-setup-save',[ SettingController::class, 'themeSetup'])->name('themesetup')->middleware('sanad.module:settings,write');
+    Route::post('site-setup-save',[ SettingController::class, 'siteSetup'])->name('sitesetup')->middleware('sanad.module:settings,write');
+    Route::post('service-config-save',[ SettingController::class, 'serviceConfig'])->name('serviceConfig')->middleware('sanad.module:settings,write');
+    Route::post('social-media-save',[ SettingController::class, 'socialMedia'])->name('socialMedia')->middleware('sanad.module:settings,write');
+    route::post('role-permission',[RoleController::class,'rolePermission'])->name('role_layout_page')->middleware('sanad.module:settings,write');
+    Route::post('cookie-setup-save',[ SettingController::class, 'cookieSetup'])->name('cookiesetup')->middleware('sanad.module:settings,write');
+
+    Route::resource('document', DocumentsController::class)->only(['index', 'show'])->middleware('sanad.module:documents,read');
+    Route::resource('document', DocumentsController::class)->only(['create', 'store', 'edit', 'update'])->middleware('sanad.module:documents,write');
+    Route::delete('document/{document}', [DocumentsController::class, 'destroy'])->name('document.destroy')->middleware('sanad.module:documents,delete');
+    Route::get('document-index-data',[DocumentsController::class,'index_data'])->name('document.index_data')->middleware('sanad.module:documents,read');
+    Route::post('document-bulk-action', [DocumentsController::class, 'bulk_action'])->name('document.bulk-action')->middleware('sanad.module:documents,delete');
+    Route::post('document-action',[DocumentsController::class, 'action'])->name('document.action')->middleware('sanad.module:documents,write');
+    Route::post('document/{id}', [DocumentsController::class, 'destroy'])->name('document.destroy.legacy')->middleware('sanad.module:documents,delete');
+
+    Route::resource('providerdocument', ProviderDocumentController::class)->only(['index', 'show'])->middleware('sanad.module:documents,read');
+    Route::resource('providerdocument', ProviderDocumentController::class)->only(['create', 'store', 'edit', 'update'])->middleware('sanad.module:documents,write');
+    Route::delete('providerdocument/{providerdocument}', [ProviderDocumentController::class, 'destroy'])->name('providerdocument.destroy')->middleware('sanad.module:documents,delete');
+    Route::get('providerdocument-index-data',[ProviderDocumentController::class,'index_data'])->name('providerdocument.index_data')->middleware('sanad.module:documents,read');
+    Route::post('providerdocument-bulk-action', [ProviderDocumentController::class, 'bulk_action'])->name('providerdocument.bulk-action')->middleware('sanad.module:documents,delete');
+    Route::post('providerdocument-action',[ProviderDocumentController::class, 'action'])->name('providerdocument.action')->middleware('sanad.module:documents,write');
+    Route::post('providerdocument/{id}', [ProviderDocumentController::class, 'destroy'])->name('providerdocument.destroy.legacy')->middleware('sanad.module:documents,delete');
 
     Route::resource('ratingreview', RatingReviewController::class);
     Route::post('ratingreview-action',[RatingReviewController::class, 'action'])->name('ratingreview.action');
@@ -359,16 +490,16 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 
     Route::post('/razorpay-layout-page',[ PaymentGatewayController::class, 'rezorpaypaymentPage'])->name('razorpay_layout_page');
 
-    Route::resource('tax', TaxController::class);
-    Route::get('tax-index_data',[TaxController::class,'index_data'])->name('tax.index_data');
-    Route::post('tax-bulk-action', [TaxController::class, 'bulk_action'])->name('tax.bulk-action');
-    Route::post('tax/{id}', [TaxController::class, 'destroy'])->name('tax.destroy');
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
+        Route::resource('tax', TaxController::class);
+        Route::get('tax-index_data',[TaxController::class,'index_data'])->name('tax.index_data');
+        Route::post('tax-bulk-action', [TaxController::class, 'bulk_action'])->name('tax.bulk-action');
+        Route::post('tax/{id}', [TaxController::class, 'destroy'])->name('tax.destroy');
+    });
     Route::get('earning',[EarningController::class,'index'])->name('earning');
     Route::get('earning-data',[EarningController::class,'setEarningData'])->name('earningData');
     Route::post('earning/{id}', [EarningController::class, 'destroy'])->name('earning.destroy');
     Route::get('earning/{id}', [EarningController::class, 'show'])->name('earning.show');
-
-
 
     //region//
     Route::group(['prefix' => 'region','as' => 'region.'], function () {
@@ -380,7 +511,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::get('/destroy/{id?}', [RegionController::class, 'destroy'])->name('destroy');
     });
     //region//
-
 
     //TimeController//
     Route::group(['prefix' => 'time','as' => 'time.'], function () {
@@ -437,7 +567,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     });
     //pricecity//
 
-
     Route::get('handyman-earning',[EarningController::class,'handymanEarning'])->name('handymanEarning');
     Route::get('handyman-earning-data',[EarningController::class,'handymanEarningData'])->name('handymanEarningData');
 
@@ -457,7 +586,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('handymandocument/{id}', [HandymanPayoutController::class,'document'])->name('handymandata.document');
     Route::post('handymandocument/{id}', [HandymanPayoutController::class,'documentstore'])->name('handymandata.document_store');
 
-    Route::group(['middleware' => ['permission:handymantype list']], function () {
+    Route::group(['middleware' => ['permission:handymantype list|handyman list|handyman add|handyman edit']], function () {
         Route::resource('handymantype', HandymanTypeController::class);
         Route::get('handyman-index_data',[HandymanTypeController::class,'index_data'])->name('handymantype.index_data');
         Route::post('handymantype-bulk-action', [HandymanTypeController::class, 'bulk_action'])->name('handymantype.bulk-action');
@@ -469,8 +598,10 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::resource('servicefaq', ServiceFaqController::class);
         Route::get('servicefaq-index-data',[ServiceFaqController::class,'index_data'])->name('servicefaq.index_data');
     });
-    Route::match(['get', 'post'], '/push-notification', [SettingController::class, 'PushNotification'])->name('pushNotification.index');
-    Route::post('send-push-notification', [ SettingController::class , 'sendPushNotification'])->name('sendPushNotification');
+    Route::group(['middleware' => ['permission:sanad legacy system access']], function () {
+        Route::match(['get', 'post'], '/push-notification', [SettingController::class, 'PushNotification'])->name('pushNotification.index');
+        Route::post('send-push-notification', [ SettingController::class , 'sendPushNotification'])->name('sendPushNotification');
+    });
     Route::post('save-earning-setting', [ SettingController::class , 'saveEarningTypeSetting'])->name('saveEarningTypeSetting');
     // Route::post('advance-earning-setting' , [ SettingController::class , 'advanceEarningSetting'])->name('advanceEarningSetting');
     Route::post('other-setting' , [ SettingController::class , 'otherSetting'])->name('otherSetting');
@@ -502,7 +633,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('bank-action',[BankController::class, 'action'])->name('bank.action');
     Route::get('bank/create/', [BankController::class,'create'])->name('bank.create');
     Route::get('bank-list/{providerbank}',[BankController::class, 'banklist'])->name('bank.list');
-
 
     Route::get('/provider-detail-page',[ ProviderController::class, 'providerDetail'])->name('provider_detail_pages');
     Route::post('/provider-detail-page',[ ProviderController::class, 'providerDetail'])->name('provider_detail_pages');
@@ -538,7 +668,6 @@ Route::group(['middleware' => ['auth', 'verified']], function()
         Route::post('blog-action',[BlogController::class, 'action'])->name('blog.action');
         Route::post('blog/{id}', [BlogController::class, 'destroy'])->name('blog.destroy');
     });
-
 
     Route::group(['middleware' => ['permission:handyman list']], function () {
         Route::get('complaint',[QualityControlController::class,'index'])->name('complaint.index_data');
@@ -586,94 +715,94 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     });
 
     Route::group(['middleware' => ['permission:store list']], function () {
-        Route::resource('store', StoreController::class);
-        Route::get('store-index-data',[StoreController::class,'index_data'])->name('store.index_data');
-        Route::post('store-action',[StoreController::class, 'action'])->name('store.action');
-        Route::post('store/{id}', [StoreController::class, 'destroy'])->name('store.destroy');
-        Route::post('store-approve', [StoreController::class, 'approve'])->name('store.approve');
-        Route::get('store-pending', [StoreController::class, 'pending'])->name('store.pending');
-        Route::get('store-pending-data',[StoreController::class,'pending_data'])->name('store.pending_data');
+        Route::resource('admin/stores', StoreController::class)->names([
+            'index' => 'store.index',
+            'create' => 'store.create',
+            'store' => 'store.store',
+            'show' => 'store.show',
+            'edit' => 'store.edit',
+            'update' => 'store.update',
+            'destroy' => 'store.destroy'
+        ]);
+        Route::get('admin/stores-data', [StoreController::class, 'index_data'])->name('store.index_data');
+        Route::get('admin/stores-list', [StoreController::class, 'list'])->name('store.list');
+        Route::post('admin/store-action', [StoreController::class, 'action'])->name('store.action');
+        // Product Approval System Routes
+        Route::group(['prefix' => 'admin/product-approval', 'as' => 'product-approval.'], function () {
+            Route::get('pending', [App\Http\Controllers\Admin\ProductApprovalController::class, 'pending'])->name('pending');
+            Route::get('rejected', [App\Http\Controllers\Admin\ProductApprovalController::class, 'rejected'])->name('rejected');
+            Route::get('review/{id}', [App\Http\Controllers\Admin\ProductApprovalController::class, 'review'])->name('review');
+            Route::post('{id}/approve', [App\Http\Controllers\Admin\ProductApprovalController::class, 'approve'])->name('approve');
+            Route::post('{id}/reject', [App\Http\Controllers\Admin\ProductApprovalController::class, 'reject'])->name('reject');
+            Route::post('{id}/reconsider', [App\Http\Controllers\Admin\ProductApprovalController::class, 'reconsider'])->name('reconsider');
+            Route::post('bulk-action', [App\Http\Controllers\Admin\ProductApprovalController::class, 'bulkAction'])->name('bulk-action');
+        });
     });
 
     Route::group(['middleware' => ['permission:order list']], function () {
         Route::resource('order', OrderController::class);
         Route::get('order-index-data',[OrderController::class,'index_data'])->name('order.index_data');
-        Route::post('order-update-status', [OrderController::class, 'updateStatus'])->name('order.update-status');
-        Route::post('order-update-payment-status', [OrderController::class, 'updatePaymentStatus'])->name('order.update-payment-status');
-        Route::post('order-cancel', [OrderController::class, 'cancel'])->name('order.cancel');
         Route::get('order-statistics', [OrderController::class, 'statistics'])->name('order.statistics');
-        Route::post('order-bulk-action', [OrderController::class, 'bulkAction'])->name('order.bulk-action');
         Route::get('order-export', [OrderController::class, 'export'])->name('order.export');
+        Route::get('order/{id}/print', [OrderController::class, 'print'])->name('order.print');
     });
 
-    // Dynamic Pricing Routes (Admin only)
-    Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
-        Route::get('dynamic-pricing', [DynamicPricingController::class, 'index'])->name('dynamic-pricing.index');
-        Route::get('dynamic-pricing-data', [DynamicPricingController::class, 'index_data'])->name('dynamic-pricing.index_data');
-        Route::get('dynamic-pricing/{id}', [DynamicPricingController::class, 'show'])->name('dynamic-pricing.show');
-        Route::post('dynamic-pricing/update', [DynamicPricingController::class, 'updatePricing'])->name('dynamic-pricing.update');
-        Route::post('dynamic-pricing/bulk-update', [DynamicPricingController::class, 'bulkUpdatePricing'])->name('dynamic-pricing.bulk-update');
-        Route::get('dynamic-pricing/analytics', [DynamicPricingController::class, 'analytics'])->name('dynamic-pricing.analytics');
-        Route::post('dynamic-pricing/price-comparison', [DynamicPricingController::class, 'priceComparison'])->name('dynamic-pricing.price-comparison');
-        Route::get('dynamic-pricing/export', [DynamicPricingController::class, 'export'])->name('dynamic-pricing.export');
-    });
+    // Order status and payment management routes with specific permissions
+    Route::post('order-update-status', [OrderController::class, 'updateStatus'])
+        ->name('order.update-status')
+        ->middleware('permission:order status update');
 
-    // Provider E-commerce Routes
-    Route::group(['prefix' => 'provider', 'middleware' => ['role:provider']], function () {
+    Route::post('order-update-payment-status', [OrderController::class, 'updatePaymentStatus'])
+        ->name('order.update-payment-status')
+        ->middleware('permission:order edit');
+
+    Route::post('order-cancel', [OrderController::class, 'cancel'])
+        ->name('order.cancel')
+        ->middleware('permission:order edit');
+
+    Route::post('order/{id}/reassign-partner', [OrderController::class, 'reassignPartner'])
+        ->name('order.reassign-partner')
+        ->middleware('permission:order edit');
+
+    Route::post('order-bulk-action', [OrderController::class, 'bulkAction'])
+        ->name('order.bulk-action')
+        ->middleware('permission:order edit');
+
+    // Dynamic pricing routes are disabled because DynamicPricingController is
+    // not present in this codebase. Restore the controller before enabling.
+
+});
+
+// Provider Dashboard Routes (Single Store Architecture) - Different prefix to avoid conflict
+Route::group(['prefix' => 'provider-dashboard', 'middleware' => ['auth', 'role:provider', 'user.type:provider']], function () {
         Route::get('dashboard', [ProviderOrderController::class, 'dashboard'])->name('provider.dashboard');
-
-        // Store Management
-        Route::get('store', [ProviderStoreController::class, 'index'])->name('provider.store.index');
-        Route::get('store/create', [ProviderStoreController::class, 'create'])->name('provider.store.create');
-        Route::post('store', [ProviderStoreController::class, 'store'])->name('provider.store.store');
-        Route::get('store/edit', [ProviderStoreController::class, 'edit'])->name('provider.store.edit');
-        Route::put('store', [ProviderStoreController::class, 'update'])->name('provider.store.update');
-
-        // Store Products
-        Route::get('store/products', [ProviderStoreController::class, 'products'])->name('provider.store.products');
-        Route::get('store/products-data', [ProviderStoreController::class, 'products_data'])->name('provider.store.products_data');
-        Route::post('store/add-product', [ProviderStoreController::class, 'addProduct'])->name('provider.store.add-product');
-        Route::put('store/product/{id}', [ProviderStoreController::class, 'updateProduct'])->name('provider.store.update-product');
-        Route::delete('store/product/{id}', [ProviderStoreController::class, 'removeProduct'])->name('provider.store.remove-product');
-
-        // Product Management
-        Route::resource('product', ProviderProductController::class, ['as' => 'provider']);
-        Route::get('product-index-data', [ProviderProductController::class, 'index_data'])->name('provider.product.index_data');
-        Route::get('available-products', [ProviderProductController::class, 'availableProducts'])->name('provider.product.available');
 
         // Order Management
         Route::get('orders', [ProviderOrderController::class, 'index'])->name('provider.order.index');
         Route::get('orders-data', [ProviderOrderController::class, 'index_data'])->name('provider.order.index_data');
         Route::get('orders/{id}', [ProviderOrderController::class, 'show'])->name('provider.order.show');
         Route::post('order-update-status', [ProviderOrderController::class, 'updateStatus'])->name('provider.order.update-status');
+        Route::post('orders/{id}/employees', [ProviderOrderController::class, 'assignEmployees'])->name('provider.order.employees.assign');
+        Route::post('orders/{id}/workflow-stages/{stageId}/complete', [ProviderOrderController::class, 'completeWorkflowStage'])->name('provider.order.workflow.complete');
         Route::get('order-statistics', [ProviderOrderController::class, 'statistics'])->name('provider.order.statistics');
+        Route::get('services', [ProviderOrderController::class, 'services'])->name('provider.services.index');
+        Route::post('services', [ProviderOrderController::class, 'updateServices'])->name('provider.services.update');
+        Route::get('workflows', [ProviderOrderController::class, 'workflows'])->name('provider.workflows.index');
+        Route::get('workflows/create', [ProviderOrderController::class, 'workflowForm'])->name('provider.workflows.create');
+        Route::get('workflows/{id}/edit', [ProviderOrderController::class, 'workflowForm'])->name('provider.workflows.edit');
+        Route::post('workflows', [ProviderOrderController::class, 'storeWorkflow'])->name('provider.workflows.store');
+        Route::post('workflows/{id}', [ProviderOrderController::class, 'storeWorkflow'])->name('provider.workflows.update');
+        Route::post('workflows/{id}/delete', [ProviderOrderController::class, 'destroyWorkflow'])->name('provider.workflows.destroy');
+        Route::get('kanban', [ProviderOrderController::class, 'kanban'])->name('provider.kanban.index');
+        Route::post('kanban/{id}/move', [ProviderOrderController::class, 'moveKanban'])->name('provider.kanban.move');
+        Route::get('employees', [ProviderOrderController::class, 'employees'])->name('provider.employees.index');
+        Route::delete('employees/{id}', [ProviderOrderController::class, 'destroyEmployee'])->name('provider.employees.destroy');
+        Route::get('performance', [ProviderOrderController::class, 'performance'])->name('provider.performance.index');
+        Route::get('financial-center', [ProviderOrderController::class, 'financial'])->name('provider.financial.index');
+        Route::get('notification-center', [ProviderOrderController::class, 'notifications'])->name('provider.notifications.index');
+        Route::get('profile', [ProviderOrderController::class, 'profile'])->name('provider.profile.index');
+        Route::post('profile/documents/{id}', [ProviderOrderController::class, 'uploadProfileDocument'])->name('provider.profile.documents.upload');
     });
 
-});
 Route::get('/ajax-list',[HomeController::class, 'getAjaxList'])->name('ajax-list');
 Route::post('/service-list',[HomeController::class, 'getAjaxServiceList'])->name('service-list');
-
-// Frontend E-commerce Routes
-Route::get('products', [FrontendProductController::class, 'index'])->name('products.index');
-Route::get('products/search', [FrontendProductController::class, 'search'])->name('products.search');
-Route::get('products/category/{slug}', [FrontendProductController::class, 'category'])->name('products.category');
-Route::get('product/{slug}', [FrontendProductController::class, 'show'])->name('products.show');
-Route::get('stores', [FrontendProductController::class, 'stores'])->name('stores.index');
-Route::get('store/{slug}', [FrontendProductController::class, 'storeShow'])->name('stores.show');
-
-// AJAX endpoints for frontend
-Route::get('api/products', [FrontendProductController::class, 'getProducts'])->name('api.products');
-Route::get('api/stores', [FrontendProductController::class, 'getStores'])->name('api.stores');
-
-// Authenticated frontend routes
-Route::middleware('auth')->group(function () {
-    Route::get('cart', [FrontendProductController::class, 'cart'])->name('products.cart');
-    Route::get('checkout', [FrontendProductController::class, 'checkout'])->name('products.checkout');
-});
-
-
-
-
-
-
-

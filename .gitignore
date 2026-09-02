@@ -1,9 +1,7 @@
 /node_modules
 /public/hot
-/public/storage
 /storage/*.key
-/vendor
-.env
+/.env
 .env.backup
 .phpunit.result.cache
 docker-compose.override.yml
@@ -11,6 +9,8 @@ Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
+chroma.log
+/storage/chroma/
 
 # IDE files
 /.idea

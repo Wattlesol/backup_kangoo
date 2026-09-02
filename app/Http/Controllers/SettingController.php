@@ -9,8 +9,11 @@ use App\Models\User;
 use App\Models\Service;
 use Hash;
 use App\Models\ProviderSlotMapping;
+use App\Models\ProviderDocument;
 use App\Http\Requests\UserRequest;
 use App\Models\NotificationTemplate;
+use App\Models\Notification;
+use Illuminate\Support\Str;
 
 class SettingController extends Controller
 {
@@ -28,13 +31,44 @@ class SettingController extends Controller
 
         if ($page == '') {
             if ($auth_user->hasAnyRole(['admin', 'demo_admin'])) {
-                $page = 'general-setting';
+                $page = 'mobile-hero';
             } else {
                 $page = 'profile_form';
             }
         }
 
-        return view('setting.index', compact('page', 'pageTitle', 'auth_user'));
+        $this->authorizeSettingsPage($auth_user, $page);
+
+        $heroSlider = \App\Models\Slider::firstOrNew([]);
+        $services = \App\Models\Service::where('status', 1)->where('service_type', 'service')->pluck('name', 'id');
+
+        return view('setting.index', compact('page', 'pageTitle', 'auth_user', 'heroSlider', 'services'));
+    }
+
+    public function saveMobileHero(Request $request)
+    {
+        if (demoUserPermission()) {
+            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        }
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'hero_image' => 'nullable|image|mimes:jpg,jpeg,png,webp,svg|max:10240',
+        ]);
+
+        $slider = \App\Models\Slider::firstOrNew(['id' => $request->id]);
+        $slider->title = $request->title;
+        $slider->type = 'service';
+        $slider->type_id = $request->type_id ?? (\App\Models\Service::where('status', 1)->value('id') ?? 1);
+        $slider->status = (int) ($request->status ?? 1);
+        $slider->description = $request->description;
+        $slider->save();
+
+        if ($request->hasFile('hero_image')) {
+            storeMediaFile($slider, $request->file('hero_image'), 'slider_image');
+        }
+
+        return redirect()->route('setting.index')->withSuccess(app()->getLocale() === 'ar' ? 'تم تحديث الصورة البارزة لتطبيق الجوال بنجاح' : 'Mobile app hero image and banner updated successfully.');
     }
 
     /*ajax show layout data*/
@@ -42,12 +76,13 @@ class SettingController extends Controller
     {
         $page = $request->page;
         $auth_user = authSession();
+        $this->authorizeSettingsPage($auth_user, $page);
         $user_id = $auth_user->id;
         $settings = AppSetting::first();
         $user_data = User::find($user_id);
         $envSettting = $envSettting_value = [];
         if($auth_user['user_type'] == 'provider'){
-            date_default_timezone_set($admin->time_zone ?? 'UTC');
+            date_default_timezone_set($auth_user->time_zone ?? 'UTC');
 
             $current_time = \Carbon\Carbon::now();
             $time = $current_time->toTimeString();
@@ -94,9 +129,13 @@ class SettingController extends Controller
 
                 if(!empty($generalsetting['value'])){
                     $decodedata = json_decode($generalsetting['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['site_name','site_description','inquriy_email', 'helpline_number', 'website', 'country_id','state_id','city_id','zipcode','address'];
                     foreach ($keys as $key) {
-                        $generalsetting[$key] = $decodedata->$key;
+                        $generalsetting[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact('page', 'generalsetting'))->render();
@@ -109,9 +148,13 @@ class SettingController extends Controller
                 $site   = Setting::where('type','=','site-setup')->first();
                 if(!empty($site['value'])){
                     $decodedata = json_decode($site['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['date_format', 'time_format', 'time_zone', 'language_option', 'default_currency','currency_position','google_map_keys','latitude','longitude','distance_type','radious','digitafter_decimal_point','android_app_links','playstore_url','provider_playstore_url','ios_app_links','appstore_url','provider_appstore_url','site_copyright'];
                     foreach ($keys as $key) {
-                        $site[$key] = $decodedata->$key;
+                        $site[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
 
                 }
@@ -122,9 +165,13 @@ class SettingController extends Controller
 
                 if(!empty($serviceconfig['value'])){
                     $decodedata = json_decode($serviceconfig['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['advance_payment', 'slot_service', 'digital_services', 'service_packages', 'service_addons','post_services'];
                     foreach ($keys as $key) {
-                        $serviceconfig[$key] = $decodedata->$key;
+                        $serviceconfig[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact('page','serviceconfig'))->render();
@@ -133,9 +180,13 @@ class SettingController extends Controller
                 $socialmedia   = Setting::where('type','=','social-media')->first();
                 if(!empty($socialmedia['value'])){
                     $decodedata = json_decode($socialmedia['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['facebook_url', 'linkedin_url', 'instagram_url', 'youtube_url', 'twitter_url'];
                     foreach ($keys as $key) {
-                        $socialmedia[$key] = $decodedata->$key;
+                        $socialmedia[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact( 'page','socialmedia'))->render();
@@ -145,9 +196,13 @@ class SettingController extends Controller
 
                 if(!empty($cookiesetup['value'])){
                     $decodedata = json_decode($cookiesetup['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
                     $keys = ['title','description'];
                     foreach ($keys as $key) {
-                        $cookiesetup[$key] = $decodedata->$key;
+                        $cookiesetup[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
                 }
                 $data = view('setting.' . $page, compact( 'page', 'cookiesetup'))->render();
@@ -162,6 +217,11 @@ class SettingController extends Controller
                 break;
             case 'password_form':
                 $data  = view('setting.' . $page, compact('user_data', 'page'))->render();
+                break;
+            case 'partner_documents':
+                abort_unless($auth_user->user_type === 'provider', 403);
+                $provider = $auth_user->load('providerDocument.document');
+                $data = view('setting.partner_documents', compact('provider', 'page'))->render();
                 break;
             case 'profile_form':
                 $why_choose_me = json_decode($user_data->why_choose_me, true);
@@ -224,6 +284,10 @@ class SettingController extends Controller
 
                 if(!empty($othersetting['value'])){
                     $decodedata = json_decode($othersetting['value']);
+                    // Ensure we have an object for consistent property access
+                    if (is_array($decodedata)) {
+                        $decodedata = (object) $decodedata;
+                    }
 
                     if(!empty($decodedata->auto_assign_provider)){
                         $keys = ['social_login', 'google_login', 'apple_login', 'otp_login', 'online_payment','blog','maintenance_mode',
@@ -238,7 +302,7 @@ class SettingController extends Controller
                     }
 
                     foreach ($keys as $key) {
-                            $othersetting[$key] = $decodedata->$key;
+                            $othersetting[$key] = isset($decodedata->$key) ? $decodedata->$key : null;
                     }
 
 
@@ -263,12 +327,106 @@ class SettingController extends Controller
 
                 $data  = view('setting.' . $page, compact('earningsetting', 'page'))->render();
                 break;
+            case 'theme-colors':
+                // Get brand colors
+                $brandColors = \App\Models\ThemeSetting::getByGroup('brand_colors');
+                if ($brandColors->isEmpty()) {
+                    // Create default brand colors if they don't exist
+                    \Artisan::call('db:seed', ['--class' => 'ThemeSettingsSeeder']);
+                    $brandColors = \App\Models\ThemeSetting::getByGroup('brand_colors');
+                }
+
+                // Get role colors
+                $roleColors = \App\Models\ThemeSetting::getByGroup('role_colors');
+                if ($roleColors->isEmpty()) {
+                    // Create default role colors if they don't exist
+                    \Artisan::call('db:seed', ['--class' => 'ThemeSettingsSeeder']);
+                    $roleColors = \App\Models\ThemeSetting::getByGroup('role_colors');
+                }
+
+                // Format colors for display
+                $brandColorsFormatted = $this->formatColorsForDisplay($brandColors);
+                $roleColorsFormatted = $this->formatColorsForDisplay($roleColors);
+
+                // Create a dummy model for form binding
+                $themeColors = new \stdClass();
+
+                $data = view('setting.' . $page, compact('page', 'brandColorsFormatted', 'roleColorsFormatted', 'themeColors'))->render();
+                break;
             default:
                 $data  = view('setting.' . $page, compact('settings', 'page', 'envSettting'))->render();
                 break;
         }
 
         return response()->json($data);
+    }
+
+    private function authorizeSettingsPage(User $user, ?string $page): void
+    {
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return;
+        }
+
+        $allowedPages = ['profile_form', 'password_form'];
+        if ($user->user_type === 'provider') {
+            $allowedPages[] = 'time_slot';
+            $allowedPages[] = 'partner_documents';
+        }
+
+        abort_unless(in_array($page, $allowedPages, true), 403);
+    }
+
+    /**
+     * Format colors for display in admin interface
+     */
+    private function formatColorsForDisplay($colors)
+    {
+        $formatted = [];
+
+        // Role metadata for display
+        $roleMetadata = [
+            'admin' => [
+                'display_name' => 'Admin',
+                'icon' => 'fa-user-shield'
+            ],
+            'provider' => [
+                'display_name' => 'Provider',
+                'icon' => 'fa-store'
+            ],
+            'handyman' => [
+                'display_name' => 'Handyman',
+                'icon' => 'fa-tools'
+            ],
+            'customer' => [
+                'display_name' => 'Customer',
+                'icon' => 'fa-user'
+            ]
+        ];
+
+        foreach ($colors as $setting) {
+            $parts = explode('_', $setting->setting_key);
+            $colorName = $parts[0];
+            $theme = $parts[1] ?? 'light';
+
+            if (!isset($formatted[$colorName])) {
+                $baseData = [
+                    'name' => ucfirst($colorName),
+                    'light' => '',
+                    'dark' => ''
+                ];
+
+                // Add role metadata if this is a role color
+                if (isset($roleMetadata[$colorName])) {
+                    $baseData = array_merge($baseData, $roleMetadata[$colorName]);
+                }
+
+                $formatted[$colorName] = $baseData;
+            }
+
+            $formatted[$colorName][$theme] = $setting->setting_value;
+        }
+
+        return $formatted;
     }
 
 
@@ -315,6 +473,68 @@ class SettingController extends Controller
         storeMediaFile($user, $request->profile_image, 'profile_image');
 
         return redirect()->route('setting.index', ['page' => 'profile_form'])->withSuccess(__('messages.profile') . ' ' . __('messages.updated'));
+    }
+
+    public function uploadPartnerDocument(Request $request, $id)
+    {
+        if (demoUserPermission()) {
+            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        }
+
+        $providerDocument = ProviderDocument::where('provider_id', auth()->id())->where('id', $id)->firstOrFail();
+        $request->validate([
+            'provider_document' => 'required|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:10240',
+        ]);
+
+        storeMediaFile($providerDocument, $request->file('provider_document'), 'provider_document');
+        $providerDocument->is_verified = 0;
+        $providerDocument->verification_status = 'pending';
+        $providerDocument->review_reason = null;
+        $providerDocument->reviewed_by = null;
+        $providerDocument->reviewed_at = null;
+        $providerDocument->save();
+        $this->notifyAdminsForPartnerDocument($providerDocument);
+
+        return redirect()->route('setting.index', ['page' => 'partner_documents'])->withSuccess('Verification document uploaded for Sanad review.');
+    }
+
+    public function deletePartnerDocument($id)
+    {
+        if (demoUserPermission()) {
+            return redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
+        }
+
+        $providerDocument = ProviderDocument::where('provider_id', auth()->id())->where('id', $id)->firstOrFail();
+        $providerDocument->clearMediaCollection('provider_document');
+        $providerDocument->is_verified = 0;
+        $providerDocument->verification_status = 'pending';
+        $providerDocument->review_reason = null;
+        $providerDocument->reviewed_by = null;
+        $providerDocument->reviewed_at = null;
+        $providerDocument->save();
+
+        return redirect()->route('setting.index', ['page' => 'partner_documents'])->withSuccess('Verification document removed.');
+    }
+
+    private function notifyAdminsForPartnerDocument(ProviderDocument $providerDocument): void
+    {
+        $providerDocument->loadMissing(['providers', 'document']);
+        User::whereIn('user_type', ['admin', 'demo_admin'])->get()->each(function ($admin) use ($providerDocument) {
+            Notification::create([
+                'id' => Str::random(32),
+                'type' => 'partner_verification_document_submitted',
+                'notifiable_type' => User::class,
+                'notifiable_id' => $admin->id,
+                'data' => json_encode([
+                    'type' => 'partner_verification_document_submitted',
+                    'id' => $providerDocument->id,
+                    'subject' => 'Partner verification document submitted',
+                    'message' => optional($providerDocument->providers)->display_name.' submitted '.optional($providerDocument->document)->name.' for verification.',
+                    'provider_id' => $providerDocument->provider_id,
+                    'document_id' => $providerDocument->document_id,
+                ]),
+            ]);
+        });
     }
 
     public function changePassword(Request $request)
@@ -495,6 +715,10 @@ class SettingController extends Controller
     $othersetting = \App\Models\Setting::where('type','OTHER_SETTING')->first();
 
     $decodedata = json_decode($othersetting['value']);
+    // Ensure we have an object for consistent property access
+    if (is_array($decodedata)) {
+        $decodedata = (object) $decodedata;
+    }
 
     $notification_type = isset($decodedata->firebase_notification) ? 1 : 0;
 
@@ -863,5 +1087,3 @@ class SettingController extends Controller
     }
 
 }
-
-

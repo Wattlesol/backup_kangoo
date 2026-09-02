@@ -25,13 +25,42 @@ class ServiceRequest extends FormRequest
      */
     public function rules()
     {
-        $id = request()->id;
+        $id = request()->route('service') ?: request()->id;
+        if (auth()->check() && auth()->user()->hasRole('provider') && !request()->is('api/*')) {
+            return [
+                'id' => 'required|exists:services,id',
+                'status' => 'required',
+                'duration' => 'nullable',
+                'partner_availability_notes' => 'nullable|string',
+                'required_employee_skills' => 'nullable|string',
+            ];
+        }
+
         return [
-            'name'                           => 'required|unique:services,name,'.$id,
+            'name_en'                        => 'required|string|max:255|unique:services,name_en,'.$id,
+            'name_ar'                        => 'required|string|max:255',
             'category_id'                    => 'required',
-            'type'                           => 'required',
-            'price'                          => 'required|min:0',
+            'type'                           => 'nullable',
+            'price'                          => 'nullable|numeric|min:0',
             'status'                         => 'required',
+            'government_entity'              => 'nullable|string|max:255',
+            'required_documents'             => 'nullable',
+            'required_documents.*.name'      => 'required|string|max:255',
+            'required_documents.*.name_ar'   => 'required|string|max:255',
+            'required_documents.*.key'       => 'required|string|max:255',
+            'required_documents.*.required'  => 'nullable|in:0,1',
+            'required_documents.*.approval_required' => 'nullable|in:0,1',
+            'required_documents.*.mime_types' => 'nullable|string|max:500',
+            'required_documents.*.max_size_mb' => 'nullable|integer|min:1|max:100',
+            'estimated_completion_time'      => 'nullable|string|max:255',
+            'government_fee'                 => 'nullable|numeric|min:0',
+            'service_fee'                    => 'nullable|numeric|min:0',
+            'service_instructions'           => 'nullable',
+            'service_instructions.*.title'   => 'nullable|string|max:255',
+            'service_instructions.*.instruction' => 'nullable|string|max:4000',
+            'terms_and_conditions'           => 'nullable|string',
+            'partner_availability_notes'     => 'nullable|string',
+            'required_employee_skills'       => 'nullable|string',
         ];
     }
     public function messages()

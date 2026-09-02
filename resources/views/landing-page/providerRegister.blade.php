@@ -132,7 +132,7 @@
 
                                     <div class="text-center mt-4 text-signup">
                                         <label class="m-0 text-capitalize"> {{__('auth.already_have_account')}}</label>
-                                        <a href="{{route('user.login')}}" class="btn-link align-baseline">{{__('auth.sign_in')}}</a>
+                                        <a href="{{route('login')}}" class="btn-link align-baseline">{{__('auth.sign_in')}}</a>
                                     </div>
 
                                 </div>

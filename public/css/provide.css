@@ -2,12 +2,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Work+Sans&display=swap');
 
 :root {
+    /* Default colors - will be overridden by dynamic theming system */
     --c1: #5F60B9;
     --c2: #ff6767;
     --bg-color: #f7f9fc;
     --bg-color2: #eee;
     --text-light-color: #758590;
     --text-color: #4b5864;
+    --sidebar-bg-dark: #181818;
     --link-color: #5F60B9;
     --input-border-color: #e4e4e4;
     --input-border-color-active: rgba(65, 83, 179, 0.5);
@@ -26,6 +28,32 @@
     --c1-light-bg: rgba(65, 83, 179, 0.05);
     --success-color: #16b559;
     --timeline-color: #dcdcdc;
+
+    /* Dynamic theme variables - populated by our theming system */
+    --primary-color: var(--c1);
+    --primary-color-rgb: 95, 96, 185;
+    --primary-color-light: var(--c1-light-bg);
+    --primary-color-dark: var(--c1);
+
+    /* Brand colors - defaults, will be overridden */
+    --brand-yellow: #F0B521;
+    --brand-yellow-dark: #8D6710;
+    --brand-red: #EF5535;
+    --brand-red-dark: #9B1F0B;
+    --brand-green: #2DB665;
+    --brand-green-dark: #005F2D;
+    --brand-blue: #4A75FB;
+    --brand-blue-dark: #004CB2;
+
+    /* Role colors - defaults, will be overridden */
+    --role-admin: #5F60B9;
+    --role-admin-dark: #4153b3;
+    --role-provider: #EF5535;
+    --role-provider-dark: #9B1F0B;
+    --role-handyman: #2DB665;
+    --role-handyman-dark: #005F2D;
+    --role-customer: #4A75FB;
+    --role-customer-dark: #004CB2;
     --title-font: 'Work Sans', sans-serif;
     --body-font: 'Work Sans', sans-serif;
     --thin: 100;
@@ -47,6 +75,146 @@
     --base-line-height: 1.4;
     --title-line-height: 1.2;
 }
+
+/* Role-based Theme Classes - Light Mode */
+/* These will be overridden by dynamic CSS variables from our theming system */
+body.theme-customer,
+html.theme-customer {
+    --c1: var(--role-customer, #4A75FB) !important;
+    --link-color: var(--role-customer, #4A75FB) !important;
+    --input-border-color-active: rgba(var(--role-customer-rgb, 74, 117, 251), 0.5) !important;
+    --c1-light-bg: rgba(var(--role-customer-rgb, 74, 117, 251), 0.05) !important;
+}
+
+body.theme-admin,
+html.theme-admin {
+    --c1: var(--role-admin, #5F60B9) !important;
+    --link-color: var(--role-admin, #5F60B9) !important;
+    --input-border-color-active: rgba(var(--role-admin-rgb, 95, 96, 185), 0.5) !important;
+    --c1-light-bg: rgba(var(--role-admin-rgb, 95, 96, 185), 0.05) !important;
+}
+
+body.theme-handyman,
+html.theme-handyman {
+    --c1: var(--role-handyman, #2DB665) !important;
+    --link-color: var(--role-handyman, #2DB665) !important;
+    --input-border-color-active: rgba(var(--role-handyman-rgb, 45, 182, 101), 0.5) !important;
+    --c1-light-bg: rgba(var(--role-handyman-rgb, 45, 182, 101), 0.05) !important;
+}
+
+body.theme-provider,
+html.theme-provider {
+    --c1: var(--role-provider, #EF5535) !important;
+    --link-color: var(--role-provider, #EF5535) !important;
+    --input-border-color-active: rgba(var(--role-provider-rgb, 239, 85, 53), 0.5) !important;
+    --c1-light-bg: rgba(var(--role-provider-rgb, 239, 85, 53), 0.05) !important;
+    --sidebar-bg-dark: #2D1A15 !important;
+}
+
+/* Role-based Theme Classes - Dark Mode */
+/* These will be overridden by dynamic CSS variables from our theming system */
+[theme="dark"] body.theme-customer,
+[theme="dark"] html.theme-customer,
+[data-bs-theme="dark"] body.theme-customer,
+[data-bs-theme="dark"] html.theme-customer,
+body[theme="dark"].theme-customer,
+html[theme="dark"].theme-customer,
+body[data-bs-theme="dark"].theme-customer,
+html[data-bs-theme="dark"].theme-customer,
+body.dark-theme.theme-customer,
+html.dark-theme.theme-customer {
+    --c1: var(--role-customer-dark, #004CB2) !important;
+    --link-color: var(--role-customer-dark, #004CB2) !important;
+    --c1-light-bg: rgba(var(--role-customer-dark-rgb, 0, 76, 178), 0.1) !important;
+}
+
+[theme="dark"] body.theme-admin,
+[theme="dark"] html.theme-admin,
+[data-bs-theme="dark"] body.theme-admin,
+[data-bs-theme="dark"] html.theme-admin,
+body[theme="dark"].theme-admin,
+html[theme="dark"].theme-admin,
+body[data-bs-theme="dark"].theme-admin,
+html[data-bs-theme="dark"].theme-admin,
+body.dark-theme.theme-admin,
+html.dark-theme.theme-admin {
+    --c1: var(--role-admin-dark, #4153b3) !important;
+    --link-color: var(--role-admin-dark, #4153b3) !important;
+    --c1-light-bg: rgba(var(--role-admin-dark-rgb, 65, 83, 179), 0.1) !important;
+}
+
+[theme="dark"] body.theme-handyman,
+[theme="dark"] html.theme-handyman,
+[data-bs-theme="dark"] body.theme-handyman,
+[data-bs-theme="dark"] html.theme-handyman,
+body[theme="dark"].theme-handyman,
+html[theme="dark"].theme-handyman,
+body[data-bs-theme="dark"].theme-handyman,
+html[data-bs-theme="dark"].theme-handyman,
+body.dark-theme.theme-handyman,
+html.dark-theme.theme-handyman {
+    --c1: var(--role-handyman-dark, #005F2D) !important;
+    --link-color: var(--role-handyman-dark, #005F2D) !important;
+    --c1-light-bg: rgba(var(--role-handyman-dark-rgb, 0, 95, 45), 0.1) !important;
+}
+
+[theme="dark"] body.theme-provider,
+[theme="dark"] html.theme-provider,
+[data-bs-theme="dark"] body.theme-provider,
+[data-bs-theme="dark"] html.theme-provider,
+body[theme="dark"].theme-provider,
+html[theme="dark"].theme-provider,
+body[data-bs-theme="dark"].theme-provider,
+html[data-bs-theme="dark"].theme-provider,
+body.dark-theme.theme-provider,
+html.dark-theme.theme-provider {
+    --c1: var(--role-provider-dark, #9B1F0B) !important;
+    --link-color: var(--role-provider-dark, #9B1F0B) !important;
+    --c1-light-bg: rgba(var(--role-provider-dark-rgb, 155, 31, 11), 0.1) !important;
+    --sidebar-bg-dark: #1A0F0B !important;
+}
+
+/* High Priority Role-based Overrides */
+/* These will be overridden by dynamic CSS variables from our theming system */
+body.theme-provider *,
+html.theme-provider * {
+    --c1: var(--role-provider, #EF5535) !important;
+}
+
+body.theme-admin *,
+html.theme-admin * {
+    --c1: var(--role-admin, #5F60B9) !important;
+}
+
+body.theme-handyman *,
+html.theme-handyman * {
+    --c1: var(--role-handyman, #2DB665) !important;
+}
+
+body.theme-customer *,
+html.theme-customer * {
+    --c1: var(--role-customer, #4A75FB) !important;
+}
+
+/* Brand Colors for Rotating Cards */
+/* These will be overridden by dynamic CSS variables from our theming system */
+.brand-color-yellow { background-color: var(--brand-yellow, #F0B521); }
+.brand-color-red { background-color: var(--brand-red, #EF5535); }
+.brand-color-green { background-color: var(--brand-green, #2DB665); }
+.brand-color-blue { background-color: var(--brand-blue, #4A75FB); }
+
+[theme="dark"] .brand-color-yellow,
+[data-bs-theme="dark"] .brand-color-yellow,
+body.dark-theme .brand-color-yellow { background-color: var(--brand-yellow-dark, #8D6710); }
+[theme="dark"] .brand-color-red,
+[data-bs-theme="dark"] .brand-color-red,
+body.dark-theme .brand-color-red { background-color: var(--brand-red-dark, #9B1F0B); }
+[theme="dark"] .brand-color-green,
+[data-bs-theme="dark"] .brand-color-green,
+body.dark-theme .brand-color-green { background-color: var(--brand-green-dark, #005F2D); }
+[theme="dark"] .brand-color-blue,
+[data-bs-theme="dark"] .brand-color-blue,
+body.dark-theme .brand-color-blue { background-color: var(--brand-blue-dark, #004CB2); }
 
 [theme="dark"] {
     --c1: #4153b3;
@@ -608,7 +776,7 @@ ul a .count {
 .btn:focus ul a:focus,
 .btn:hover {
     color: var(--absolute-white);
-    background-color: #46479f;
+    background-color: var(--c1);
 }
 .btn--primary,
 .wizard .actions ul a {
@@ -620,7 +788,7 @@ ul a .count {
     color: var(--absolute-dark) !important;
 }
 .btn--secondary:hover {
-    background-color: #ccc;
+    background-color: var(--border-color);
 }
 .btn--danger {
     background-color: var(--c2);
@@ -628,15 +796,15 @@ ul a .count {
 }
 .btn-soft--danger {
     background-color: rgba(255, 103, 103, 0.1);
-    color: #ff6767;
+    color: var(--c2);
 }
 .btn--success {
     background-color: var(--success-color);
     color: var(--absolute-white);
 }
 .badge-warning{
-    color: #fff !important;
-    background: #4e8fd3;
+    color: var(--absolute-white) !important;
+    background: var(--c1);
     padding: 0.3em 1.4em;
 }
 .btn--light {
@@ -658,7 +826,7 @@ ul a .count {
     text-decoration: none;
 }
 a.btn-link-hover:hover {
-    color: #1C1F34;
+    color: var(--title-color);
 }
 .btn-link:active,
 .btn-link:focus,
@@ -887,7 +1055,7 @@ a.btn-link-hover:hover {
 }
 .statistics-card h2 {
     font-size: 2.5rem;
-    color: #2a95ff;
+    color: var(--c1);
 }
 .statistics-card h3 {
     color: var(--title-color);
@@ -904,7 +1072,7 @@ a.btn-link-hover:hover {
     );
 }
 .statistics-card__ongoing h2 {
-    color: #3bc575;
+    color: var(--success-color);
 }
 .statistics-card__not_served::after,
 .statistics-card__canceled::after {
@@ -916,7 +1084,7 @@ a.btn-link-hover:hover {
 }
 .statistics-card__not_served h2,
 .statistics-card__canceled h2 {
-    color: #ff6767;
+    color: var(--c2);
 }
 .statistics-card__total_provider::after,
 .statistics-card__subscribed-providers::after {
@@ -928,7 +1096,7 @@ a.btn-link-hover:hover {
 }
 .statistics-card__total_provider h2,
 .statistics-card__subscribed-providers h2 {
-    color: #f3a735;
+    color: var(--c1);
 }
 .statistics-card__style2 {
     border: 0.0625rem solid rgba(42, 149, 255, 0.5);
@@ -938,7 +1106,7 @@ a.btn-link-hover:hover {
 }
 .statistics-card__style2 h2 {
     font-size: 1.875rem;
-    color: #2a95ff;
+    color: var(--c1);
     -webkit-margin-after: 1.25rem;
     margin-block-end: 1.25rem;
 }
@@ -949,7 +1117,7 @@ a.btn-link-hover:hover {
     border: 0.0625rem solid rgba(59, 197, 117, 0.5);
 }
 .statistics-card__already-withdraw h2 {
-    color: #3bc575;
+    color: var(--success-color);
 }
 .statistics-card__already-withdraw::after {
     background: rgba(59, 197, 117, 0.05);
@@ -958,7 +1126,7 @@ a.btn-link-hover:hover {
     border: 0.0625rem solid rgba(255, 103, 103, 0.5);
 }
 .statistics-card__withdrawable-amount h2 {
-    color: #ff6767;
+    color: var(--c2);
 }
 .statistics-card__withdrawable-amount::after {
     background: rgba(255, 103, 103, 0.05);
@@ -967,7 +1135,7 @@ a.btn-link-hover:hover {
     border: 0.0625rem solid rgba(243, 167, 53, 0.5);
 }
 .statistics-card__total-earning h2 {
-    color: #f3a735;
+    color: var(--c1);
 }
 .statistics-card__total-earning::after {
     background: rgba(243, 167, 53, 0.05);
@@ -984,7 +1152,7 @@ a.btn-link-hover:hover {
 .statistics-card__collect-cash h2 {
     -webkit-margin-after: 1.875rem;
     margin-block-end: 1.875rem;
-    color: #4153b3;
+    color: var(--c1);
 }
 .statistics-card__collect-cash::after {
     background: linear-gradient(
@@ -1037,40 +1205,40 @@ a.btn-link-hover:hover {
     border-radius: 100%;
 }
 .badge-info {
-    background-color: rgba(43, 149, 255, 0.1);
-    color: #2b95ff;
+    background-color: var(--c1-light-bg);
+    color: var(--c1);
 }
 .badge-info .dot {
-    background-color: #2b95ff;
+    background-color: var(--c1);
 }
 .badge-primary {
-    background-color: #199b95;
-    color: #fff !important;
+    background-color: var(--c1);
+    color: var(--absolute-white) !important;
     padding: 0.3em 1em;
 }
 .badge-primary .dot {
-    background-color: #4153b3;
+    background-color: var(--c1);
 }
 .badge-success,
 .table .badge-success {
-    background-color: #16b559;
-    color: #fff;
+    background-color: var(--success-color);
+    color: var(--absolute-white);
 }
 .badge-light {
-    background-color: #ff3737;
-    color: #fff !important;
+    background-color: var(--c2);
+    color: var(--absolute-white) !important;
     padding: 0.3em 1.2em;
 }
 .badge-success .dot {
-    background-color: #16b559;
+    background-color: var(--success-color);
 }
 .badge-danger {
-    background-color: #dbc106;
-    color: #fff !important;
+    background-color: var(--c1);
+    color: var(--absolute-white) !important;
     padding: 0.3em 0.9em;
 }
 .badge-danger .dot {
-    background-color: #ff3737;
+    background-color: var(--c2);
 }
 
 .service-price-list {
@@ -1251,7 +1419,7 @@ label {
 .rating-review__title {
     font-weight: var(--medium);
     font-size: 2.1875rem;
-    color: #758590;
+    color: var(--text-light-color);
     -webkit-margin-after: 0.25rem;
     margin-block-end: 0.8rem;
 }
@@ -1259,7 +1427,7 @@ label {
     margin-bottom: 0.8rem;
 }
 .rating-review__info {
-    color: #758590;
+    color: var(--text-light-color);
     font-weight: var(--semi-bold);
 }
 .progress {
@@ -1294,12 +1462,12 @@ label {
     padding-top: 0;
     margin-bottom: 1rem;
     cursor: pointer;
-    border-bottom: 1px solid #f1f1f1;
+    border-bottom: 1px solid var(--border-color);
 }
 .common-list li h6,
 .common-list li h5 {
     font-weight: bold;
-    color: #758590;
+    color: var(--text-light-color);
     -webkit-margin-after: 0.3125rem;
      margin-block-end: 0.3125rem;
   }
@@ -1365,7 +1533,7 @@ p:last-child {
     background-color: rgba(65, 83, 179, 0.05);
 }
 .timeline-step.completed .timeline-number {
-    background-color: #16b559;
+    background-color: var(--success-color);
     border-radius: 50%;
     padding: 6px;
 }
@@ -1373,21 +1541,21 @@ p:last-child {
     margin: 0.3125rem 0 1.25rem;
 }
 .timeline-step.completed .timeline-title {
-    color: #213b36;
+    color: var(--title-color);
 }
 .timeline-title {
     font-size: 1rem;
-    color: #dcdcdc;
+    color: var(--timeline-color);
     margin: 0 0 0.5rem;
 }
 .timeline-step.completed .timeline-text {
-    color: #4b5864;
+    color: var(--text-color);
     opacity: 0.5;
 }
 .timeline-text {
     -webkit-margin-after: 0.3125rem;
     margin-block-end: 0.3125rem;
-    color: #dcdcdc;
+    color: var(--timeline-color);
 }
 .timeline-step {
     display: flex;
@@ -1397,7 +1565,7 @@ p:last-child {
 .timeline-number {
     width: 2rem;
     height: 2rem;
-    background-color: #dcdcdc;
+    background-color: var(--timeline-color);
     flex-shrink: 0;
     display: flex;
     justify-content: center;
@@ -1414,7 +1582,7 @@ p:last-child {
     inset-block-start: 2rem;
     block-size: 0;
     inline-size: 0.125rem;
-    background-color: #dcdcdc;
+    background-color: var(--timeline-color);
 }
 .radius-10 {
     border-radius: 0.625rem !important;
@@ -2251,11 +2419,11 @@ h4.booking-text{
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background-color: #5F60B9;
+    background-color: var(--c1);
     padding: 15px 20px;
 }
 .iq-sub-dropdown .notification_data .card-header .notify-title{
-    color: #fff;
+    color: var(--absolute-white);
 }
 .iq-sub-dropdown .notification_data  ul.notification-height a{
     white-space: normal;
@@ -2266,7 +2434,7 @@ h4.booking-text{
     text-decoration: none;
 }
 .iq-top-navbar{
-    background: #fff;
+    background: var(--white-color);
 }
 .dataTables_paginate .pagination .paginate_button.previous .page-link,
 .dataTables_paginate .pagination .paginate_button.next .page-link{
@@ -2294,12 +2462,12 @@ table.dataTable{
 }
 .table td,
 .table thead th{
-    border-bottom: 1px solid #f1f1f1;
+    border-bottom: 1px solid var(--border-color);
 }
 .table thead th,
 .table tr th{
-    background:#5F60B9;
-    color:#fff;
+    background: var(--c1);
+    color: var(--absolute-white);
 }
 .table thead th {
     vertical-align: middle;
@@ -2316,16 +2484,16 @@ table.dataTable > thead .sorting::after, table.dataTable > thead .sorting::befor
     transform: translateY(-50%);
 }
 .setting-pills .nav-pills .nav-link{
-    background-color: rgba(95, 96, 185, 0.1);
-    color:#5F60B9;
+    background-color: var(--c1-light-bg);
+    color: var(--c1);
     padding: 12px 16px;
     line-height: normal;
     display: block;
 }
 .setting-pills .nav-pills .nav-link.active,
 .setting-pills .nav-pills .nav-link:hover{
-    background-color: #5F60B9;
-    color:#fff;
+    background-color: var(--c1);
+    color: var(--absolute-white);
 }
 .setting-pills .nav-pills li{
     margin-bottom:16px;
@@ -2337,16 +2505,16 @@ table.dataTable > thead .sorting::after, table.dataTable > thead .sorting::befor
     padding:1.5em;
 }
 #permissionList .btn:hover {
-    background-color: #5F60B9;    
+    background-color: var(--c1);
 }
 #permissionList .btn:hover .permission-text{
-    color:#fff;
+    color: var(--absolute-white);
 }
 .iq-sidebar .iq-sidebar-logo{
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    border-bottom: 1px solid #f1f1f1;
+    border-bottom: 1px solid var(--border-color);
     margin-bottom: 8px;
 }
 .iq-sidebar .iq-sidebar-logo a{
@@ -2383,14 +2551,14 @@ body:not(.sidebar-main) .user-profile .avatar{
 }
 .dropdown-menu.user-dropdown .dropdown-item:hover{
     border-radius: 0;
-    background: rgba(143, 159, 188, 0.1);
+    background: var(--c1-light-bg);
 }
 .common-list .book-date{
     color: var(--text-color);
 }
 .nav-tabs .nav-link{
-    background-color: rgba(95, 96, 185, 0.1);
-    color: #5F60B9;
+    background-color: var(--c1-light-bg);
+    color: var(--c1);
     padding: 12px 16px;
     line-height: normal;
     border-bottom: none;
@@ -2398,8 +2566,8 @@ body:not(.sidebar-main) .user-profile .avatar{
 }
 .nav-tabs .nav-link.active,
 .nav-tabs .nav-link:hover{
-    background-color: #5F60B9;
-    color: #fff;
+    background-color: var(--c1);
+    color: var(--absolute-white);
 }
 .nav-tabs .nav-item{
     margin: 0 15px 0 0;
@@ -2427,8 +2595,8 @@ body:not(.sidebar-main) .user-profile .avatar{
 }
 .provider-detail-tab .nav-item.active .nav-link,
 .provider-detail-tab .nav-item:hover .nav-link  {
-    background-color: #5F60B9;
-    color: #fff;
+    background-color: var(--c1);
+    color: var(--absolute-white);
 }
 .provider-detail-tab .nav-item .nav-link {
     padding:8px 16px;
@@ -2440,7 +2608,7 @@ body:not(.sidebar-main) .user-profile .avatar{
     margin-right:0;
 }
 .bk-summary-table{
-    background: #f1f1f1;
+    background: var(--bg-color2);
     padding: 20px;
     margin-top: 20px;
     border-radius: 5px;
@@ -2515,6 +2683,10 @@ body:not(.sidebar-main) .user-profile .avatar{
     padding: 0.8rem 1.5rem;
     border-radius: 5px;
 }
+.iq-sidebar-menu .side-menu li a:hover{
+    color: var(--c1);
+    background: var(--c1-light-bg);
+}
 .iq-sidebar-menu .side-menu>li>a{
     margin: 0 1rem;
 }
@@ -2529,20 +2701,21 @@ body:not(.sidebar-main) .user-profile .avatar{
 }
 .iq-sidebar-menu .side-menu li:hover>a>svg.sidebar-menu-icon path,
 .iq-sidebar-menu .side-menu li.active>a>svg.sidebar-menu-icon path{
-    fill:#5F60B9;
+    fill: var(--c1);
 }
 .iq-sidebar-menu .side-menu li.active>a>svg.iq-arrow-right.arrow-active path,
 .iq-sidebar-menu .side-menu li:hover>a>svg.iq-arrow-right path{
-    stroke:#5F60B9;
+    stroke: var(--c1);
 }
 .sidebar-default .iq-sidebar-menu .side-menu > li.active > a{
-    background: rgba(95, 96, 185, 0.1);
+    background: var(--c1-light-bg);
+    color: var(--c1);
 }
 .sidebar-default .iq-sidebar-menu .side-menu li.active .submenu li.active > a{
     background: transparent;
 }
 .common-list .media-body span{
-    color: #758590;
+    color: var(--text-light-color);
 }
 .iq-sidebar-menu .side-menu li a span.custom-tooltip{
     opacity: 0;
@@ -2554,7 +2727,7 @@ body:not(.sidebar-main) .user-profile .avatar{
     stroke:none;
 }
 .sidebar-default .iq-sidebar-menu svg.iq-arrow-right {
-    stroke:#8F9FBC;
+    stroke: var(--text-light-color);
 }
 table.data-table.provider-booking-data{
     width:100% !important;
@@ -2569,21 +2742,21 @@ table.data-table.provider-booking-data{
 .card.total-provider-card,
 .card.total-booking-card,
 .card.total-revenue{
-    background: #5F60B9;
+    background: var(--c1);
     opacity: 1;
 }
 .change-mode .custom-switch.custom-switch-icon label.custom-control-label:before {
-    border-color: #5F60B9;
+    border-color: var(--c1);
 }
 .change-mode .custom-switch.custom-switch-icon label.custom-control-label:after {
-    background-color: #5F60B9;
-    border-color: #5F60B9;
+    background-color: var(--c1);
+    border-color: var(--c1);
 }
 .iq-card-icon.iq-card-icon-booking,
 .iq-card-icon.iq-card-icon-service,
 .iq-card-icon.iq-card-icon-provider,
 .iq-card-icon.iq-card-icon-revenue {
-    background: #46479f;
+    background: var(--c1);
 }
 .iq-card-icon{
     display: inline-flex;
@@ -2591,8 +2764,8 @@ table.data-table.provider-booking-data{
     justify-content: center;
 }
 .badge-pending{
-    background: rgba(95, 96, 185, 0.1);
-    color: #5F60B9;
+    background: var(--c1-light-bg);
+    color: var(--c1);
 }
 .page-item.disabled .page-link{
     background-color: var(--body-bg);
@@ -2600,19 +2773,19 @@ table.data-table.provider-booking-data{
 }
 .badge-paid,
 .badge-active{
-    background-color: #D0F0DE;
-    border:1px solid #16b559;
-    color: #16b559 !important;
+    background-color: rgba(22, 181, 89, 0.1);
+    border:1px solid var(--success-color);
+    color: var(--success-color) !important;
 }
 .badge-pay-pending{
-    background: #DCE9F6;
-    border:1px solid #4e8fd3;
-    color: #4e8fd3 !important;
+    background: var(--c1-light-bg);
+    border:1px solid var(--c1);
+    color: var(--c1) !important;
 }
 .badge-inactive{
-    background-color: #FFD7D7;
-    color: #ff3737 !important;
-    border:1px solid #ff3737;
+    background-color: rgba(255, 103, 103, 0.1);
+    color: var(--c2) !important;
+    border:1px solid var(--c2);
 }
 .statistics-card .btn{
     text-align: center;
@@ -2627,7 +2800,7 @@ ul.contact-list li:last-child{
     margin-bottom: 0;
 }
 .rating-progress .progress {
-    background-color: #f5f5f5;
+    background-color: var(--bg-color2);
     box-shadow: none;
 }
 select.booking-Status {
@@ -2825,16 +2998,16 @@ table.dataTable > thead .sorting_desc_disabled::after {
     .iq-sidebar-menu .side-menu li.category-main{
         margin-top: 20px;
         padding-top: 20px;
-        border-top: 1px solid #EBEBEB;
+        border-top: 1px solid var(--border-color);
         margin-bottom: 8px;
     }
     body:not(.sidebar-main) .sidebar-default .iq-sidebar-menu .side-menu > li > a[aria-expanded="true"]{
-        background: rgba(95, 96, 185, 0.1);
-        color: #5F60B9;
+        background: var(--c1-light-bg);
+        color: var(--c1);
     }
 
     body:not(.sidebar-main) .sidebar-default .iq-sidebar-menu .side-menu > li.active > a .iq-arrow-right path{
-        stroke: #5F60B9;
+        stroke: var(--c1);
     }
     body:not(.sidebar-main) .iq-sidebar-menu .side-menu li ul.submenu {
         padding-left: 1.5rem;
@@ -2860,7 +3033,7 @@ table.dataTable > thead .sorting_desc_disabled::after {
         left:0;
         width: 1px;
         height:100%;
-        background-color:#EBEBEB;
+        background-color: var(--bg-color2);
         transition: all .45s ease;
         -webkit-transition: all .45s ease;
         -o-transition: all .45s ease;    
@@ -2874,7 +3047,7 @@ table.dataTable > thead .sorting_desc_disabled::after {
         left:0;
         width: 15px;
         height: 1px;
-        background-color:#EBEBEB;
+        background-color: var(--bg-color2);
         top:50%;
         transform: translateY(-50%);
     }
@@ -2911,15 +3084,15 @@ table.dataTable > thead .sorting_desc_disabled::after {
     body.sidebar-main .iq-sidebar-menu .side-menu li.category-main{
         margin-top: 20px;
         padding-top: 20px;
-        border-top: 1px solid #EBEBEB;
+        border-top: 1px solid var(--border-color);
         margin-bottom: 8px;
     }
     body.sidebar-main .sidebar-default .iq-sidebar-menu .side-menu > li > a[aria-expanded="true"]{
-        background: rgba(95, 96, 185, 0.1);
-        color: #5F60B9;
+        background: var(--c1-light-bg);
+        color: var(--c1);
     }
     body.sidebar-main .sidebar-default .iq-sidebar-menu .side-menu > li.active > a .iq-arrow-right path{
-        stroke: #5F60B9;
+        stroke: var(--c1);
     }
     body.sidebar-main .iq-sidebar-menu .side-menu li ul.submenu {
         padding-left: 1.5rem;
@@ -2946,7 +3119,7 @@ table.dataTable > thead .sorting_desc_disabled::after {
         left:0;
         width: 1px;
         height:100%;
-        background-color:#EBEBEB;
+        background-color: var(--bg-color2);
     }
     body.sidebar-main .iq-sidebar-menu .side-menu li ul.submenu li:last-child:after{
         height: 50%;
@@ -2957,7 +3130,7 @@ table.dataTable > thead .sorting_desc_disabled::after {
         left:0;
         width: 15px;
         height: 1px;
-        background-color:#EBEBEB;
+        background-color: var(--bg-color2);
         top:50%;
         transform: translateY(-50%);
     }
@@ -2965,7 +3138,7 @@ table.dataTable > thead .sorting_desc_disabled::after {
         padding: 12px 15px 12px 24px;
     }
     .sidebar-default .iq-sidebar-menu .side-menu li.active .submenu li.active > a{
-        background: rgba(95, 96, 185, 0.1);
+        background: var(--c1-light-bg);
     }
     .iq-sidebar-menu .side-menu li.category-main a{
         padding:0.8rem 1.5rem;
@@ -3268,73 +3441,73 @@ table.dataTable > thead .sorting_desc_disabled::after {
 .dark .common-list li,
 .dark .bk-summary-table .grand-total td,
 .dark .iq-sidebar-menu .side-menu li.category-main{
-    border-color:#252525;
+    border-color: var(--bg-color2);
 }
 .dark .border-top {
-    border-top: 1px solid #252525 !important;
+    border-top: 1px solid var(--border-color) !important;
 }
 .dark a.btn-link-hover:hover span{
-    color: #5F60B9;
+    color: var(--c1);
 }
 .dark .iq-sidebar-menu .side-menu li.category-main a,
 .dark .nav--tabs .nav-link{
-    color: #fff;
+    color: var(--absolute-white);
 }
 .dark .customer-info-detail .customer-info-text,
 .dark .customer-info-detail .customer-info-value{
-    color:#EFF0F1;
+    color: var(--text-color);
 }
 .dark .card.bank-info-card{
-    background-color: #222222;
+    background-color: var(--white-color);
 }
 .dark .select2-container--default .select2-selection--multiple .select2-selection__choice__remove{
-    border-right-color: #252525;
+    border-right-color: var(--border-color);
 }
 .dark .card.config-info-card{
     background-color: rgba(143, 159, 188, 0.1);
 }
 .dark .iq-sidebar-menu .side-menu li a .svg path{
-    fill:#EFF0F1;
+    fill: var(--text-color);
 }
 .dark .user-profile,
 .dark .bk-summary-table{
     background:transparent;
-    color: #fff;
+    color: var(--absolute-white);
 }
 .dark .bk-summary-table .table-sm td{
-    color: #fff;
+    color: var(--absolute-white);
 }
 .dark .svg-icon{
     fill:none;
 }
 .dark .iq-sidebar .iq-sidebar-logo{
-    border-bottom-color:#252525;
+    border-bottom-color: var(--bg-color2);
 }
 .dark .iq-sidebar-menu .side-menu li a .iq-arrow-right path{
-    stroke: #8F9FBC;
+    stroke: var(--text-light-color);
 }
 .dark  .iq-sidebar-menu .side-menu li ul.submenu li:hover .nav-link span{
-    color:#5F60B9;
+    color: var(--c1);
 }
 .dark .iq-sidebar-menu .side-menu li ul.submenu li.active .nav-link span {
-    color: #5F60B9;
+    color: var(--c1);
 }
 
 .dark .common-list .media-body span{
-    color: #EFF0F1;
+    color: var(--text-color);
 }
 .dark  .read-notify-box .notification_count{
-    color: #fff;
-} 
+    color: var(--absolute-white);
+}
 .dark .pagination .page-link,
 .dark .pagination .page-item.disabled .page-link {
-    background-color: #222222;
-    border-color: #222222;
-    color: #fff;
+    background-color: var(--white-color);
+    border-color: var(--border-color);
+    color: var(--absolute-white);
 }
 .dark .page-item.active .page-link{
-    background-color: #5F60B9;
-    border-color: #5F60B9;
+    background-color: var(--c1);
+    border-color: var(--c1);
 }
 .dark .pagination .page-item.disabled .page-link{
     opacity: 0.6;
@@ -3351,40 +3524,40 @@ table.dataTable > thead .sorting_desc_disabled::after {
 }
 .dark a.btn-link-hover:hover,
 .dark a.btn-link-hover:focus {
-    color: #fff;
+    color: var(--absolute-white);
 }
 .dark .nav-tabs .nav-link.active {
-    color: #fff;
-    background-color:#5F60B9;
+    color: var(--absolute-white);
+    background-color: var(--c1);
     border-color: transparent;
 }
 .dark .nav-tabs .nav-link:hover{
     border-color: transparent;
 }
 .dark table.dataTable .notify-table-link{
-    color: #EFF0F1;
+    color: var(--text-color);
 }
 .dark table.dataTable .notify-table-link:hover{
-    color: #5F60B9;
+    color: var(--c1);
 }
 .dark ul.contact-list li .contact-info-text{
-    color:#EFF0F1;
+    color: var(--text-color);
 }
 .dark .rating-progress .progress {
-    background-color: #222222;
+    background-color: var(--white-color);
     box-shadow: none;
 }
 .dark .booking-service-link{
-    color: #EFF0F1;
+    color: var(--text-color);
 }
 .dark .booking-service-link:hover{
-    color: #5F60B9;
+    color: var(--c1);
 }
 .dark .bk-summary-table{
-    background-color: #222222;
+    background-color: var(--white-color);
 }
 .dark .bk-summary-table .grand-total td{
-    border-color: #323232;
+    border-color: var(--border-color);
 }
 .change-mode .custom-switch.custom-switch-icon label.custom-control-label .switch-icon-right,
 .change-mode .custom-switch.custom-switch-icon label.custom-control-label .switch-icon-left{
@@ -3395,10 +3568,10 @@ table.dataTable > thead .sorting_desc_disabled::after {
     background-color: rgba(95, 96, 185, 0.1);
 }
 .dark .text-danger{
-    color:#c03221 !important;
+    color: var(--c2) !important;
 }
 .dark .earning-icon{
-    color: #fff ;
+    color: var(--absolute-white);
 }
 .light-mode-trashed {
     background-color: rgba(95, 96, 185, 0.1) !important;
@@ -3407,29 +3580,29 @@ table.dataTable > thead .sorting_desc_disabled::after {
 @media (min-width: 1300px){
    .dark .iq-sidebar .side-menu-bt-sidebar.wide-device-toggle,
    body.dark.sidebar-main .iq-sidebar .iq-sidebar-logo{
-        background: #181818;
+        background: var(--sidebar-bg-dark);
     }
     .dark .iq-sidebar .side-menu-bt-sidebar.wide-device-toggle .iq-toggle-arrow{
-        color: #fff;
+        color: var(--absolute-white);
     }
     body:not(.sidebar-main).dark .iq-sidebar-menu .side-menu li ul.submenu li:after,
     body:not(.sidebar-main).dark .iq-sidebar-menu .side-menu li ul.submenu li:before{
-        background-color: #252525;
+        background-color: var(--bg-color2);
     }
 
 }
 @media (max-width: 1299px){
     body.dark.sidebar-main .iq-sidebar-menu .side-menu li ul.submenu li:after,
     body.dark.sidebar-main .iq-sidebar-menu .side-menu li ul.submenu li:before{
-        background-color: #252525;
+        background-color: var(--bg-color2);
     }
     body.sidebar-main .iq-sidebar-menu .side-menu li.category-main{
-        border-color:#252525;
+        border-color: var(--bg-color2);
     }
 }
 .badge-primary1 {
-    background: #5F60B9;
-    color: #fff !important;
+    background: var(--c1);
+    color: var(--absolute-white) !important;
 }
 
 .notification-setting-table{

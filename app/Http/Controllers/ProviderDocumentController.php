@@ -11,6 +11,23 @@ use App\Models\User;
 
 class ProviderDocumentController extends Controller
 {
+    private function scopedDocumentQuery(bool $withTrashed = false)
+    {
+        $query = $withTrashed ? ProviderDocument::withTrashed() : ProviderDocument::query();
+
+        if (auth()->user()->hasRole('provider')) {
+            $query->where('provider_id', auth()->id());
+        }
+
+        return $query;
+    }
+
+    private function authorizeDocumentActor(bool $adminOnly = false): void
+    {
+        $roles = $adminOnly ? ['admin', 'demo_admin'] : ['admin', 'demo_admin', 'provider'];
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole($roles), 403);
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -66,7 +83,7 @@ class ProviderDocumentController extends Controller
             })
 
             ->editColumn('document_id' , function ($query){
-                return ($query->document_id != null && isset($query->document)) ? $query->document->name : '';
+                return ($query->document_id != null && isset($query->document)) ? $query->document->localized_name : '';
             })
             ->filterColumn('provider_id',function($query,$keyword){
                 $query->whereHas('providers',function ($q) use($keyword){
@@ -84,6 +101,7 @@ class ProviderDocumentController extends Controller
     /* bulck action method */
     public function bulk_action(Request $request)
     {
+        $this->authorizeDocumentActor(true);
         $ids = explode(',', $request->rowIds);
 
         $actionType = $request->action_type;
@@ -92,7 +110,13 @@ class ProviderDocumentController extends Controller
 
         switch ($actionType) {
             case 'change-featured':
-                $branches = ProviderDocument::whereIn('id', $ids)->update(['is_verified' => $request->is_verified]);
+                $branches = ProviderDocument::whereIn('id', $ids)->update([
+                    'is_verified' => $request->is_verified,
+                    'verification_status' => $request->is_verified ? 'approved' : 'pending',
+                    'review_reason' => null,
+                    'reviewed_by' => auth()->id(),
+                    'reviewed_at' => now(),
+                ]);
                 $message = 'Bulk ProviderDocument Featured Updated';
                 break;
 
@@ -126,11 +150,13 @@ class ProviderDocumentController extends Controller
      */
     public function create(Request $request)
     {
+        $this->authorizeDocumentActor();
         $id = $request->id;
         $auth_user = authSession();
         $providerdocument = $request->providerdocument;
-        $providerdata = User::with('providerDocument')->where('user_type','provider')->where('id',$providerdocument)->first();
-        $provider_document = ProviderDocument::find($id);
+        $providerdocument = auth()->user()->hasRole('provider') ? auth()->id() : $providerdocument;
+        $providerdata = User::with('providerDocument')->where('user_type','provider')->where('id',$providerdocument)->firstOrFail();
+        $provider_document = $id ? $this->scopedDocumentQuery()->findOrFail($id) : null;
         $pageTitle = trans('messages.update_form_title',['form'=>trans('messages.providerdocument')]);
 
         if( $provider_document == null){
@@ -149,6 +175,7 @@ class ProviderDocumentController extends Controller
      */
     public function store(ProviderDocumentRequest $request)
     {
+        $this->authorizeDocumentActor();
         if(demoUserPermission()){
             if(request()->is('api/*')){
                 return comman_message_response( __('messages.demo_permission_denied') );
@@ -156,13 +183,25 @@ class ProviderDocumentController extends Controller
                 return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
             }
         }
-        $data = $request->all();
+        $data = $request->validated();
+        unset($data['id'], $data['provider_document']);
         if (auth()->user()->hasRole('provider')) {
             $data['provider_id'] = auth()->id();
+            unset($data['is_verified']);
         }
-        $data['is_verified'] = !empty($data['is_verified']) ? $data['is_verified']: 0;
         $data['provider_id'] = !empty( $data['provider_id'] ) ?  $data['provider_id'] : auth()->user()->id;
-        $result = ProviderDocument::updateOrCreate(['id' => $request->id ],$data);
+        $result = $request->filled('id')
+            ? $this->scopedDocumentQuery()->findOrFail($request->id)
+            : new ProviderDocument();
+        if (!$result->exists || auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            $isVerified = (bool) ($data['is_verified'] ?? false);
+            $data['is_verified'] = $isVerified;
+            $data['verification_status'] = $isVerified ? 'approved' : 'pending';
+            $data['review_reason'] = null;
+            $data['reviewed_by'] = $isVerified ? auth()->id() : null;
+            $data['reviewed_at'] = $isVerified ? now() : null;
+        }
+        $result->fill($data)->save();
         storeMediaFile($result,$request->provider_document, 'provider_document');
 
         $message = __('messages.update_form',['form' => __('messages.providerdocument')]);
@@ -183,6 +222,10 @@ class ProviderDocumentController extends Controller
      */
     public function show(Request $request, $id)
     {
+        $this->authorizeDocumentActor();
+        if (auth()->user()->hasRole('provider')) {
+            abort_unless((int) $id === (int) auth()->id(), 403);
+        }
         $auth_user = authSession();
         $providerdata = User::with('providerDocument')->where('user_type','provider')->where('id',$id)->first();
         $filter = [
@@ -196,7 +239,22 @@ class ProviderDocumentController extends Controller
             return redirect(route('provider.index'))->withError($msg);
         }
 
-        return view('providerdocument.view', compact('pageTitle' ,'providerdata' ,'auth_user','assets','filter' ));
+        $sanadProviderVerificationSummary = $this->sanadProviderVerificationSummary($providerdata);
+
+        return view('providerdocument.view', compact('pageTitle' ,'providerdata' ,'auth_user','assets','filter','sanadProviderVerificationSummary' ));
+    }
+
+    private function sanadProviderVerificationSummary(User $provider)
+    {
+        $documents = ProviderDocument::where('provider_id', $provider->id);
+
+        return [
+            'total_documents' => (clone $documents)->count(),
+            'verified_documents' => (clone $documents)->where('is_verified', 1)->count(),
+            'pending_documents' => (clone $documents)->where('is_verified', 0)->count(),
+            'required_document_types' => \App\Models\Documents::where('status', 1)->where('is_required', 1)->count(),
+            'verification_status' => (clone $documents)->where('is_verified', 0)->exists() ? 'Pending Review' : 'Verified',
+        ];
     }
 
     /**
@@ -230,13 +288,15 @@ class ProviderDocumentController extends Controller
      */
     public function destroy($id)
     {
+        $this->authorizeDocumentActor();
         if(demoUserPermission()){
             if(request()->is('api/*')){
                 return comman_message_response( __('messages.demo_permission_denied') );
             }
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
-        $provider_document = ProviderDocument::find($id);
+        $provider_document = $this->scopedDocumentQuery()->find($id);
+        $msg = __('messages.not_found_entry',['name' => __('messages.providerdocument')] );
 
         if( $provider_document!='') {
 
@@ -250,9 +310,10 @@ class ProviderDocumentController extends Controller
     }
 
     public function action(Request $request){
+        $this->authorizeDocumentActor(true);
         $id = $request->id;
 
-        $provider_document  = ProviderDocument::withTrashed()->where('id',$id)->first();
+        $provider_document  = $this->scopedDocumentQuery(true)->where('id',$id)->firstOrFail();
         $msg = __('messages.not_found_entry',['name' => __('messages.providerdocument')] );
         if($request->type == 'restore') {
             $provider_document->restore();

@@ -6,11 +6,23 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="baseUrl" content="{{env('APP_URL')}}" />
 
-    <title>{{ config('app.name', 'Laravel') }}</title>
+    <title>{{ config('sanad.brand.name', 'Quick') }}</title>
 
     @include('partials._head')
 </head>
-<body class="" id="app">
+<body class="{{ $userTheme['theme_class'] ?? 'theme-customer' }}" id="app">
 @include('partials._body')
+<script>
+    // Apply role-based theme
+    document.documentElement.className += ' {{ $userTheme['theme_class'] ?? 'theme-customer' }}';
+
+    // Set CSS custom properties for dynamic theming
+    document.documentElement.style.setProperty('--role-primary-light', '{{ $userTheme['primary_light'] ?? '#4A75FB' }}');
+    document.documentElement.style.setProperty('--role-primary-dark', '{{ $userTheme['primary_dark'] ?? '#004CB2' }}');
+
+    // Brand colors for rotating cards
+    window.brandColors = @json($brandColors ?? []);
+    window.userRole = '{{ $userTheme['role'] ?? 'customer' }}';
+</script>
 </body>
 </html>

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Service;
+use App\Models\ServiceAddon;
+use App\Models\ServicePackage;
 use App\Models\User;
 use App\Models\Setting;
 use App\Http\Requests\ServiceRequest;
@@ -12,6 +14,10 @@ use App\Models\UserFavouriteService;
 
 class ServiceController extends Controller
 {
+    private function ensureSanadCatalogAdmin(Request $request): void
+    {
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+    }
     /**
      * Display a listing of the resource.
      *
@@ -27,7 +33,25 @@ class ServiceController extends Controller
         $pageTitle = __('messages.list_form_title',['form' => __('messages.service')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('service.index', compact('pageTitle','auth_user','assets','filter','postrequestid','servicepackage'));
+        $sanadServiceSummary = $this->sanadServiceSummary();
+        return view('service.index', compact('pageTitle','auth_user','assets','filter','postrequestid','servicepackage','sanadServiceSummary'));
+    }
+
+    private function sanadServiceSummary()
+    {
+        $serviceQuery = Service::query()->myService();
+        $packageQuery = ServicePackage::query()->myPackage();
+        $addonQuery = ServiceAddon::query()->serviceAddon();
+
+        return [
+            'total_services' => (clone $serviceQuery)->count(),
+            'active_services' => (clone $serviceQuery)->where('status', 1)->count(),
+            'inactive_services' => (clone $serviceQuery)->where('status', 0)->count(),
+            'packages' => (clone $packageQuery)->count(),
+            'active_packages' => (clone $packageQuery)->where('status', 1)->count(),
+            'addons' => (clone $addonQuery)->count(),
+            'active_addons' => (clone $addonQuery)->where('status', 1)->count(),
+        ];
     }
 
     // get datatable data
@@ -66,15 +90,33 @@ class ServiceController extends Controller
             })
 
             ->editColumn('name', function($query){
+                $image = getSingleMedia($query, 'service_attachment', null) ?: getSingleMedia($query, 'service_image', null);
+                $nameEn = $query->name_en ?: $query->name;
+                $nameAr = $query->name_ar ?: '';
+
+                $thumb = $image 
+                    ? '<img src="'.$image.'" alt="'.e($nameEn).'" class="quick-category-avatar" style="width:38px;height:38px;object-fit:cover;border-radius:10px;border:1px solid var(--quick-shell-line);flex-shrink:0;background:var(--quick-shell-surface);">'
+                    : '<div class="quick-category-avatar-placeholder" style="width:38px;height:38px;border-radius:10px;background:rgba(31,107,255,.09);color:var(--quick-blue);display:grid;place-items:center;font-weight:900;font-size:14px;border:1px solid rgba(31,107,255,.15);flex-shrink:0;">'.mb_substr($nameEn, 0, 1).'</div>';
+
                 if (auth()->user()->can('service edit')) {
-                    $link =  '<a class="btn-link btn-link-hover" href='.route('service.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                    $link = '<a class="quick-category-title-link" style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);text-decoration:none;" href="'.route('service.create', ['id' => $query->id]).'">'.e($nameEn).'</a>';
                 } else {
-                    $link = $query->name;
+                    $link = '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">'.e($nameEn).'</span>';
                 }
-                return $link;
+
+                $subtext = $nameAr ? '<span style="display:block;font-size:11px;color:var(--quick-shell-muted);margin-top:2px;">'.e($nameAr).'</span>' : '';
+
+                return '<div style="display:flex;align-items:center;gap:12px;">'.$thumb.'<div style="min-width:0;">'.$link.$subtext.'</div></div>';
+            })
+            ->editColumn('name_ar', function($query){
+                return '<span style="font-weight:700;font-size:13px;color:var(--quick-shell-ink);">'.e($query->name_ar ?: '-').'</span>';
             })
             ->editColumn('category_id' , function ($query){
-                return ($query->category_id != null && isset($query->category)) ? $query->category->name : '-';
+                if ($query->category_id != null && isset($query->category)) {
+                    $catName = app()->getLocale() === 'ar' && !empty($query->category->name_ar) ? $query->category->name_ar : ($query->category->name_en ?: $query->category->name);
+                    return '<span class="quick-order-badge" style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:8px;background:rgba(31,107,255,.08);color:var(--quick-blue);font-weight:700;font-size:12px;border:1px solid rgba(31,107,255,.14);">'.e($catName).'</span>';
+                }
+                return '<span style="color:var(--quick-shell-muted);">-</span>';
             })
             ->filterColumn('category_id',function($query,$keyword){
                 $query->whereHas('category',function ($q) use($keyword){
@@ -91,14 +133,33 @@ class ServiceController extends Controller
                 });
             })
             ->editColumn('price' , function ($query){
-                return getPriceFormat($query->price).'-'.ucFirst($query->type);
+                return '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">' . getPriceFormat($query->price) . '</span> <small style="color:var(--quick-shell-muted);font-weight:600;">/ ' . ucfirst($query->type) . '</small>';
             })
 
             ->editColumn('discount' , function ($query){
                 return $query->discount ? $query->discount .'%' : '-';
             })
+            ->editColumn('government_entity' , function ($query){
+                return $query->government_entity ?: '-';
+            })
+            ->editColumn('government_fee' , function ($query){
+                return $query->government_fee !== null ? getPriceFormat($query->government_fee) : '-';
+            })
+            ->editColumn('service_fee' , function ($query){
+                return $query->service_fee !== null ? getPriceFormat($query->service_fee) : '-';
+            })
+            ->editColumn('is_featured' , function ($query){
+                $disabled = $query->trashed() ? 'disabled': '';
+
+                return '<div class="custom-control custom-switch custom-switch-text custom-switch-color custom-control-inline">
+                    <div class="custom-switch-inner">
+                        <input type="checkbox" class="custom-control-input change_status" data-type="service_featured" data-name="is_featured" '.($query->is_featured ? "checked" : "").' '.$disabled.' value="'.$query->id.'" id="f'.$query->id.'" data-id="'.$query->id.'">
+                        <label class="custom-control-label" for="f'.$query->id.'" data-on-label="'.__("messages.yes").'" data-off-label="'.__("messages.no").'"></label>
+                    </div>
+                </div>';
+            })
             ->addColumn('action', function ($data) {
-                return view('service.action', compact('data'));
+                return view('service.action', compact('data'))->render();
             })
             ->editColumn('status' , function ($query){
                 $disabled = $query->trashed() ? 'disabled': '';
@@ -110,12 +171,13 @@ class ServiceController extends Controller
                 </div>';
             })
 
-            ->rawColumns(['action', 'status', 'check','name'])
+            ->rawColumns(['action', 'status', 'check','name','name_ar','category_id','price','is_featured'])
             ->toJson();
     }
 
     public function bulk_action(Request $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         $ids = explode(',', $request->rowIds);
 
         $actionType = $request->action_type;
@@ -163,7 +225,8 @@ class ServiceController extends Controller
         $pageTitle = __('messages.list_form_title',['form' => __('messages.service')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('service.user_service_list', compact('pageTitle','auth_user','assets','filter'));
+        $sanadServiceSummary = $this->sanadServiceSummary();
+        return view('service.user_service_list', compact('pageTitle','auth_user','assets','filter','sanadServiceSummary'));
 
     }
 
@@ -174,6 +237,7 @@ class ServiceController extends Controller
      */
     public function create(Request $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         $id = $request->id;
 
         $auth_user = authSession();
@@ -228,16 +292,60 @@ class ServiceController extends Controller
      */
     public function store(ServiceRequest $request)
     {
+        $this->ensureSanadCatalogAdmin($request);
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
 
         $services = $request->all();
+        $services['name'] = $request->name_en;
+        $services['required_documents'] = $this->requiredDocumentsToArray($request->required_documents);
+        $services['service_instructions'] = $this->serviceInstructionsToJson($request->service_instructions);
+        $services['required_employee_skills'] = $this->linesToArray($request->required_employee_skills);
+        $services['type'] = $request->type ?: 'fixed';
+        $services['price'] = $request->price ?? $request->service_fee ?? 0;
 
         $services['service_type'] = !empty($request->service_type) ? $request->service_type : 'service';
-        $services['provider_id'] = !empty($request->provider_id) ? $request->provider_id : auth()->user()->id;
+        $services['provider_id'] = !empty($request->provider_id) ? $request->provider_id : admin_id();
         if(auth()->user()->hasRole('user')){
             $services['service_type'] = 'user_post_service';
+        }
+
+        if(auth()->user()->hasRole('provider') && !$request->is('api/*')) {
+            if(empty($request->id)) {
+                return redirect()->back()->withErrors('Partners can enable and maintain assigned Sanad services, but cannot create public master services.');
+            }
+
+            $existingService = Service::where('provider_id', auth()->id())->findOrFail($request->id);
+            $services = array_merge($existingService->only([
+                'name',
+                'name_ar',
+                'name_en',
+                'category_id',
+                'subcategory_id',
+                'provider_id',
+                'type',
+                'price',
+                'discount',
+                'description',
+                'government_entity',
+                'required_documents',
+                'estimated_completion_time',
+                'government_fee',
+                'service_fee',
+                'service_instructions',
+                'terms_and_conditions',
+                'is_featured',
+                'service_type',
+                'visit_type',
+            ]), [
+                'id' => $existingService->id,
+                'status' => $request->status,
+                'duration' => $request->duration,
+                'is_slot' => $request->has('is_slot') ? 1 : 0,
+                'partner_availability_notes' => $request->partner_availability_notes,
+                'required_employee_skills' => $this->linesToArray($request->required_employee_skills),
+            ]);
         }
 
         if($request->id == null && default_earning_type() === 'subscription'){
@@ -371,7 +479,8 @@ class ServiceController extends Controller
      */
     public function edit($id)
     {
-        //
+        $this->ensureSanadCatalogAdmin(request());
+        return redirect()->route('service.create', ['id' => $id]);
     }
 
     /**
@@ -381,9 +490,11 @@ class ServiceController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(ServiceRequest $request, $id)
     {
-        //
+        $this->ensureSanadCatalogAdmin($request);
+        $request->merge(['id' => $id]);
+        return $this->store($request);
     }
 
     /**
@@ -394,6 +505,7 @@ class ServiceController extends Controller
      */
     public function destroy($id)
     {
+        $this->ensureSanadCatalogAdmin(request());
         if(demoUserPermission()){
             if(request()->is('api/*')){
                 return comman_message_response( __('messages.demo_permission_denied') );
@@ -413,6 +525,7 @@ class ServiceController extends Controller
         return comman_custom_response(['message'=> $msg, 'status' => true]);
     }
     public function action(Request $request){
+        $this->ensureSanadCatalogAdmin($request);
         $id = $request->id;
         $service = Service::withTrashed()->where('id',$id)->first();
         $msg = __('messages.not_found_entry',['name' => __('messages.service')] );
@@ -451,5 +564,131 @@ class ServiceController extends Controller
         $message = __('messages.delete_form',[ 'form' => __('messages.favourite') ] );
 
         return  redirect()->back()->withSuccess($message);
+    }
+
+    private function linesToArray($value)
+    {
+        if (is_array($value)) {
+            return array_values(array_filter($value));
+        }
+
+        if (empty($value)) {
+            return null;
+        }
+
+        $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return array_values(array_filter($decoded, function ($item) {
+                return is_string($item) ? trim($item) !== '' : !empty($item['name'] ?? $item['key'] ?? null);
+            }));
+        }
+
+        return collect(preg_split('/\r\n|\r|\n/', $value))
+            ->map(function ($line) {
+                return trim($line);
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function requiredDocumentsToArray($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $value = $decoded;
+            } else {
+                $value = preg_split('/\r\n|\r|\n/', $value);
+            }
+        }
+
+        return collect($value)
+            ->map(function ($document) {
+                if (is_string($document)) {
+                    $name = trim($document);
+                    return [
+                        'key' => \Illuminate\Support\Str::slug($name, '_'),
+                        'name' => $name,
+                        'name_ar' => $name,
+                        'required' => true,
+                        'approval_required' => true,
+                        'mime_types' => [],
+                        'max_size_mb' => 10,
+                    ];
+                }
+
+                $name = trim($document['name'] ?? '');
+                $nameAr = trim($document['name_ar'] ?? '');
+                $key = trim($document['key'] ?? '');
+                $mimeTypes = $document['mime_types'] ?? [];
+                if (is_string($mimeTypes)) {
+                    $mimeTypes = collect(explode(',', $mimeTypes))
+                        ->map(function ($mimeType) {
+                            return trim($mimeType);
+                        })
+                        ->filter()
+                        ->values()
+                        ->all();
+                }
+
+                return [
+                    'key' => $key !== '' ? \Illuminate\Support\Str::slug($key, '_') : \Illuminate\Support\Str::slug($name, '_'),
+                    'name' => $name,
+                    'name_ar' => $nameAr,
+                    'required' => filter_var($document['required'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'approval_required' => filter_var($document['approval_required'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'mime_types' => $mimeTypes,
+                    'max_size_mb' => max(1, (int) ($document['max_size_mb'] ?? 10)),
+                ];
+            })
+            ->filter(function ($document) {
+                return ($document['name'] ?? '') !== '' && ($document['name_ar'] ?? '') !== '';
+            })
+            ->values()
+            ->all() ?: null;
+    }
+
+    private function serviceInstructionsToJson($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $value = $decoded;
+            } else {
+                $value = preg_split('/\r\n|\r|\n/', $value);
+            }
+        }
+
+        $steps = collect($value)
+            ->map(function ($step, $index) {
+                if (is_string($step)) {
+                    $instruction = trim($step);
+                    return [
+                        'title' => 'Step '.($index + 1),
+                        'instruction' => $instruction,
+                    ];
+                }
+
+                return [
+                    'title' => trim($step['title'] ?? 'Step '.($index + 1)),
+                    'instruction' => trim($step['instruction'] ?? $step['description'] ?? ''),
+                ];
+            })
+            ->filter(function ($step) {
+                return ($step['title'] ?? '') !== '' || ($step['instruction'] ?? '') !== '';
+            })
+            ->values()
+            ->all();
+
+        return empty($steps) ? null : json_encode($steps, JSON_UNESCAPED_UNICODE);
     }
 }

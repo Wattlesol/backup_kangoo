@@ -23,7 +23,7 @@ trait EcommerceNotificationTrait
             'order' => $order,
             'order_number' => $order->formatted_order_number,
             'total_amount' => getPriceFormat($order->total_amount),
-            'order_date' => $order->created_at->format('Y-m-d H:i:s'),
+            'order_date' => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : now()->format('Y-m-d H:i:s'),
             'store_name' => $order->is_admin_order ? 'Admin Store' : ($order->store ? $order->store->name : 'N/A'),
             'user_name' => $order->customer ? $order->customer->display_name : 'Guest',
             'datetime' => now()->format('Y-m-d H:i:s')
@@ -261,25 +261,127 @@ trait EcommerceNotificationTrait
      */
     public function sendNotification($data)
     {
-        // Set specific recipients based on notification type
+        \Log::info('EcommerceNotificationTrait::sendNotification called with data: ', $data);
+        // Get site setup and general settings
+        $app_setting = \App\Models\Setting::getValueByKey('site-setup', 'site-setup');
+        date_default_timezone_set($app_setting->time_zone ?? 'UTC');
+        $data['datetime'] = date('Y-m-d H:i:s');
+
+        $admin = \App\Models\User::where('user_type', 'admin')->first();
+        $notification_type = $data['activity_type'];
+
+        // Set up order-specific data
         if (isset($data['order'])) {
-            $recipients = $this->getOrderNotificationRecipients($data['order']);
-            $data['recipients'] = $recipients;
-        } elseif (isset($data['store'])) {
-            $recipients = $this->getStoreNotificationRecipients($data['store']);
-            $data['recipients'] = $recipients;
-        } elseif (isset($data['product'])) {
-            $store = isset($data['store']) ? $data['store'] : null;
-            $recipients = $this->getProductNotificationRecipients($data['product'], $store);
-            $data['recipients'] = $recipients;
+            $order = $data['order'];
+            $id = $order->id;
+            $userId = $order->customer_id;
+
+            // Get provider IDs from order items
+            $providerIds = [];
+            foreach ($order->items as $item) {
+                if ($item->product && $item->product->created_by_type === 'provider') {
+                    $providerIds[] = $item->product->created_by;
+                }
+            }
+            $providerIds = array_unique($providerIds);
         }
 
-        // TODO: Implement actual notification sending logic
-        // For now, just log the notification data for testing
-        \Log::info('E-commerce notification would be sent', [
-            'type' => get_class($this),
-            'recipients' => $data['recipients'] ?? [],
-            'data' => $data
-        ]);
+        // Get general settings for company info
+        $generalsetting = \App\Models\Setting::getValueByKey('general-setting', 'general-setting');
+
+        // Prepare notification data
+        $notification_data = [
+            'id' => $id ?? 0,
+            'type' => $data['activity_type'],
+            'message' => $data['activity_message'],
+            "ios_badgeType" => "Increase",
+            "ios_badgeCount" => 1,
+            "notification-type" => $notification_type,
+            'logged_in_user_fullname' => $admin ? $admin['display_name'] ?: default_user_name() : '',
+            'logged_in_user_role' => $admin ? ucfirst($admin->user_type) ?? '-' : '',
+            'company_name' => env('APP_NAME'),
+            'company_contact_info' => implode('', [
+                $generalsetting->helpline_number ?? '' . PHP_EOL,
+                $generalsetting->inquriy_email ?? '',
+            ]),
+        ];
+
+        // Add order-specific data to notification
+        if (isset($order)) {
+            $notification_data['user_name'] = $order->customer ? $order->customer->display_name : 'Guest';
+            $notification_data['order_number'] = $order->formatted_order_number;
+            $notification_data['total_amount'] = getPriceFormat($order->total_amount);
+            $notification_data['order_date'] = $order->created_at->format('Y-m-d H:i:s');
+            $notification_data['store_name'] = $order->is_admin_order ? 'Admin Store' : ($order->store ? $order->store->name : 'Main Store');
+            $notification_data['order_status'] = ucfirst(str_replace('_', ' ', $order->status));
+
+            // Add status-specific data
+            if (isset($data['old_status'])) {
+                $notification_data['old_status'] = ucfirst(str_replace('_', ' ', $data['old_status']));
+            }
+            if (isset($data['status_notes'])) {
+                $notification_data['status_notes'] = $data['status_notes'];
+            }
+            if (isset($data['delivered_date'])) {
+                $notification_data['delivered_date'] = $data['delivered_date'];
+            }
+            if (isset($data['cancellation_reason'])) {
+                $notification_data['cancellation_reason'] = $data['cancellation_reason'];
+            }
+        }
+
+        // Find notification template
+        $mailable = \App\Models\NotificationTemplate::where('type', $notification_type)
+                    ->with('defaultNotificationTemplateMap')
+                    ->first();
+
+        if ($mailable != null && $mailable->to != null) {
+            $mails = json_decode($mailable->to);
+
+            foreach ($mails as $key => $mailTo) {
+                switch ($mailTo) {
+                    case 'admin':
+                        $admin = \App\Models\User::role('admin')->first();
+                        if (isset($admin->email)) {
+                            try {
+                                $admin->notify(new \App\Notifications\CommonNotification($notification_type, $notification_data));
+                            } catch (\Exception $e) {
+                                \Log::error('Failed to send admin notification: ' . $e->getMessage());
+                            }
+                        }
+                        break;
+
+                    case 'provider':
+                        if (isset($providerIds) && !empty($providerIds)) {
+                            foreach ($providerIds as $providerId) {
+                                $provider = \App\Models\User::find($providerId);
+                                if (isset($provider->email)) {
+                                    try {
+                                        $provider->notify(new \App\Notifications\CommonNotification($notification_type, $notification_data));
+                                    } catch (\Exception $e) {
+                                        \Log::error('Failed to send provider notification: ' . $e->getMessage());
+                                    }
+                                }
+                            }
+                        }
+                        break;
+
+                    case 'user':
+                        if (isset($userId)) {
+                            $user = \App\Models\User::find($userId);
+                            if (isset($user->email)) {
+                                try {
+                                    $user->notify(new \App\Notifications\CommonNotification($notification_type, $notification_data));
+                                } catch (\Exception $e) {
+                                    \Log::error('Failed to send user notification: ' . $e->getMessage());
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
+        } else {
+            \Log::warning('No notification template found for type: ' . $notification_type);
+        }
     }
 }

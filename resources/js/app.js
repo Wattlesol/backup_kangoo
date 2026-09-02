@@ -34,6 +34,8 @@ import SectionThumbnailSection from './sections/SectionThumbnailSection.vue'
 import PaginationCard from './components/PaginationCard.vue'
 import RatingCard from './components/RatingCard.vue'
 import BookingWizard from './sections/BookingWizard.vue'
+import OrderWizard from './sections/OrderWizard.vue'
+import OrderList from './sections/OrderList.vue'
 import RatingAllPage from './sections/RatingAllPage.vue'
 import BookingRating from './sections/BookingRating.vue'
 import HandymanRating from './sections/HandymanRating.vue'
@@ -41,6 +43,7 @@ import Payment from './components/Payment.vue'
 import PostJobForm from './sections/PostJobForm.vue'
 import BookingPostJob from './sections/BookingPostJob.vue'
 import Wallet from './components/Wallet.vue'
+
 const pinia = createPinia();
 
 const app = createApp()
@@ -71,6 +74,8 @@ app.component('section-thumbnail-section', SectionThumbnailSection)
 app.component('pagination-component', PaginationCard)
 app.component('rating-component', RatingCard)
 app.component('booking-wizard',BookingWizard)
+app.component('order-wizard',OrderWizard)
+app.component('order-list',OrderList)
 app.component('rating-all-page', RatingAllPage)
 app.component('booking-rating', BookingRating)
 app.component('handyman-rating', HandymanRating)
@@ -78,6 +83,7 @@ app.component('payment', Payment)
 app.component('post-job-form',PostJobForm)
 app.component('booking-post-job',BookingPostJob)
 app.component('wallet', Wallet)
+
 
 /*--------------------------------------
 Calculate Header height
@@ -148,9 +154,10 @@ function formatCurrency(number, noOfDecimal, currencyPosition, currencySymbol) {
 window.formatCurrency = formatCurrency;
 const i18n = createI18n({
   legacy: false,
-  locale: "en",
+  locale: window.currentLocale || document.documentElement.lang || "en",
+  fallbackLocale: "en",
   globalInjection: true,
-  messages: {en: window.localMessagesUpdate} || {},
+  messages: {[window.currentLocale || document.documentElement.lang || "en"]: window.localMessagesUpdate} || {},
 });
 
 window.i18n = i18n

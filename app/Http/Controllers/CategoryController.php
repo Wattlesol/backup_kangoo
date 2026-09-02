@@ -22,6 +22,11 @@ use App\Models\NotificationTemplate;
 
 class CategoryController extends Controller
 {
+    private function ensureSanadCatalogAdmin(): void
+    {
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -35,7 +40,17 @@ class CategoryController extends Controller
         $pageTitle = trans('messages.list_form_title',['form' => trans('messages.category')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('category.index', compact('pageTitle','auth_user','assets','filter'));
+
+        $categorySummary = [
+            'total' => Category::count(),
+            'active' => Category::where('status', 1)->count(),
+            'inactive' => Category::where('status', 0)->count(),
+            'featured' => Category::where('is_featured', 1)->count(),
+            'subcategories' => SubCategory::count(),
+            'services' => Service::count(),
+        ];
+
+        return view('category.index', compact('pageTitle','auth_user','assets','filter', 'categorySummary'));
     }
 
 
@@ -58,12 +73,30 @@ class CategoryController extends Controller
             })
 
             ->editColumn('name', function($query){                
+                $image = getSingleMedia($query, 'category_icon', null) ?: getSingleMedia($query, 'category_image', null);
+                $name = $query->name_en ?: $query->name;
+                $nameAr = $query->name_ar ?: '';
+                
+                $thumb = $image 
+                    ? '<img src="'.$image.'" alt="'.e($name).'" class="quick-category-avatar" style="width:38px;height:38px;object-fit:cover;border-radius:10px;border:1px solid var(--quick-shell-line);flex-shrink:0;background:var(--quick-shell-surface);">'
+                    : '<div class="quick-category-avatar-placeholder" style="width:38px;height:38px;border-radius:10px;background:rgba(31,107,255,.09);color:var(--quick-blue);display:grid;place-items:center;font-weight:900;font-size:14px;border:1px solid rgba(31,107,255,.15);flex-shrink:0;">'.mb_substr($name, 0, 1).'</div>';
+
                 if (auth()->user()->can('category edit')) {
-                    $link = '<a class="btn-link btn-link-hover" href='.route('category.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                    $link = '<a class="quick-category-title-link" style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);text-decoration:none;" href="'.route('category.create', ['id' => $query->id]).'">'.e($name).'</a>';
                 } else {
-                    $link = $query->name; 
+                    $link = '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">'.e($name).'</span>';
                 }
-                return $link;
+
+                $subtext = $nameAr ? '<span style="display:block;font-size:11px;color:var(--quick-shell-muted);margin-top:2px;">'.e($nameAr).'</span>' : '';
+
+                return '<div style="display:flex;align-items:center;gap:12px;">'.$thumb.'<div style="min-width:0;">'.$link.$subtext.'</div></div>';
+            })
+            ->editColumn('name_ar', function($query){
+                return '<span style="font-weight:700;font-size:13px;color:var(--quick-shell-ink);">'.e($query->name_ar ?: '-').'</span>';
+            })
+            ->editColumn('display_order', function($query){
+                $val = $query->display_order ?? 0;
+                return '<span class="quick-order-badge" style="display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 8px;border-radius:7px;background:color-mix(in srgb, var(--quick-blue) 9%, var(--quick-shell-surface));color:var(--quick-blue);font-weight:800;font-size:12px;border:1px solid rgba(31,107,255,.18);">'.$val.'</span>';
             })
            
             ->addColumn('action', function ($data) {
@@ -170,10 +203,13 @@ class CategoryController extends Controller
      */
     public function store(CategoryRequest $request)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $data['name'] = $request->name_en;
+        $data['display_order'] = $request->display_order ?? 0;
        
         $data['is_featured'] = 0;
         if($request->has('is_featured')){
@@ -189,6 +225,7 @@ class CategoryController extends Controller
         $result = Category::updateOrCreate(['id' => $data['id'] ],$data);
 
         storeMediaFile($result,$request->category_image, 'category_image');
+        storeMediaFile($result,$request->category_icon, 'category_icon');
 
         $message = trans('messages.update_form',['form' => trans('messages.category')]);
         if($result->wasRecentlyCreated){
@@ -219,7 +256,7 @@ class CategoryController extends Controller
      */
     public function edit($id)
     {
-        //
+        return redirect()->route('category.create', ['id' => $id]);
     }
 
     /**
@@ -231,7 +268,9 @@ class CategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->ensureSanadCatalogAdmin();
+        $request->merge(['id' => $id]);
+        return $this->store(app(CategoryRequest::class));
     }
 
     /**
@@ -242,6 +281,7 @@ class CategoryController extends Controller
      */
     public function destroy($id)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }

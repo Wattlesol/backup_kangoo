@@ -49,13 +49,7 @@ class ProductResource extends JsonResource
                 return new ProductCategoryResource($this->category);
             }),
             
-            'creator' => $this->whenLoaded('creator', function() {
-                return [
-                    'id' => $this->creator->id,
-                    'name' => $this->creator->display_name,
-                    'type' => $this->creator->user_type
-                ];
-            }),
+            // Provider/creator information hidden for unified customer experience
             
             'variants' => $this->whenLoaded('variants', function() {
                 return ProductVariantResource::collection($this->variants->where('status', true));

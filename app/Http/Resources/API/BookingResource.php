@@ -16,32 +16,41 @@ class BookingResource extends JsonResource
     public function toArray($request)
     {
         $extraValue = 0;
-        if($this->bookingExtraCharge->count() > 0){
+        if($this->bookingExtraCharge && $this->bookingExtraCharge->count() > 0){
             foreach($this->bookingExtraCharge as $chrage){
                 $extraValue += $chrage->price * $chrage->qty;
             }
         }
         $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-        $datetime = json_decode($sitesetup->value);
+        $datetime = $sitesetup ? json_decode($sitesetup->value) : null;
+        $dateFormat = ($datetime && !empty($datetime->date_format)) ? $datetime->date_format : 'Y-m-d';
+        $timeFormat = ($datetime && !empty($datetime->time_format)) ? $datetime->time_format : 'H:i';
+        $bookingDate = $this->date ? date("$dateFormat / $timeFormat", strtotime($this->date)) : '';
+
         return [
             'id'                    => $this->id,
+            'order_number'          => $this->sanad_reference ?: ('ORD-'.$this->id),
             'address'               => $this->address,
             'customer_id'           => $this->customer_id,
             'service_id'            => $this->service_id,
             'provider_id'           => $this->provider_id,
             'date'                  => $this->date,
-            'booking_date'          => date("$datetime->date_format / $datetime->time_format", strtotime($this->date)),
+            'booking_date'          => $bookingDate,
             'price'                 => optional($this->service)->price,
             'type'                  => optional($this->service)->type,
             'discount'              => optional($this->service)->discount,
             'status'                => $this->status,
+            'current_status'        => $this->sanad_stage ?: $this->status,
+            'priority'              => $this->sanad_priority,
+            'assignment_mode'       => $this->assignment_mode,
+            'expected_completion_at'=> $this->expected_completion_at,
+            'payment_status'        => optional($this->payment)->payment_status,
             'status_label'          => BookingStatus::bookingStatus($this->status),
             'description'           => $this->description,
             'provider_name'         => optional($this->provider)->display_name,
             'customer_name'         => optional($this->customer)->display_name,
             'service_name'          => optional($this->service)->name,
             'payment_id'            => $this->payment_id,
-            'payment_status'        => optional($this->payment)->payment_status,
             'payment_method'        => optional($this->payment)->payment_type,
             'provider_name'         => optional($this->provider)->display_name,
             'customer_name'         => optional($this->customer)->display_name,
@@ -62,7 +71,7 @@ class BookingResource extends JsonResource
             'booking_type'            => $this->type,
             'booking_slot' => $this->booking_slot,
             'total_review' => optional(optional($this->service)->serviceRating)->count() ?? 0,
-            'booking_package'              => new BookingPackageResource($this->bookingPackage),
+            'booking_package'              => $this->bookingPackage ? new BookingPackageResource($this->bookingPackage) : null,
             'advance_paid_amount'  => $this->advance_paid_amount == null ? 0:(double) $this->advance_paid_amount,
             'advance_payment_amount' => optional($this->service)->advance_payment_amount == null ? 0:(bool) optional($this->service)->advance_payment_amount,
 

@@ -2,8 +2,8 @@
     <thead>
     <tr>
         <th>#</th>
-        <th>Name</th>
-        <th>phone</th>
+        <th>{{ __('messages.name') }}</th>
+        <th>{{ __('messages.phone') }}</th>
 
     </tr>
     </thead>

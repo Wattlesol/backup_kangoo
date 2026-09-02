@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 Theme Colors Test Page</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Dynamic Theme CSS -->
+    <link rel="stylesheet" href="/css/theme-colors.css?role=admin&theme=light&v=123456" id="dynamic-theme-css">
+    
+    <style>
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .color-box {
+            width: 100px;
+            height: 50px;
+            display: inline-block;
+            margin: 5px;
+            border: 1px solid #000;
+            text-align: center;
+            line-height: 50px;
+            color: white;
+            font-weight: bold;
+        }
+        .css-var-display {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center mb-4">🎨 Theme Colors Test Page</h1>
+        
+        <!-- CSS Variables Display -->
+        <div class="test-section">
+            <h3>📊 Current CSS Variables</h3>
+            <div class="css-var-display" id="css-variables">
+                Loading CSS variables...
+            </div>
+        </div>
+        
+        <!-- Bootstrap Primary Classes -->
+        <div class="test-section">
+            <h3>🎯 Bootstrap Primary Classes</h3>
+            <div class="row">
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100 mb-2">btn-primary</button>
+                    <div class="bg-primary text-white p-3 mb-2">bg-primary</div>
+                    <p class="text-primary">text-primary</p>
+                </div>
+                <div class="col-md-4">
+                    <div class="border border-primary p-3 mb-2">border-primary</div>
+                    <div class="alert alert-primary">alert-primary</div>
+                </div>
+                <div class="col-md-8">
+                    <h5>Expected Colors:</h5>
+                    <p><strong>Admin Role:</strong> Should be green (#00f900) based on database</p>
+                    <p><strong>Original:</strong> Was blue (#4A75FB)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Brand Color Variables -->
+        <div class="test-section">
+            <h3>🌈 Brand Color Variables</h3>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--brand-yellow);">Yellow</div>
+                    <small>var(--brand-yellow)</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--brand-red);">Red</div>
+                    <small>var(--brand-red)</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--brand-green);">Green</div>
+                    <small>var(--brand-green)</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--brand-blue);">Blue</div>
+                    <small>var(--brand-blue)</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Role Color Variables -->
+        <div class="test-section">
+            <h3>👤 Role Color Variables</h3>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--role-admin);">Admin</div>
+                    <small>var(--role-admin)</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--role-provider);">Provider</div>
+                    <small>var(--role-provider)</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--role-handyman);">Handyman</div>
+                    <small>var(--role-handyman)</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="color-box" style="background-color: var(--role-customer);">Customer</div>
+                    <small>var(--role-customer)</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Primary Color Variable -->
+        <div class="test-section">
+            <h3>⭐ Primary Color Variable</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="color-box" style="background-color: var(--primary-color);">Primary</div>
+                    <small>var(--primary-color)</small>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>This should match the admin role color (green #00f900)</strong></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dynamic CSS Link Test -->
+        <div class="test-section">
+            <h3>🔗 Dynamic CSS Link</h3>
+            <p><strong>CSS URL:</strong> <span id="css-url"></span></p>
+            <button class="btn btn-secondary" onclick="reloadCSS()">🔄 Reload CSS</button>
+            <button class="btn btn-info" onclick="showCSSContent()">📄 Show CSS Content</button>
+        </div>
+        
+        <!-- CSS Content Display -->
+        <div class="test-section" id="css-content-section" style="display: none;">
+            <h3>📄 Dynamic CSS Content</h3>
+            <pre id="css-content" style="background: #f8f9fa; padding: 15px; border-radius: 4px; max-height: 400px; overflow-y: auto;"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Display current CSS variables
+        function displayCSSVariables() {
+            const root = document.documentElement;
+            const computedStyle = getComputedStyle(root);
+            
+            const variables = [
+                '--brand-yellow', '--brand-red', '--brand-green', '--brand-blue',
+                '--role-admin', '--role-provider', '--role-handyman', '--role-customer',
+                '--primary-color', '--bs-primary'
+            ];
+            
+            let html = '';
+            variables.forEach(varName => {
+                const value = computedStyle.getPropertyValue(varName).trim();
+                html += `<strong>${varName}:</strong> ${value || 'Not defined'}<br>`;
+            });
+            
+            document.getElementById('css-variables').innerHTML = html;
+        }
+        
+        // Display CSS URL
+        function displayCSSURL() {
+            const cssLink = document.getElementById('dynamic-theme-css');
+            document.getElementById('css-url').textContent = cssLink ? cssLink.href : 'Not found';
+        }
+        
+        // Reload CSS
+        function reloadCSS() {
+            const cssLink = document.getElementById('dynamic-theme-css');
+            if (cssLink) {
+                const newUrl = cssLink.href.replace(/v=\d+/, 'v=' + Date.now());
+                cssLink.href = newUrl;
+                document.getElementById('css-url').textContent = newUrl;
+                setTimeout(displayCSSVariables, 500);
+            }
+        }
+        
+        // Show CSS content
+        async function showCSSContent() {
+            const cssLink = document.getElementById('dynamic-theme-css');
+            if (cssLink) {
+                try {
+                    const response = await fetch(cssLink.href);
+                    const cssText = await response.text();
+                    document.getElementById('css-content').textContent = cssText;
+                    document.getElementById('css-content-section').style.display = 'block';
+                } catch (error) {
+                    document.getElementById('css-content').textContent = 'Error loading CSS: ' + error.message;
+                    document.getElementById('css-content-section').style.display = 'block';
+                }
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            displayCSSVariables();
+            displayCSSURL();
+        });
+    </script>
+</body>
+</html>

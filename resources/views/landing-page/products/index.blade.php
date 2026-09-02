@@ -9,11 +9,8 @@
                 <nav aria-label="breadcrumb" class="text-center iq-breadcrumb-two">
                     <h2 class="title text-white">{{ $pageTitle }}</h2>
                     <ol class="breadcrumb main-bg">
-                        <li class="breadcrumb-item"><a href="{{ route('frontend.index') }}">Home</a></li>
-                        <li class="breadcrumb-item active">Products</li>
-                        @if($selectedCategory)
-                            <li class="breadcrumb-item active">{{ $selectedCategory->name }}</li>
-                        @endif
+                        <li class="breadcrumb-item"><a href="{{ route('store.unified') }}">Store</a></li>
+                        <li class="breadcrumb-item active">{{ $pageTitle }}</li>
                     </ol>
                 </nav>
             </div>
@@ -30,10 +27,10 @@
                 <div class="iq-sidebar-widget">
                     <!-- Search -->
                     <div class="widget">
-                        <h5 class="widget-title">Search Products</h5>
+                        <h5 class="widget-title">{{ __('landingpage.search_products') }}</h5>
                         <form method="GET" action="{{ route('products.search') }}">
                             <div class="input-group">
-                                <input type="text" class="form-control" name="q" placeholder="Search products..." value="{{ $search }}">
+                                <input type="text" class="form-control" name="q" placeholder="{{ __('landingpage.search_products_placeholder') }}" value="{{ $search }}">
                                 <button class="btn btn-primary" type="submit">
                                     <i class="fas fa-search"></i>
                                 </button>
@@ -68,7 +65,7 @@
                             <button type="button" class="btn btn-outline-primary btn-sm" id="use-location">
                                 <i class="fas fa-map-marker-alt"></i> Use My Location
                             </button>
-                            <small class="text-muted d-block mt-2">Find products available near you</small>
+                            <small class="text-muted d-block mt-2">{{ $isAr ? 'ابحث عن المنتجات المتاحة بالقرب منك' : 'Find products available near you' }}</small>
                         </div>
                     </div>
                 </div>
@@ -83,7 +80,7 @@
                     </div>
                     <div class="sort-options">
                         <select class="form-select" id="sort-select" style="width: auto;">
-                            <option value="created_at-desc">Newest First</option>
+                            <option value="created_at-desc">{{ $isAr ? 'الأحدث أولاً' : 'Newest First' }}</option>
                             <option value="created_at-asc">Oldest First</option>
                             <option value="name-asc">Name A-Z</option>
                             <option value="name-desc">Name Z-A</option>
@@ -192,23 +189,68 @@ $(document).ready(function() {
             html = '<div class="col-12 text-center py-5"><h4>No products found</h4><p>Try adjusting your search or filters</p></div>';
         } else {
             products.forEach(function(product) {
+                const hasDiscount = product.has_discount || false;
+                const discountPercentage = product.discount_percentage || 0;
+                const originalPrice = product.original_price || product.base_price;
+                const isInStock = product.is_in_stock !== false;
+
+                // Build discount badge
+                const discountBadge = hasDiscount ?
+                    `<span class="badge bg-danger position-absolute top-0 end-0 m-2">${discountPercentage}% OFF</span>` : '';
+
+                // Build featured badge
+                const featuredBadge = product.is_featured ?
+                    '<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2"><i class="fas fa-star me-1"></i>Featured</span>' : '';
+
+                // Build stock badge
+                const stockBadge = !isInStock ?
+                    '<span class="badge bg-secondary position-absolute" style="bottom: 10px; left: 10px;">Out of Stock</span>' : '';
+
+                // Build price display
+                const priceDisplay = hasDiscount ?
+                    `<div class="price-section">
+                        <span class="h5 text-primary mb-0">${product.price_formatted}</span>
+                        <small class="text-muted text-decoration-line-through ms-1">$${parseFloat(originalPrice).toFixed(2)}</small>
+                    </div>` :
+                    `<span class="h5 text-primary mb-0">${product.price_formatted}</span>`;
+
                 html += `
                     <div class="col-lg-4 col-md-6 mb-4">
-                        <div class="card product-card h-100">
+                        <div class="card product-card h-100 border-0 shadow-sm">
                             <div class="position-relative">
-                                <img src="${product.main_image || '{{ asset("images/default-product.jpg") }}'}" 
+                                <img src="${product.main_image || '{{ asset("images/default-product.jpg") }}'}"
                                      class="card-img-top" alt="${product.name}" style="height: 200px; object-fit: cover;">
-                                ${product.is_featured ? '<span class="badge bg-warning position-absolute top-0 end-0 m-2">Featured</span>' : ''}
-                                ${!product.is_in_stock ? '<span class="badge bg-danger position-absolute top-0 start-0 m-2">Out of Stock</span>' : ''}
+                                ${featuredBadge}
+                                ${discountBadge}
+                                ${stockBadge}
                             </div>
                             <div class="card-body d-flex flex-column">
-                                <h6 class="card-title">${product.name}</h6>
-                                <p class="card-text text-muted small">${product.category ? product.category.name : ''}</p>
-                                <p class="card-text flex-grow-1">${product.short_description || ''}</p>
+                                <h6 class="card-title text-dark fw-semibold">${product.name}</h6>
+                                <div class="mb-2">
+                                    <span class="badge bg-light text-dark border">${product.category ? product.category.name : 'General'}</span>
+                                    <span class="badge ${isInStock ? 'bg-success' : 'bg-secondary'} text-white ms-1">${product.stock_status || (isInStock ? 'In Stock' : 'Out of Stock')}</span>
+                                </div>
+                                <p class="card-text text-muted small flex-grow-1">${product.short_description || ''}</p>
+
+                                <!-- Customer Benefits -->
+                                <div class="mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-shipping-fast me-1"></i>Fast Delivery •
+                                        <i class="fas fa-shield-alt me-1"></i>Quality Guaranteed
+                                    </small>
+                                </div>
+
                                 <div class="mt-auto">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <span class="h5 text-primary mb-0">${product.price_format}</span>
-                                        <a href="/product/${product.slug}" class="btn btn-primary btn-sm">View Details</a>
+                                        ${priceDisplay}
+                                        ${isInStock ?
+                                            `<a href="/product/${product.slug}" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-eye me-1"></i>View Details
+                                            </a>` :
+                                            `<button class="btn btn-secondary btn-sm" disabled>
+                                                <i class="fas fa-times me-1"></i>Out of Stock
+                                            </button>`
+                                        }
                                     </div>
                                 </div>
                             </div>

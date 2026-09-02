@@ -2,8 +2,136 @@
 
 @section('title', __('landingpage.store'))
 
+@section('after_style')
+<style>
+/* Store Page Dynamic Theme Support */
+.store-page {
+    /* Use dynamic theme colors from database */
+    --store-bg-color: var(--bs-body-bg, #f8f9fa);
+    --store-card-bg: var(--bs-body-bg, #ffffff);
+    --store-text-color: var(--bs-body-color, #212529);
+    --store-text-muted: var(--bs-secondary, #6c757d);
+    --store-border-color: var(--bs-border-color, #dee2e6);
+    --store-input-bg: var(--bs-tertiary-bg, #f8f9fa);
+    --store-primary-color: var(--primary-color, var(--brand-blue, #5F60B9));
+    --store-shadow: var(--bs-box-shadow, rgba(0, 0, 0, 0.1));
+}
+
+/* Dark mode colors */
+[data-bs-theme="dark"] .store-page,
+.dark .store-page {
+    --store-bg-color: var(--bs-dark, #171928);
+    --store-card-bg: var(--bs-dark, #1C1F34);
+    --store-text-color: var(--bs-light, #ffffff);
+    --store-text-muted: var(--bs-secondary, #6c757d);
+    --store-border-color: var(--bs-border-color-translucent, #303346);
+    --store-input-bg: var(--bs-tertiary-bg, #2a2d42);
+    --store-primary-color: var(--primary-color, var(--brand-blue, #8283c9));
+    --store-shadow: var(--bs-box-shadow, rgba(255, 255, 255, 0.05));
+}
+
+/* Apply theme colors */
+.store-page {
+    background-color: var(--store-bg-color) !important;
+    color: var(--store-text-color) !important;
+}
+
+.store-page .bg-white {
+    background-color: var(--store-card-bg) !important;
+    color: var(--store-text-color) !important;
+}
+
+.store-page .text-primary {
+    color: var(--store-primary-color) !important;
+}
+
+.store-page .btn-primary {
+    background-color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+    color: var(--bs-white, #ffffff) !important;
+}
+
+.store-page .btn-outline-primary {
+    color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+    background-color: transparent !important;
+}
+
+.store-page .btn-outline-primary:hover {
+    background-color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+    color: var(--bs-white, #ffffff) !important;
+}
+
+.store-page .bg-primary {
+    background-color: var(--store-primary-color) !important;
+}
+
+.store-page .spinner-border.text-primary {
+    color: var(--store-primary-color) !important;
+}
+
+.store-page .form-check-input:checked {
+    background-color: var(--store-primary-color) !important;
+    border-color: var(--store-primary-color) !important;
+}
+
+.store-page .text-muted {
+    color: var(--store-text-muted) !important;
+}
+
+.store-page .border,
+.store-page .border-bottom {
+    border-color: var(--store-border-color) !important;
+}
+
+.store-page .form-control,
+.store-page .form-select {
+    background-color: var(--store-input-bg) !important;
+    border-color: var(--store-border-color) !important;
+    color: var(--store-text-color) !important;
+}
+
+.store-page .form-control:focus,
+.store-page .form-select:focus {
+    background-color: var(--store-input-bg) !important;
+    border-color: var(--store-primary-color) !important;
+    color: var(--store-text-color) !important;
+    box-shadow: 0 0 0 0.2rem rgba(95, 96, 185, 0.25) !important;
+}
+
+.store-page .shadow-sm {
+    box-shadow: 0 0.125rem 0.25rem var(--store-shadow) !important;
+}
+
+/* Ensure proper text contrast in dark mode */
+[data-bs-theme="dark"] .store-page h1,
+[data-bs-theme="dark"] .store-page h2,
+[data-bs-theme="dark"] .store-page h3,
+[data-bs-theme="dark"] .store-page h4,
+[data-bs-theme="dark"] .store-page h5,
+[data-bs-theme="dark"] .store-page h6,
+.dark .store-page h1,
+.dark .store-page h2,
+.dark .store-page h3,
+.dark .store-page h4,
+.dark .store-page h5,
+.dark .store-page h6 {
+    color: var(--store-text-color) !important;
+}
+
+/* Card styling for dark mode */
+[data-bs-theme="dark"] .store-page .card,
+.dark .store-page .card {
+    background-color: var(--store-card-bg) !important;
+    border-color: var(--store-border-color) !important;
+    color: var(--store-text-color) !important;
+}
+</style>
+@endsection
+
 @section('content')
-<div class="section-padding">
+<div class="section-padding store-page">
     <div class="container">
         <!-- Page Header -->
         <div class="row mb-5">
@@ -23,7 +151,7 @@
                         <form id="searchForm" class="row g-3">
                             <div class="col-md-4">
                                 <div class="position-relative">
-                                    <input type="text" class="form-control form-control-lg" id="searchQuery" 
+                                    <input type="text" class="form-control form-control-lg" id="searchQuery"
                                            placeholder="{{__('landingpage.search_products_stores')}}" value="{{ request('q') }}">
                                     <i class="fas fa-search position-absolute top-50 end-0 translate-middle-y me-3 text-muted"></i>
                                 </div>
@@ -127,10 +255,10 @@
                             <div class="card h-100 shadow-sm border-0 category-card">
                                 <div class="card-body text-center">
                                     @if($category->image)
-                                        <img src="{{ $category->image_url }}" alt="{{ $category->name }}" 
+                                        <img src="{{ $category->image_url }}" alt="{{ $category->name }}"
                                              class="img-fluid rounded-circle mb-3" style="width: 80px; height: 80px; object-fit: cover;">
                                     @else
-                                        <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                                        <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
                                              style="width: 80px; height: 80px;">
                                             <i class="fas fa-tags text-white fa-2x"></i>
                                         </div>
@@ -231,14 +359,14 @@ $(document).ready(function() {
     function switchView(view) {
         currentView = view;
         currentPage = 1;
-        
+
         // Update button states
         $(`#view${view.charAt(0).toUpperCase() + view.slice(1)}`).addClass('active').siblings().removeClass('active');
-        
+
         // Show/hide views
         $('.results-view').hide();
         $(`#${view}View`).show();
-        
+
         if (view !== 'categories') {
             loadResults();
         }
@@ -295,7 +423,7 @@ $(document).ready(function() {
     function renderProductCard(product) {
         const cardClass = isGridView ? 'col-lg-3 col-md-4 col-sm-6 mb-4' : 'col-12 mb-3';
         const layoutClass = isGridView ? '' : 'd-flex';
-        
+
         return `
             <div class="${cardClass}">
                 <div class="card h-100 shadow-sm border-0 product-card ${layoutClass}">
@@ -332,7 +460,7 @@ $(document).ready(function() {
     function renderStoreCard(store) {
         const cardClass = isGridView ? 'col-lg-4 col-md-6 mb-4' : 'col-12 mb-3';
         const layoutClass = isGridView ? '' : 'd-flex';
-        
+
         return `
             <div class="${cardClass}">
                 <div class="card h-100 shadow-sm border-0 store-card ${layoutClass}">
@@ -369,23 +497,23 @@ $(document).ready(function() {
         }
 
         let paginationHtml = '<nav><ul class="pagination">';
-        
+
         // Previous button
         if (pagination.current_page > 1) {
             paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${pagination.current_page - 1})">{{__('landingpage.previous')}}</a></li>`;
         }
-        
+
         // Page numbers
         for (let i = Math.max(1, pagination.current_page - 2); i <= Math.min(pagination.last_page, pagination.current_page + 2); i++) {
             const activeClass = i === pagination.current_page ? 'active' : '';
             paginationHtml += `<li class="page-item ${activeClass}"><a class="page-link" href="#" onclick="changePage(${i})">${i}</a></li>`;
         }
-        
+
         // Next button
         if (pagination.current_page < pagination.last_page) {
             paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${pagination.current_page + 1})">{{__('landingpage.next')}}</a></li>`;
         }
-        
+
         paginationHtml += '</ul></nav>';
         $('#paginationContainer').html(paginationHtml);
     }
@@ -399,7 +527,7 @@ $(document).ready(function() {
     window.quickView = function(type, id) {
         $('#quickViewModal').modal('show');
         $('#quickViewContent').html('<div class="text-center"><div class="spinner-border" role="status"></div></div>');
-        
+
         // Load quick view content via AJAX
         $.get(`/api/${type}s/${id}`)
             .done(function(response) {

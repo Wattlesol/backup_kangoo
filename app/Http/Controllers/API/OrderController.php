@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\ShoppingCart;
+use App\Models\Product;
 use App\Models\Store;
 use App\Http\Resources\API\OrderResource;
 use Illuminate\Support\Facades\Validator;
@@ -257,6 +257,105 @@ class OrderController extends Controller
 
         } catch (\Exception $e) {
             return comman_message_response(__('messages.failed'));
+        }
+    }
+
+    /**
+     * Create order for direct product purchase (no cart)
+     */
+    public function createDirectOrder(Request $request)
+    {
+        try {
+            $user = Auth::user();
+
+            // Validate request
+            $validator = Validator::make($request->all(), [
+                'product_id' => 'required|exists:products,id',
+                'quantity' => 'required|integer|min:1',
+                'delivery_address' => 'required|array',
+                'delivery_address.name' => 'required|string|max:255',
+                'delivery_address.address' => 'required|string|max:500',
+                'delivery_address.city' => 'required|string|max:100',
+                'delivery_address.state' => 'required|string|max:100',
+                'delivery_address.zip' => 'required|string|max:20',
+                'delivery_address.country' => 'required|string|max:100',
+                'delivery_phone' => 'required|string|max:20',
+                'delivery_notes' => 'nullable|string|max:500',
+                'payment_method' => 'required|string'
+            ]);
+
+            if ($validator->fails()) {
+                return comman_message_response($validator->errors()->first(), 400);
+            }
+
+            // Get product and validate
+            $product = Product::with(['store', 'category'])->findOrFail($request->product_id);
+
+            if (!$product->is_in_stock) {
+                return comman_message_response('Product is out of stock', 400);
+            }
+
+            if ($product->stock_quantity < $request->quantity) {
+                return comman_message_response('Insufficient stock quantity', 400);
+            }
+
+            DB::beginTransaction();
+
+            // Calculate totals
+            $subtotal = $product->effective_price * $request->quantity;
+            $tax = $subtotal * 0.10; // 10% tax
+            $deliveryFee = 5.00;
+            $total = $subtotal + $tax + $deliveryFee;
+
+            // Create order
+            $order = Order::create([
+                'order_number' => 'ORD-' . time() . '-' . rand(1000, 9999),
+                'customer_id' => $user->id,
+                'store_id' => $product->store_id,
+                'status' => 'pending',
+                'subtotal' => $subtotal,
+                'tax_amount' => $tax,
+                'delivery_fee' => $deliveryFee,
+                'total_amount' => $total,
+                'delivery_address' => json_encode($request->delivery_address),
+                'delivery_phone' => $request->delivery_phone,
+                'delivery_notes' => $request->delivery_notes,
+                'payment_method' => $request->payment_method,
+                'payment_status' => 'pending'
+            ]);
+
+            // Create order item
+            OrderItem::create([
+                'order_id' => $order->id,
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_sku' => $product->sku ?? 'N/A',
+                'quantity' => $request->quantity,
+                'unit_price' => $product->effective_price,
+                'total_price' => $subtotal
+            ]);
+
+            // Update product stock
+            $product->decrement('stock_quantity', $request->quantity);
+
+            DB::commit();
+
+            $response = [
+                'status' => true,
+                'data' => [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'total_amount' => $total,
+                    'payment_method' => $request->payment_method
+                ],
+                'message' => 'Order created successfully'
+            ];
+
+            return comman_custom_response($response);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return comman_message_response('Failed to create order: ' . $e->getMessage(), 500);
         }
     }
 }

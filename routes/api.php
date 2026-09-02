@@ -45,15 +45,18 @@ Route::get('products', [API\ProductController::class, 'index']);
 Route::get('products/{id}', [API\ProductController::class, 'show']);
 Route::get('products-search', [API\ProductController::class, 'search']);
 Route::get('featured-products', [API\ProductController::class, 'featured']);
-Route::get('stores', [API\StoreController::class, 'index']);
-Route::get('stores/{id}', [API\StoreController::class, 'show']);
-Route::get('stores/{id}/products', [API\StoreController::class, 'products']);
-Route::get('nearby-stores', [API\StoreController::class, 'nearby']);
-
-
+Route::get('store', [API\StoreController::class, 'index']);
+Route::get('store/products', [API\StoreController::class, 'products']);
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
+});
+
+// Theme API routes for mobile apps
+Route::prefix('v1/theme')->group(function () {
+    Route::get('/colors', [App\Http\Controllers\API\ThemeController::class, 'getThemeColors']);
+    Route::get('/colors/{role}', [App\Http\Controllers\API\ThemeController::class, 'getRoleTheme']);
+    Route::post('/check-update', [App\Http\Controllers\API\ThemeController::class, 'checkThemeUpdate']);
 });
 
 Route::post('register',[API\User\UserController::class, 'register']);
@@ -62,8 +65,6 @@ Route::post('forgot-password',[ API\User\UserController::class,'forgotPassword']
 Route::post('social-login',[ API\User\UserController::class, 'socialLogin' ]);
 Route::post('contact-us', [ API\User\UserController::class, 'contactUs' ] );
 Route::post('user-email-verify',[API\User\UserController::class,'verify']);
-
-
 
 Route::get('dashboard-detail',[ API\DashboardController::class, 'dashboardDetail' ]);
 Route::get('service-rating-list',[API\ServiceController::class,'getServiceRating']);
@@ -82,13 +83,34 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //Route::post('service-save', [ App\Http\Controllers\ServiceController::class, 'store' ] );
     Route::post('service-delete/{id}', [ App\Http\Controllers\ServiceController::class, 'destroy' ] );
     Route::post('booking-save', [ App\Http\Controllers\BookingController::class, 'store' ] );
+    Route::post('booking/{id}/additional-services', [ App\Http\Controllers\BookingController::class, 'addServiceAddon' ] );
     Route::post('get-payment-method', [ App\Http\Controllers\BookingController::class, 'getPaymentMethod' ] );
     Route::post('create-stripe-payment', [ App\Http\Controllers\BookingController::class, 'createStripePayment' ] );
-
 
     Route::post('booking-update', [ API\BookingController::class, 'bookingUpdate' ] );
     Route::get('provider-dashboard',[ API\DashboardController::class, 'providerDashboard' ]);
     Route::get('admin-dashboard',[ API\DashboardController::class, 'adminDashboard' ]);
+    Route::get('sanad/foundation', [ API\SanadController::class, 'foundation' ]);
+    Route::get('sanad/requests', [ API\SanadController::class, 'requests' ]);
+    Route::get('sanad/requests/{id}', [ API\SanadController::class, 'showRequest' ]);
+    Route::post('sanad/requests/{id}/documents', [ API\SanadController::class, 'uploadRequestDocument' ]);
+    Route::post('sanad/requests/{id}/cancel', [ API\SanadController::class, 'cancelRequest' ]);
+    Route::post('sanad/requests/{id}/lifecycle', [ API\SanadController::class, 'updateRequestLifecycle' ]);
+    Route::get('sanad/buzz', [ API\SanadController::class, 'buzzAlerts' ]);
+    Route::post('sanad/buzz', [ API\SanadController::class, 'createBuzz' ]);
+    Route::post('sanad/buzz/{id}/acknowledge', [ API\SanadController::class, 'acknowledgeBuzz' ]);
+    Route::get('sanad/document-vault', [ API\SanadController::class, 'documentVault' ]);
+    Route::post('sanad/document-vault', [ API\SanadController::class, 'storeDocumentVault' ]);
+    Route::post('sanad/document-vault/{id}/verify', [ API\SanadController::class, 'verifyDocumentVaultItem' ]);
+    Route::get('sanad/chat-threads', [ API\SanadController::class, 'chatThreads' ]);
+    Route::post('sanad/chat-messages', [ API\SanadController::class, 'storeChatMessage' ]);
+    Route::get('sanad/requests/{id}/communication', [ API\SanadController::class, 'communication' ]);
+    Route::post('sanad/requests/{id}/communication', [ API\SanadController::class, 'sendCommunication' ]);
+    Route::post('sanad/requests/{id}/communication/{threadId}/read', [ API\SanadController::class, 'markCommunicationRead' ]);
+    Route::post('sanad/requests/{id}/document-requests', [ API\SanadController::class, 'createDocumentRequest' ]);
+    Route::post('sanad/ai/ask', [ API\SanadController::class, 'aiAsk' ]);
+    Route::post('sanad/ai/knowledge', [ API\SanadController::class, 'storeAiKnowledge' ]);
+    Route::get('sanad/partner-performance', [ API\SanadController::class, 'partnerPerformance' ]);
     Route::get('booking-list', [ API\BookingController::class, 'getBookingList' ] );
     Route::post('booking-detail', [ API\BookingController::class, 'getBookingDetail' ] );
     Route::post('save-booking-rating', [ API\BookingController::class, 'saveBookingRating' ] );
@@ -116,7 +138,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('payment-history',[API\PaymentController::class, 'paymentHistory']);
     Route::get('cash-detail',[API\PaymentController::class, 'paymentDetail']);
     Route::get('user-bank-detail',[API\CommanController::class, 'getBankList']);
-
 
     Route::post('save-provideraddress', [ App\Http\Controllers\ProviderAddressMappingController::class, 'store' ]);
     Route::get('provideraddress-list', [ API\ProviderAddressMappingController::class, 'getProviderAddressList' ]);
@@ -161,21 +182,16 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('save-bid',[  App\Http\Controllers\PostJobBidController::class, 'store' ]);
     Route::get('get-bid-list',[  API\PostJobBidController::class, 'getPostBidList' ]);
 
-
     Route::post('save-provider-slot', [ App\Http\Controllers\ProviderSlotController::class, 'store'] );
     Route::get('get-provider-slot', [API\ProviderSlotController::class, 'getProviderSlot' ] );
-
 
     Route::post('package-save',[  App\Http\Controllers\ServicePackageController::class, 'store' ]);
     Route::get('package-list',[API\ServicePackageController::class,'getServicePackageList']);
     Route::post('package-delete/{id}', [ App\Http\Controllers\ServicePackageController::class, 'destroy' ] );
 
-
-
     Route::post('blog-save', [ App\Http\Controllers\BlogController::class, 'store' ] );
     Route::post('blog-delete/{id}', [ App\Http\Controllers\BlogController::class, 'destroy' ] );
     Route::post('blog-action',[ App\Http\Controllers\BlogController::class, 'action' ]);
-
 
     Route::post('save-favourite-provider',[ API\ProviderFavouriteController::class, 'saveFavouriteProvider' ]);
     Route::post('delete-favourite-provider',[ API\ProviderFavouriteController::class, 'deleteFavouriteProvider' ]);
@@ -193,33 +209,33 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('payment-gateway-list',[API\FrontendSettingController::class,'getPaymentGatewayList']);
     Route::get('payment-gateways',[API\PaymentController::class, 'paymentGateways']);
 
-    // E-commerce Authenticated Routes
-    // Cart Management
-    Route::get('cart', [API\CartController::class, 'index']);
-    Route::post('cart/add', [API\CartController::class, 'add']);
-    Route::put('cart/{id}', [API\CartController::class, 'update']);
-    Route::delete('cart/{id}', [API\CartController::class, 'remove']);
-    Route::delete('cart', [API\CartController::class, 'clear']);
-    Route::get('cart/count', [API\CartController::class, 'count']);
+    // E-commerce Authenticated Routes (Direct Purchase - No Cart)
+    // Direct Order Creation (Primary method for mobile/API)
+    Route::post('orders', [API\OrderController::class, 'createDirectOrder']);
+
+    // Cart-based Order Creation (Alternative method)
+    Route::post('orders/from-cart', [API\OrderController::class, 'create']);
 
     // Order Management
     Route::get('orders', [API\OrderController::class, 'index']);
     Route::get('orders/{id}', [API\OrderController::class, 'show']);
-    Route::post('orders', [API\OrderController::class, 'create']);
     Route::post('orders/{id}/cancel', [API\OrderController::class, 'cancel']);
     Route::get('orders/{id}/track', [API\OrderController::class, 'track']);
 
-    // Provider Store Management
-    Route::get('my-store', [API\StoreController::class, 'myStore']);
-    Route::post('my-store', [API\StoreController::class, 'createStore']);
-    Route::put('my-store', [API\StoreController::class, 'updateStore']);
+    // Product Payment Management
+    Route::get('product-payment-methods', [App\Http\Controllers\ProductPaymentController::class, 'getPaymentMethods']);
+    Route::post('create-product-stripe-payment', [App\Http\Controllers\ProductPaymentController::class, 'createStripePayment']);
+    Route::post('process-product-wallet-payment', [App\Http\Controllers\ProductPaymentController::class, 'processWalletPayment']);
+    Route::post('retry-product-payment', [App\Http\Controllers\ProductPaymentController::class, 'retryPayment']);
+
+    // Provider functionality (Single Store Architecture - no store management for providers)
 
     // E-commerce Admin API Routes (with permission checks)
     Route::group(['prefix' => 'ecommerce', 'middleware' => ['permission:product_category list|product list|store list|order list']], function () {
 
         // Product Categories (Admin & Provider can view, Admin can manage)
         Route::group(['middleware' => ['permission:product_category list']], function () {
-            Route::get('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'index_data']);
+            Route::get('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'getAllCategories']);
             Route::post('product-categories', [App\Http\Controllers\ProductCategoryController::class, 'store'])->middleware('permission:product_category add');
             Route::get('product-categories/{id}', [App\Http\Controllers\ProductCategoryController::class, 'show']);
             Route::put('product-categories/{id}', [App\Http\Controllers\ProductCategoryController::class, 'update'])->middleware('permission:product_category edit');
@@ -235,6 +251,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
             Route::delete('products/{id}', [App\Http\Controllers\ProductController::class, 'destroy'])->middleware('permission:product delete');
         });
 
+        // Mobile-optimized provider products endpoint
+        Route::get('provider/products', [App\Http\Controllers\API\ProductController::class, 'providerProducts']);
+
         // Stores (Admin can manage all, Provider can manage own)
         Route::group(['middleware' => ['permission:store list']], function () {
             Route::get('stores', [App\Http\Controllers\StoreController::class, 'index_data']);
@@ -247,17 +266,14 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
         // Orders (Admin can manage all, Provider can manage own)
         Route::group(['middleware' => ['permission:order list']], function () {
-            Route::get('orders', [App\Http\Controllers\OrderController::class, 'index_data']);
-            Route::get('orders/{id}', [App\Http\Controllers\OrderController::class, 'show']);
+            Route::get('orders', [App\Http\Controllers\OrderController::class, 'getOrdersAPI']);
+            Route::get('orders/{id}', [App\Http\Controllers\OrderController::class, 'getOrderAPI']);
             Route::put('orders/{id}/status', [App\Http\Controllers\OrderController::class, 'updateStatus'])->middleware('permission:order status update');
             Route::put('orders/{id}/payment-status', [App\Http\Controllers\OrderController::class, 'updatePaymentStatus'])->middleware('permission:order edit');
         });
 
-        // Dynamic Pricing (Admin only)
-        Route::group(['middleware' => ['permission:dynamic_pricing list']], function () {
-            Route::get('dynamic-pricing', [App\Http\Controllers\DynamicPricingController::class, 'index_data']);
-            Route::post('dynamic-pricing/update', [App\Http\Controllers\DynamicPricingController::class, 'updatePricing'])->middleware('permission:dynamic_pricing edit');
-        });
+        // Dynamic pricing routes are disabled because DynamicPricingController is
+        // not present in this codebase. Restore the controller before enabling.
     });
 
 });

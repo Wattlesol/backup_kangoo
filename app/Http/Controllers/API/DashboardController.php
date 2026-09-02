@@ -35,6 +35,7 @@ use App\Http\Resources\API\{
     CategoryResource,
     SliderResource,
     UserResource,
+    PublicUserResource,
     PaymentGatewayResource,
     BookingRatingResource,
     HandymanRatingResource,
@@ -56,7 +57,13 @@ class DashboardController extends Controller
         $slider = SliderResource::collection(Slider::where('status',1)->paginate($per_page));
 
         $category_section = FrontendSetting::getValueByKey('section_2');
-        $category= CategoryResource::collection( Category::whereIN( 'id' ,$category_section->category_id )->orderBy('name','asc')->paginate(8));
+        $category_ids = [];
+        if (is_object($category_section) && isset($category_section->category_id)) {
+            $category_ids = $category_section->category_id;
+        } elseif (is_array($category_section) && isset($category_section['category_id'])) {
+            $category_ids = $category_section['category_id'];
+        }
+        $category= CategoryResource::collection( Category::whereIN( 'id' ,$category_ids )->orderBy('name','asc')->paginate(8));
 
         $service = Service::where('status',1)->where('service_type','service');
         $service = $service->whereHas('providers', function ($a) use ($request) {
@@ -92,10 +99,16 @@ class DashboardController extends Controller
         if ($request->has('city_id') && !empty($request->city_id)) {
             $provider = $provider->where('city_id', $request->city_id);
         }
-        $provider = UserResource::collection($provider->paginate($per_page));
+        $provider = PublicUserResource::collection($provider->paginate($per_page));
 
         $featured_service_section = FrontendSetting::getValueByKey('section_4');
-        $featured_service= Service::whereIN( 'id' ,$featured_service_section->service_id );
+        $service_ids = [];
+        if (is_object($featured_service_section) && isset($featured_service_section->service_id)) {
+            $service_ids = $featured_service_section->service_id;
+        } elseif (is_array($featured_service_section) && isset($featured_service_section['service_id'])) {
+            $service_ids = $featured_service_section['service_id'];
+        }
+        $featured_service= Service::whereIN( 'id' ,$service_ids );
         $featured_service = $featured_service->whereHas('providers', function ($a) use ($request) {
             $a->where('status', 1);
         });
@@ -116,13 +129,15 @@ class DashboardController extends Controller
             $featured_service = ServiceResource::collection($featured_service);
         }
 
-        if($request->has('customer_id') && isset($request->customer_id)){
-            $customer_review = BookingRating::with('customer','service')->where('customer_id',$request->customer_id)->get();
+        $authenticatedCustomer = auth('sanctum')->user();
+        if ($authenticatedCustomer && in_array($authenticatedCustomer->user_type, ['user', 'customer'], true)) {
+            $customerId = $authenticatedCustomer->id;
+            $customer_review = BookingRating::with('customer','service')->where('customer_id', $customerId)->get();
             if (!empty($customer_review))
             {
                 $customer_review = BookingRatingResource::collection($customer_review);
             }
-            $user = User::where('id',$request->customer_id)->first();
+            $user = $authenticatedCustomer;
 
             $notification=0;
 
@@ -131,7 +146,7 @@ class DashboardController extends Controller
                 $notification = count($user->unreadNotifications);
             }
         
-            $upcomming_booking = Booking::where('customer_id',$request->customer_id)
+            $upcomming_booking = Booking::where('customer_id', $customerId)
             ->with('customer')->where('status', 'accept')->orderBy('id', 'DESC')->first();
 
             if(!empty($upcomming_booking)){
@@ -368,78 +383,95 @@ class DashboardController extends Controller
         $help_support = Setting::getValueByKey('help_support','help_support');
         $refund_policy = Setting::getValueByKey('refund_policy','refund_policy');
         $earning_setting = Setting::getValueByKey('earning-setting','earning-setting');
-        $country_obj= Country::where('id', $sitesetup->default_currency)->first();
+
+        // Helper function to safely get value from object or array
+        $getSetting = function($setting, $key, $default = null) {
+            if (is_object($setting) && isset($setting->$key)) {
+                return $setting->$key;
+            } elseif (is_array($setting) && isset($setting[$key])) {
+                return $setting[$key];
+            }
+            return $default;
+        };
+
+        // Handle both object and array cases for sitesetup
+        $default_currency = $getSetting($sitesetup, 'default_currency');
+
+        $country_obj = null;
+        if ($default_currency) {
+            $country_obj = Country::where('id', $default_currency)->first();
+        }
         $response = [
-            "site_name"=> $general_setting->site_name,
-            "site_description"=> $general_setting->site_description,
-            "inquiry_email"=> $general_setting->inquriy_email,
-            "helpline_number"=> $general_setting->helpline_number,
-            "website"=> $general_setting->website,
-            "zipcode"=> $general_setting->zipcode,
-            "site_copyright"=> $sitesetup->site_copyright,
-            "date_format"=> $sitesetup->date_format,
-            "time_format"=> $sitesetup->time_format,
-            "time_zone"=> $sitesetup->time_zone,
-            "distance_type"=> $sitesetup->distance_type,
-            "radius"=> $sitesetup->radious,
+            "site_name"=> $getSetting($general_setting, 'site_name'),
+            "site_description"=> $getSetting($general_setting, 'site_description'),
+            "inquiry_email"=> $getSetting($general_setting, 'inquriy_email'),
+            "helpline_number"=> $getSetting($general_setting, 'helpline_number'),
+            "website"=> $getSetting($general_setting, 'website'),
+            "zipcode"=> $getSetting($general_setting, 'zipcode'),
+            "site_copyright"=> $getSetting($sitesetup, 'site_copyright'),
+            "date_format"=> $getSetting($sitesetup, 'date_format'),
+            "time_format"=> $getSetting($sitesetup, 'time_format'),
+            "time_zone"=> $getSetting($sitesetup, 'time_zone'),
+            "distance_type"=> $getSetting($sitesetup, 'distance_type'),
+            "radius"=> $getSetting($sitesetup, 'radious'),
 
-            "playstore_url"=> $sitesetup->playstore_url,
-            "appstore_url"=> $sitesetup->appstore_url,
-            "provider_appstore_url"=> $sitesetup->provider_appstore_url,
-            "provider_playstore_url"=> $sitesetup->provider_playstore_url,
+            "playstore_url"=> $getSetting($sitesetup, 'playstore_url'),
+            "appstore_url"=> $getSetting($sitesetup, 'appstore_url'),
+            "provider_appstore_url"=> $getSetting($sitesetup, 'provider_appstore_url'),
+            "provider_playstore_url"=> $getSetting($sitesetup, 'provider_playstore_url'),
 
-            "currency_code"=> $sitesetup->default_currency,
-            "currency_position"=> $sitesetup->currency_position,
-            "currency_symbol"=> $country_obj->symbol,
-            "decimal_point"=> $sitesetup->digitafter_decimal_point,
+            "currency_code"=> $getSetting($sitesetup, 'default_currency'),
+            "currency_position"=> $getSetting($sitesetup, 'currency_position'),
+            "currency_symbol"=> $country_obj ? $country_obj->symbol : null,
+            "decimal_point"=> $getSetting($sitesetup, 'digitafter_decimal_point'),
 
 
-            "advance_payment_status"=> $service_config->advance_payment,
-            "slot_service_status"=> $service_config->slot_service,
-            "digital_service_status"=> $service_config->digital_services,
-            "service_package_status"=> $service_config->service_packages,
-            "service_addon_status"=> $service_config->service_addons,
-            "job_request_service_status"=> $service_config->post_services,
-            "social_login_status"=> $other_setting->social_login,
-            "google_login_status"=> $other_setting->google_login,
-            "apple_login_status"=> $other_setting->apple_login,
-            "otp_login_status"=> $other_setting->otp_login,
-            "online_payment_status"=> $other_setting->online_payment,
-            "blog_status"=> $other_setting->blog,
-            "maintenance_mode"=> $other_setting->maintenance_mode,
-            "wallet_status"=> $other_setting->wallet,
-            "chat_gpt_status"=> $other_setting->enable_chat_gpt,
-            "test_chat_gpt_without_key"=> $other_setting->test_without_key,
+            "advance_payment_status"=> $getSetting($service_config, 'advance_payment'),
+            "slot_service_status"=> $getSetting($service_config, 'slot_service'),
+            "digital_service_status"=> $getSetting($service_config, 'digital_services'),
+            "service_package_status"=> $getSetting($service_config, 'service_packages'),
+            "service_addon_status"=> $getSetting($service_config, 'service_addons'),
+            "job_request_service_status"=> $getSetting($service_config, 'post_services'),
+            "social_login_status"=> $getSetting($other_setting, 'social_login'),
+            "google_login_status"=> $getSetting($other_setting, 'google_login'),
+            "apple_login_status"=> $getSetting($other_setting, 'apple_login'),
+            "otp_login_status"=> $getSetting($other_setting, 'otp_login'),
+            "online_payment_status"=> $getSetting($other_setting, 'online_payment'),
+            "blog_status"=> $getSetting($other_setting, 'blog'),
+            "maintenance_mode"=> $getSetting($other_setting, 'maintenance_mode'),
+            "wallet_status"=> $getSetting($other_setting, 'wallet'),
+            "chat_gpt_status"=> $getSetting($other_setting, 'enable_chat_gpt'),
+            "test_chat_gpt_without_key"=> $getSetting($other_setting, 'test_without_key'),
 
-            "force_update_user_app"=> $other_setting->force_update_user_app,
-            "user_app_minimum_version"=> $other_setting->user_app_minimum_version,
-            "user_app_latest_version"=> $other_setting->user_app_latest_version,
-            "force_update_provider_app"=> $other_setting->force_update_provider_app,
-            "provider_app_minimum_version"=> $other_setting->provider_app_minimum_version,
-            "provider_app_latest_version"=> $other_setting->provider_app_latest_version,
-            "force_update_admin_app"=> $other_setting->force_update_admin_app,
-            "admin_app_minimum_version"=> $other_setting->admin_app_minimum_version,
-            "admin_app_latest_version"=> $other_setting->admin_app_latest_version,
-            "firebase_notification_status"=> $other_setting->firebase_notification,
+            "force_update_user_app"=> $getSetting($other_setting, 'force_update_user_app'),
+            "user_app_minimum_version"=> $getSetting($other_setting, 'user_app_minimum_version'),
+            "user_app_latest_version"=> $getSetting($other_setting, 'user_app_latest_version'),
+            "force_update_provider_app"=> $getSetting($other_setting, 'force_update_provider_app'),
+            "provider_app_minimum_version"=> $getSetting($other_setting, 'provider_app_minimum_version'),
+            "provider_app_latest_version"=> $getSetting($other_setting, 'provider_app_latest_version'),
+            "force_update_admin_app"=> $getSetting($other_setting, 'force_update_admin_app'),
+            "admin_app_minimum_version"=> $getSetting($other_setting, 'admin_app_minimum_version'),
+            "admin_app_latest_version"=> $getSetting($other_setting, 'admin_app_latest_version'),
+            "firebase_notification_status"=> $getSetting($other_setting, 'firebase_notification'),
 
-            "facebook_url"=> $social_media->facebook_url,
-            "linkedin_url"=> $social_media->linkedin_url,
-            "instagram_url"=> $social_media->instagram_url,
-            "youtube_url"=> $social_media->youtube_url,
-            "twitter_url"=> $social_media->twitter_url,
+            "facebook_url"=> $getSetting($social_media, 'facebook_url'),
+            "linkedin_url"=> $getSetting($social_media, 'linkedin_url'),
+            "instagram_url"=> $getSetting($social_media, 'instagram_url'),
+            "youtube_url"=> $getSetting($social_media, 'youtube_url'),
+            "twitter_url"=> $getSetting($social_media, 'twitter_url'),
 
             "terms_conditions"=> $terms_condition,
             "privacy_policy"=> $privacy_policy,
             "help_support"=> $help_support,
             "refund_policy"=> $refund_policy,
             "earning_type"=> $earning_setting,
-            "auto_assign_status" => !empty($other_setting->auto_assign_provider) ? $other_setting->auto_assign_provider: 0
+            "auto_assign_status" => $getSetting($other_setting, 'auto_assign_provider', 0)
 
         ];
         if(!empty($request->is_authenticated) && $request->is_authenticated == 1){
-            $response["google_map_key"] = $sitesetup->google_map_keys;
-            $response["chat_gpt_key"] = $other_setting->chat_gpt_key;
-            $response["firebase_key"] = $other_setting->firebase_key;
+            $response["google_map_key"] = $getSetting($sitesetup, 'google_map_keys');
+            $response["chat_gpt_key"] = $getSetting($other_setting, 'chat_gpt_key');
+            $response["firebase_key"] = $getSetting($other_setting, 'firebase_key');
         }
 
         return comman_custom_response($response);

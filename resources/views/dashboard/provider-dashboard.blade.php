@@ -1,6 +1,8 @@
 <x-master-layout>
     <div class="container-fluid">
         <div class="row">
+            @include('dashboard.partials.sanad-operations')
+            @include('dashboard.partials.sanad-partner-overview')
             <div class="col-md-12">
                 <div class="row">
                     <div class="col-lg-3 col-md-6">

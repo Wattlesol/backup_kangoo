@@ -18,46 +18,37 @@
     <ul class="dropdown-menu-1 overflow-y-auto list-style-1 mb-0 notification-height">
         @if(isset($notifications) && count($notifications) > 0)
             @foreach($notifications->sortByDesc('created_at')->take(5) as $notification)
+                @php
+                    $notifData = is_array($notification->data) ? $notification->data : (json_decode($notification->data ?? '{}', true) ?: []);
+                    $notifId = $notifData['id'] ?? ($notifData['booking_id'] ?? '');
+                    $notifType = $notifData['type'] ?? '';
+                    $isBooking = isset($notifData['check_booking_type']) || in_array($notifType, ['add_booking', 'booking_added', 'assigned_booking', 'transfer_booking', 'update_booking_status', 'cancel_booking', 'cancelled_booking', 'reject_booking', 'accept_booking', 'sanad_chat_assignment']);
+                    $url = '#';
+                    if ($isBooking && !empty($notifId)) {
+                        $url = route('booking.show', $notifId);
+                    } elseif ($notifType === 'partner_verification_document_submitted') {
+                        $url = route('providerdocument.index');
+                    }
+                @endphp
                 <li class="dropdown-item-1 float-none p-3 {{ $notification->read_at ? '':'notify-list-bg'}} ">
-                    @if(isset($notification->data['check_booking_type']))
-                        <a href="{{ route('booking.show', $notification->data['id']) }}" class="">
-                            <div class="list-item d-flex justify-content-start align-items-start">
-                                <div class="list-style-detail ml-2 mr-2">
-                                    <h6 class="font-weight-bold mb-1">Booking # {{ $notification->data['id'] ." ". str_replace("_"," ",ucfirst($notification->data['type'])) }}</h6>
-                                    <p class="mb-1">
-                                        <small class="text-secondary">{{ isset($notification->data['message']) ? $notification->data['message'] : __('messages.booking') }}</small>
-                                    </p>
-                                    <p class="m-0">
-                                        <small class="text-secondary">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="text-secondary mr-1" width="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            {{ timeAgoFormate($notification->created_at) }}
-                                        </small>
-                                    </p>
-                                </div>
-                            </div>                                                
-                        </a>
-                    @else
-                        <a href="#" class="">
-                            <div class="list-item d-flex justify-content-start align-items-start">
-                                <div class="list-style-detail ml-2 mr-2">
-                                    <h6 class="font-weight-bold mb-1"># {{ $notification->data['id'] ." ". str_replace("_"," ",ucfirst($notification->data['type'])) }}</h6>
-                                    <p class="mb-1">
-                                        <small class="text-secondary">{{ isset($notification->data['message']) ? $notification->data['message'] : __('messages.booking') }}</small>
-                                    </p>
-                                    <p class="m-0">
-                                        <small class="text-secondary">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="text-secondary mr-1" width="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            {{ timeAgoFormate($notification->created_at) }}
-                                        </small>
-                                    </p>
-                                </div>
-                            </div>                                                
-                        </a>
-                    @endif
+                    <a href="{{ $url }}" class="">
+                        <div class="list-item d-flex justify-content-start align-items-start">
+                            <div class="list-style-detail ml-2 mr-2">
+                                <h6 class="font-weight-bold mb-1">{{ formatNotificationTitle($notification) }}</h6>
+                                <p class="mb-1">
+                                    <small class="text-secondary">{{ formatNotificationMessage($notification) }}</small>
+                                </p>
+                                <p class="m-0">
+                                    <small class="text-secondary">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="text-secondary mr-1" width="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ timeAgoFormate($notification->created_at) }}
+                                    </small>
+                                </p>
+                            </div>
+                        </div>
+                    </a>
                 </li>
             @endforeach
         @else

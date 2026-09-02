@@ -9,9 +9,11 @@ use App\Models\complaints_comment;
 use App\Models\Qualitycontrol;
 use App\Models\QualitycontrolComment;
 use App\Models\Region;
+use App\Models\SanadCustomerComplaint;
 use App\Models\Time;
 use App\Models\TimeData;
 use App\Traits\FileHandler;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class QualityControlController extends Controller
@@ -29,10 +31,40 @@ class QualityControlController extends Controller
         if (request()->status) {
             $query->where('status', request()->status);
         }
+        if (request()->issue_type) {
+            $query->where('issue_type', request()->issue_type);
+        }
         $data = $query->paginate(20);
-        $title = "مراقبه الجوده";
-        $route = route('time.create');
-        return view('QualityControl.index',compact('data','title','route'));
+        $sanadComplaints = collect();
+        $sanadComplaintStats = ['total' => 0, 'open' => 0, 'urgent' => 0, 'resolved' => 0];
+
+        if (auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            $showSanadComplaints = !request()->issue_type || request()->issue_type === 'customer_complaint';
+            $sanadComplaintQuery = SanadCustomerComplaint::with(['booking.service', 'booking.provider', 'customer'])
+                ->when(request()->provider_id, function ($complaintQuery) {
+                    $complaintQuery->whereHas('booking', fn ($bookingQuery) => $bookingQuery->where('provider_id', request()->provider_id));
+                })
+                ->when(request()->status, fn ($complaintQuery) => $complaintQuery->where('status', request()->status));
+
+            if ($showSanadComplaints) {
+                $sanadComplaints = (clone $sanadComplaintQuery)->latest()->paginate(20, ['*'], 'sanad_page')->withQueryString();
+            }
+
+            $statsQuery = SanadCustomerComplaint::query();
+            $sanadComplaintStats = [
+                'total' => (clone $statsQuery)->count(),
+                'open' => (clone $statsQuery)->where('status', 'open')->count(),
+                'urgent' => (clone $statsQuery)->where('priority', 'urgent')->count(),
+                'resolved' => (clone $statsQuery)->where(function ($resolvedQuery) {
+                    $resolvedQuery->whereNotNull('resolved_at')->orWhere('status', 'resolved');
+                })->count(),
+            ];
+        }
+
+       $title = "مراقبه الجوده";
+        $route = '#';
+       $providers = User::where('user_type', 'provider')->orderBy('display_name')->get();
+        return view('QualityControl.index',compact('data','title','route', 'sanadComplaints', 'sanadComplaintStats', 'providers'));
     }
 
     /**
@@ -65,7 +97,17 @@ class QualityControlController extends Controller
             'title' => $request->title,
             'created_by' => auth()->user()->id,
             'provider_id' => $request->provider_id,
+            'issue_type' => $request->issue_type ?: 'customer_complaint',
         ]);
+
+        if ($request->filled('details') || $request->hasFile('file')) {
+            $comment = new QualitycontrolComment();
+            $comment->quality_control_id = $Time->id;
+            $comment->comment = $request->details ?: $request->title;
+            $comment->file = $request->hasFile('file') ? $this->UploadFile($request->file, 'files/') : '';
+            $comment->created_by = auth()->user()->id;
+            $comment->save();
+        }
 
 
         session()->flash('success', trans('record added'));

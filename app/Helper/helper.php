@@ -3,7 +3,7 @@
 use \Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
-function authSession($force=false){
+function authSession(bool $force = false){
     $session = new \App\Models\User;
     if($force){
         $user = \Auth::user()->getRoleNames();
@@ -21,11 +21,11 @@ function authSession($force=false){
     return $session;
 }
 
-function comman_message_response( $message, $status_code = 200){
+function comman_message_response(string $message, int $status_code = 200){
 	return response()->json( [ 'message' => $message ], $status_code );
 }
 
-function comman_custom_response( $response, $status_code = 200 ){
+function comman_custom_response(array $response, int $status_code = 200 ){
     return response()->json($response,$status_code);
 }
 
@@ -79,14 +79,12 @@ function checkRolePermission($role,$permission){
 }
 
 function demoUserPermission(){
-    if(\Auth::user()->hasAnyRole(['demo_admin'])){
-        return true;
-    }else{
-        return false;
-    }
+    // The demo_admin account is the designated full-access QA administrator.
+    // Keep this helper for legacy callers, but do not block its write actions.
+    return false;
 }
 
-function getSingleMedia($model, $collection = 'profile_image', $skip=true   ){
+function getSingleMedia($model, string $collection = 'profile_image', ?bool $skip = true){
     if (!\Auth::check() && $skip) {
         return asset('images/user/user.png');
     }
@@ -202,7 +200,7 @@ function getAttachmentArray($attchments){
     return $files;
 }
 
-function getMediaFileExit($model, $collection = 'profile_image'){
+function getMediaFileExit($model, string $collection = 'profile_image'){
     if($model==null){
         return asset('images/user/user.png');;
     }
@@ -226,7 +224,7 @@ function formatOffset($offset){
         . ':' . str_pad($minutes, 2, '0');
 }
 
-function settingSession($type='get'){
+function settingSession(string $type = 'get'){
     if(\Session::get('setting_data') == ''){
         $type='set';
     }
@@ -241,7 +239,7 @@ function settingSession($type='get'){
     return \Session::get('setting_data');
 }
 
-function imageSession($type='get'){
+function imageSession(string $type = 'get'){
     if(\Session::get('images_data') == ''){
         $type='set';
     }
@@ -256,14 +254,14 @@ function imageSession($type='get'){
     return \Session::get('images_data');
 }
 
-function sitesetupSession($type='get'){
+function sitesetupSession(string $type = 'get'){
     if(\Session::get('setup_data') == ''){
         $type='set';
     }
     switch ($type){
         case "set" :
-            $sitesetup = App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-            $settings = $sitesetup ? json_decode($sitesetup->value) : null;
+            // Use the improved getValueByKey method that handles array/object consistency
+            $settings = App\Models\Setting::getValueByKey('site-setup', 'site-setup');
             if(!empty($settings)){
                 \Session::put('setup_data',$settings);
             }
@@ -312,8 +310,8 @@ function envChanges($type,$value){
 function getPriceFormat($price){
     $price = (double)$price;
 
-    $sitesetup = App\Models\Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-    $sitesetupdata = $sitesetup ? json_decode($sitesetup->value) : null;
+    // Use the improved getValueByKey method that handles array/object consistency
+    $sitesetupdata = App\Models\Setting::getValueByKey('site-setup', 'site-setup');
     $currencyId = optional($sitesetupdata)->default_currency;
     $currency_position = optional($sitesetupdata)->currency_position;
     $afterdecimalpoint = optional($sitesetupdata)->digitafter_decimal_point;
@@ -864,6 +862,41 @@ function verify_provider_document($provider_id){
     }
 }
 
+function localized_service_document_name($document, $fallback = 'Document')
+{
+    if (is_string($document)) {
+        return trim($document) ?: $fallback;
+    }
+
+    if (!is_array($document)) {
+        return $fallback;
+    }
+
+    $name = trim((string) ($document['name'] ?? $document['document_name'] ?? ''));
+    $nameAr = trim((string) ($document['name_ar'] ?? ''));
+
+    if (app()->getLocale() === 'ar') {
+        return $nameAr ?: $name ?: ($document['key'] ?? $fallback);
+    }
+
+    return $name ?: $nameAr ?: ($document['key'] ?? $fallback);
+}
+
+function localized_model_name($model, $fallback = '-')
+{
+    if (!$model) {
+        return $fallback;
+    }
+
+    $name = trim((string) ($model->name ?? ''));
+    $nameEn = trim((string) ($model->name_en ?? ''));
+    $nameAr = trim((string) ($model->name_ar ?? ''));
+
+    return app()->getLocale() === 'ar'
+        ? ($nameAr ?: $name ?: $nameEn ?: $fallback)
+        : ($nameEn ?: $name ?: $nameAr ?: $fallback);
+}
+
 function calculate_commission($total_amount = 0,$provider_commission = 0, $commission_type = 'percent',$type = '', $totalEarning = 0,$count=0){
     if($total_amount === 0){
         return [
@@ -945,7 +978,11 @@ function get_handyman_provider_commission($handyman_id){
 }
 
 function adminEarning(){
-    $revenuedata= \App\Models\Payment::selectRaw('sum(total_amount) as total , booking_id, DATE_FORMAT(datetime , "%m") as month' )
+    $monthExpression = \DB::connection()->getDriverName() === 'sqlite'
+        ? 'strftime("%m", datetime)'
+        : 'DATE_FORMAT(datetime , "%m")';
+
+    $revenuedata= \App\Models\Payment::selectRaw('sum(total_amount) as total , booking_id, '.$monthExpression.' as month' )
     ->whereYear('datetime',date('Y'))
     ->where('payment_status','paid')
     ->groupBy('month');
@@ -992,20 +1029,22 @@ function getTimeZone(){
 }
 
 function get_plan_expiration_date($plan_start_date = '',$plan_type = '',$left_days = 0, $plan_duration = 1){
-    $start_at = new \Carbon\Carbon( $plan_start_date);
+    $start_at = new \Carbon\Carbon( $plan_start_date ?: now());
     $end_date = '';
+    $plan_duration = max(1, (int)$plan_duration);
+    $left_days = (int)$left_days;
 
     if($plan_type === 'weekly'){
-       $getdays = App\Models\Plans::where('identifier','free')->first();
-       $getdays = $getdays->trial_period;
-       $days = $left_days + $getdays;
-       $end_date =  $start_at->addDays($days);
+       $end_date = $start_at->copy()->addWeeks($plan_duration)->addDays($left_days);
     }
     if($plan_type === 'monthly'){
-        $end_date =  $start_at->addMonths($plan_duration)->addDays($left_days);
+        $end_date =  $start_at->copy()->addMonths($plan_duration)->addDays($left_days);
     }
     if($plan_type === 'yearly'){
-        $end_date =  $start_at->addYears($plan_duration)->addDays($left_days);
+        $end_date =  $start_at->copy()->addYears($plan_duration)->addDays($left_days);
+    }
+    if(empty($end_date)){
+        $end_date = $start_at->copy()->addMonths($plan_duration)->addDays($left_days);
     }
     return $end_date->format('Y-m-d H:i:s');
 }
@@ -1346,8 +1385,12 @@ function total_cash($user_id){
 }
 
 function admin_id(){
-    $user = \App\Models\User::getUserByKeyValue('user_type','admin');
-    return $user->id;
+    $user = \App\Models\User::whereIn('user_type', ['admin', 'demo_admin'])
+        ->where('status', 1)
+        ->orderByRaw("CASE WHEN user_type = 'admin' THEN 0 ELSE 1 END")
+        ->first();
+
+    return $user?->id;
 }
 
 function get_user_name($user_id){
@@ -1357,6 +1400,68 @@ function get_user_name($user_id){
         $name = $user->display_name;
     }
     return $name;
+}
+
+function getUserRoleTheme(){
+    if (!\Auth::check()) {
+        return [
+            'role' => 'guest',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_light', '#4A75FB'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_dark', '#004CB2'),
+            'theme_class' => 'theme-customer'
+        ];
+    }
+
+    $user = \Auth::user();
+
+    // Determine user role and return appropriate theme colors from database
+    if ($user->hasRole('admin') || $user->hasRole('demo_admin')) {
+        return [
+            'role' => 'admin',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'admin_light', '#5F60B9'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'admin_dark', '#4153b3'),
+            'theme_class' => 'theme-admin'
+        ];
+    } elseif ($user->hasRole('provider')) {
+        return [
+            'role' => 'provider',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'provider_light', '#EF5535'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'provider_dark', '#9B1F0B'),
+            'theme_class' => 'theme-provider'
+        ];
+    } elseif ($user->hasRole('handyman')) {
+        return [
+            'role' => 'handyman',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'handyman_light', '#2DB665'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'handyman_dark', '#005F2D'),
+            'theme_class' => 'theme-handyman'
+        ];
+    } else {
+        // Default to customer theme for 'user' role and any other roles
+        return [
+            'role' => 'customer',
+            'primary_light' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_light', '#4A75FB'),
+            'primary_dark' => \App\Models\ThemeSetting::getColor('role_colors', 'customer_dark', '#004CB2'),
+            'theme_class' => 'theme-customer'
+        ];
+    }
+}
+
+function getBrandColors(){
+    // Get brand colors from database, fallback to defaults if not found
+    return \App\Models\ThemeSetting::getBrandColors() ?: [
+        'yellow' => ['light' => '#F0B521', 'dark' => '#8D6710'],
+        'red' => ['light' => '#EF5535', 'dark' => '#9B1F0B'],
+        'green' => ['light' => '#2DB665', 'dark' => '#005F2D'],
+        'blue' => ['light' => '#4A75FB', 'dark' => '#004CB2'],
+    ];
+}
+
+function getRotatingCardColor($index){
+    $colors = getBrandColors();
+    $colorKeys = array_keys($colors);
+    $selectedColor = $colorKeys[$index % count($colorKeys)];
+    return $colors[$selectedColor];
 }
 
 function set_admin_approved_cash($payment_id){
@@ -1704,7 +1809,7 @@ function create_bank_tranfer($data){
 
 }
 
-function calculateReadingTime($content, $wpm = 100) {
+function calculateReadingTime(string $content, int $wpm = 100) {
     $wordCount = str_word_count(strip_tags($content));
 
     $readingTime = intval($wordCount / $wpm);
@@ -1949,4 +2054,186 @@ if (!function_exists('Labels')) {
         }
     }
 
+}
+
+if (!function_exists('formatNotificationTitle')) {
+    function formatNotificationTitle($notification) {
+        $data = is_array($notification) ? $notification : (is_object($notification) ? (is_array($notification->data ?? null) ? $notification->data : (json_decode($notification->data ?? '{}', true) ?: [])) : []);
+        $type = $data['type'] ?? '';
+        $id = $data['id'] ?? ($data['booking_id'] ?? '');
+        $isAr = app()->getLocale() === 'ar';
+
+        if ($isAr) {
+            $arTitles = [
+                'partner_verification_document_submitted' => 'مستند تحقق الشريك',
+                'sanad_document_review' => 'مراجعة المستند',
+                'sanad_chat_assignment' => 'تعيين محادثة',
+                'add_booking' => 'طلب جديد',
+                'booking_added' => 'طلب جديد',
+                'assigned_booking' => 'إسناد طلب',
+                'transfer_booking' => 'تحويل طلب',
+                'update_booking_status' => 'تحديث حالة الطلب',
+                'cancel_booking' => 'إلغاء الطلب',
+                'cancelled_booking' => 'إلغاء الطلب',
+                'reject_booking' => 'رفض الطلب',
+                'accept_booking' => 'قبول الطلب',
+                'payment_message_status' => 'حالة الدفع',
+                'wallet_top_up' => 'شحن المحفظة',
+                'wallet_refund' => 'استرداد المحفظة',
+                'payout' => 'سداد المستحقات',
+                'payout_paid' => 'سداد المستحقات',
+                'buzz_alert' => 'تنبيه عاجل',
+                'post_request' => 'طلب خدمة جديد',
+                'bid_accepted' => 'قبول العرض',
+                'incomming_bid' => 'عرض أسعار جديد',
+                'provider_registered' => 'شريك جديد',
+                'customer_registered' => 'عميل جديد',
+            ];
+
+            $label = $arTitles[$type] ?? (isset($data['subject']) && $data['subject'] !== '' ? formatNotificationMessage($data['subject']) : str_replace('_', ' ', $type));
+            if (!empty($id)) {
+                return $label . ' #' . $id;
+            }
+            return $label;
+        }
+
+        $label = ucwords(str_replace('_', ' ', $type ?: ($data['subject'] ?? 'Notification')));
+        if (!empty($id)) {
+            return $label . ' #' . $id;
+        }
+        return $label;
+    }
+}
+
+if (!function_exists('formatNotificationMessage')) {
+    function formatNotificationMessage($messageOrNotification) {
+        if (is_array($messageOrNotification) || (is_object($messageOrNotification) && isset($messageOrNotification->data))) {
+            $data = is_array($messageOrNotification) ? $messageOrNotification : (is_array($messageOrNotification->data) ? $messageOrNotification->data : (json_decode($messageOrNotification->data ?? '{}', true) ?: []));
+            $msg = $data['message'] ?? ($data['subject'] ?? '');
+        } else {
+            $msg = (string) $messageOrNotification;
+        }
+
+        if (empty($msg)) {
+            return app()->getLocale() === 'ar' ? 'إشعار جديد' : 'New notification';
+        }
+
+        if (app()->getLocale() !== 'ar') {
+            return $msg;
+        }
+
+        $docReplacements = [
+            'Commercial Registration' => 'السجل التجاري',
+            'Trade License' => 'الرخصة التجارية',
+            'National ID' => 'الهوية الوطنية',
+            'Passport' => 'جواز السفر',
+            'Driving License' => 'رخصة القيادة',
+            'Tax Certificate' => 'الشهادة الضريبية',
+            'Certificate of Incorporation' => 'شهادة التأسيس',
+            'Bank Statement' => 'كشف حساب بنكي',
+            'Emirates ID' => 'الهوية الإماراتية',
+            'Identity Document' => 'وثيقة إثبات الهوية',
+            'Business License' => 'رخصة مزاولة الأعمال',
+            'Address Proof' => 'إثبات العنوان',
+        ];
+
+        if (preg_match('/^(.*?)\s+submitted\s+(.*?)\s+for\s+verification\.?$/i', $msg, $m)) {
+            $provider = trim($m[1]);
+            $doc = trim($m[2]);
+            $docAr = $docReplacements[$doc] ?? $doc;
+            return "قام {$provider} بتقديم {$docAr} للتحقق.";
+        }
+
+        if (preg_match('/^Your\s+document\s+was\s+marked\s+(Approved|Rejected|Pending)\.?$/i', $msg, $m)) {
+            $status = strtolower($m[1]);
+            if ($status === 'approved') return 'تمت الموافقة على المستند الخاص بك.';
+            if ($status === 'rejected') return 'تم رفض المستند الخاص بك.';
+            return 'المستند الخاص بك قيد المراجعة.';
+        }
+
+        if (stripos($msg, 'Chat assignment request') !== false) {
+            return str_replace(
+                ['Chat assignment request.', 'Chat assignment request', 'Request:', 'Customer:', 'Assigned by:', 'Please accept to entertain the customer.'],
+                ['طلب تعيين محادثة.', 'طلب تعيين محادثة', 'الطلب:', 'العميل:', 'تم التعيين بواسطة:', 'يرجى القبول لخدمة العميل.'],
+                $msg
+            );
+        }
+
+        if (preg_match('/^New\s+booking\s+(?:#(\d+)\s+)?added\s+by\s+(.*?)$/i', $msg, $m)) {
+            $id = $m[1] ?? '';
+            $name = $m[2] ?? '';
+            return $id ? "تمت إضافة طلب جديد #{$id} بواسطة {$name}" : "تمت إضافة طلب جديد بواسطة {$name}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+has\s+been\s+assigned\s+to\s+(.*?)$/i', $msg, $m)) {
+            return "تم إسناد الطلب #{$m[1]} إلى {$m[2]}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+has\s+been\s+transferred\s+to\s+(.*?)$/i', $msg, $m)) {
+            return "تم تحويل الطلب #{$m[1]} إلى {$m[2]}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+status\s+has\s+been\s+changed\s+to\s+(.*?)$/i', $msg, $m)) {
+            return "تم تغيير حالة الطلب #{$m[1]} إلى {$m[2]}";
+        }
+
+        if (preg_match('/^Booking\s+#?(\d+)\s+has\s+been\s+cancelled/i', $msg, $m)) {
+            return "تم إلغاء الطلب #{$m[1]}";
+        }
+
+        $search = [
+            'Partner verification document submitted' => 'تم تقديم مستند تحقق الشريك',
+            'Document review' => 'مراجعة المستند',
+            'Chat assigned to you' => 'تم تعيين محادثة لك',
+            'Wallet top up' => 'شحن المحفظة',
+            'Payout paid' => 'سداد المستحقات',
+        ];
+        return str_replace(array_keys($search), array_values($search), $msg);
+    }
+}
+
+if (!function_exists('quick_status_label')) {
+    function quick_status_label($status, ?string $locale = null): string {
+        $status = \Illuminate\Support\Str::snake((string) $status);
+        $locale = $locale ?: app()->getLocale();
+
+        if ($locale !== 'ar') {
+            return \Illuminate\Support\Str::headline($status);
+        }
+
+        $labels = [
+            'submitted' => 'تم تقديم الطلب',
+            'pending_review' => 'قيد المراجعة',
+            'assigned_to_partner' => 'تم الإسناد إلى الشريك',
+            'assigned_to_employee' => 'تم الإسناد إلى الموظف',
+            'in_progress' => 'قيد التنفيذ',
+            'awaiting_customer_action' => 'بانتظار إجراء العميل',
+            'awaiting_quality_review' => 'بانتظار مراجعة الجودة',
+            'completed' => 'مكتمل',
+            'closed' => 'مغلق',
+            'escalated' => 'مصعّد',
+            'pending' => 'قيد الانتظار',
+            'paid' => 'مدفوع',
+            'refunded' => 'مسترد',
+            'approved' => 'معتمد',
+            'verified' => 'موثّق',
+            'rejected' => 'مرفوض',
+            'replacement_requested' => 'مطلوب استبدال',
+            'stored' => 'محفوظ',
+            'processing' => 'قيد المعالجة',
+            'failed' => 'فشل',
+            'urgent' => 'عاجل',
+            'high' => 'مرتفع',
+            'normal' => 'عادي',
+            'low' => 'منخفض',
+            'open' => 'مفتوح',
+            'resolved' => 'تم الحل',
+            'cancelled' => 'ملغي',
+            'acknowledged' => 'تم التأكيد',
+            'unread' => 'غير مقروء',
+            'answered' => 'تمت الإجابة',
+        ];
+
+        return $labels[$status] ?? \Illuminate\Support\Str::headline($status);
+    }
 }

@@ -1,40 +1,38 @@
-@extends('layouts.master')
-
-@section('title')
-    {{ $pageTitle ?? trans('messages.product') }}
-@endsection
-
-@section('content')
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between">
-                    <div class="header-title">
-                        <h4 class="card-title">{{ $pageTitle ?? trans('messages.product_details') }}</h4>
-                    </div>
-                    <div class="header-action">
-                        <a href="{{ route('product.index') }}" class="btn btn-sm btn-primary">
-                            <i class="fas fa-arrow-left"></i> {{ trans('messages.back') }}
-                        </a>
-                        @if(auth()->user()->can('product edit'))
-                            <a href="{{ route('product.create', ['id' => $product->id]) }}" class="btn btn-sm btn-warning">
-                                <i class="fas fa-edit"></i> {{ trans('messages.edit') }}
-                            </a>
-                        @endif
+<x-master-layout>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card card-block card-stretch">
+                    <div class="card-body p-0">
+                        <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
+                            <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.product_details') }}</h5>
+                            <div class="d-flex gap-2">
+                                <a href="{{ route('product.index') }}" class="btn btn-sm btn-secondary">
+                                    <i class="fa fa-angle-double-left"></i> {{ trans('messages.back') }}
+                                </a>
+                                @if(auth()->user()->can('product edit'))
+                                    <a href="{{ route('product.edit', $product->id) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-edit"></i> {{ trans('messages.edit') }}
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
+            <div class="col-lg-12">
+                <div class="card">
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="product-image">
                                 @if($product->getFirstMediaUrl('product_image'))
-                                    <img src="{{ $product->getFirstMediaUrl('product_image') }}" 
-                                         alt="{{ $product->name }}" 
-                                         class="img-fluid rounded" 
+                                    <img src="{{ $product->getFirstMediaUrl('product_image') }}"
+                                         alt="{{ $product->name }}"
+                                         class="img-fluid rounded"
                                          style="max-height: 400px;">
                                 @else
-                                    <div class="no-image-placeholder bg-light d-flex align-items-center justify-content-center rounded" 
+                                    <div class="no-image-placeholder bg-light d-flex align-items-center justify-content-center rounded"
                                          style="height: 300px;">
                                         <i class="fas fa-image fa-3x text-muted"></i>
                                     </div>
@@ -45,7 +43,7 @@
                             <div class="product-details">
                                 <h3>{{ $product->name }}</h3>
                                 <p class="text-muted mb-3">{{ $product->description }}</p>
-                                
+
                                 <div class="product-info">
                                     <div class="row mb-2">
                                         <div class="col-sm-4"><strong>{{ trans('messages.category') }}:</strong></div>
@@ -57,19 +55,19 @@
                                             @endif
                                         </div>
                                     </div>
-                                    
+
                                     <div class="row mb-2">
                                         <div class="col-sm-4"><strong>{{ trans('messages.sku') }}:</strong></div>
                                         <div class="col-sm-8">{{ $product->sku }}</div>
                                     </div>
-                                    
+
                                     <div class="row mb-2">
                                         <div class="col-sm-4"><strong>{{ trans('messages.price') }}:</strong></div>
                                         <div class="col-sm-8">
                                             <span class="h5 text-primary">{{ getPriceFormat($product->base_price) }}</span>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="row mb-2">
                                         <div class="col-sm-4"><strong>{{ trans('messages.stock') }}:</strong></div>
                                         <div class="col-sm-8">
@@ -80,7 +78,7 @@
                                             @endif
                                         </div>
                                     </div>
-                                    
+
                                     <div class="row mb-2">
                                         <div class="col-sm-4"><strong>{{ trans('messages.creator') }}:</strong></div>
                                         <div class="col-sm-8">
@@ -89,7 +87,7 @@
                                             </span>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="row mb-2">
                                         <div class="col-sm-4"><strong>{{ trans('messages.status') }}:</strong></div>
                                         <div class="col-sm-8">
@@ -100,12 +98,12 @@
                                             @endif
                                         </div>
                                     </div>
-                                    
+
                                     <div class="row mb-2">
                                         <div class="col-sm-4"><strong>{{ trans('messages.created_at') }}:</strong></div>
                                         <div class="col-sm-8">{{ dateAgoFormate($product->created_at, true) }}</div>
                                     </div>
-                                    
+
                                     @if($product->updated_at != $product->created_at)
                                         <div class="row mb-2">
                                             <div class="col-sm-4"><strong>{{ trans('messages.updated_at') }}:</strong></div>
@@ -116,7 +114,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     @if($product->variants && $product->variants->count() > 0)
                         <div class="row mt-4">
                             <div class="col-12">
@@ -154,5 +152,5 @@
             </div>
         </div>
     </div>
-</div>
-@endsection
+    </div>
+</x-master-layout>

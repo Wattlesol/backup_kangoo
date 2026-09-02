@@ -21,11 +21,15 @@ use App\Http\Controllers\CustomerController;
 require __DIR__.'/auth.php';
 
 Route::get('/', [FrontendController::class, 'index'])->name('frontend.index');
-Route::get('/login-page', [FrontendController::class, 'userLoginView'])->name('user.login');
+Route::get('/login-page', fn () => redirect()->route('login'))->name('user.login');
 Route::post('/user-login', [CustomerController::class, 'userLogin'])->name('user.user_login');
 Route::get('/register-page', [FrontendController::class, 'userRegistrationView'])->name('user.register');
 Route::get('/provider-register', [FrontendController::class, 'partnerRegistrationView'])->name('partner.register');
 Route::get('/forgotpassword-page', [FrontendController::class, 'forgotPassword'])->name('user.forgot_password');
+
+// Frontend logout routes (both GET and POST)
+Route::post('/user-logout', [CustomerController::class, 'userLogout'])->name('user.logout');
+Route::get('/user-logout', [CustomerController::class, 'userLogout'])->name('user.logout.get');
 
 Route::get('/category-list', [FrontendController::class, 'catgeoryList'])->name('category.list');
 
@@ -48,6 +52,7 @@ Route::get('/refund-policy', [FrontendController::class, 'refundPolicy'])->name(
 Route::get('/help-support', [FrontendController::class, 'helpSupport'])->name('user.help_support');
 Route::post('/contact', [FrontendController::class, 'submitForm'])->name('contact.submit');
 Route::get('/book-service', [FrontendController::class, 'bookServiceView'])->name('book.service');
+Route::get('/order-product', [FrontendController::class, 'orderProductView'])->name('order.product');
 Route::get('/book-post-job', [FrontendController::class, 'bookPostJobView'])->name('book.post_job');
 Route::get('/booking-detail/{id}', [FrontendController::class, 'bookingDetail'])->name('booking.detail');
 
@@ -60,9 +65,10 @@ Route::get('/rating-all', [FrontendController::class, 'ratingList'])->name('rati
 
 Route::get('/post-job-detail/{id}', [FrontendController::class, 'postJobDetail'])->name('post.job.detail');
 
-
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/booking-list', [FrontendController::class, 'bookingList'])->name('booking.list');
+    // Customer order management (moved from standalone route to customer dashboard)
+    Route::get('/my-orders', [FrontendController::class, 'customerOrders'])->name('customer.orders');
     Route::get('/post-job-list', [FrontendController::class, 'postJobList'])->name('post.job.list');
     Route::post('save-favourite',[ServiceController::class, 'saveFavouriteService' ])->name('save-favourite');
     Route::post('/buy_package_data', [FrontendController::class, 'buy_package_data'])->name('buy_package_data')->middleware('auth');
@@ -82,14 +88,3 @@ Route::get('/post-job-datatable', [FrontendController::class, 'postJobDatatable'
 Route::get('/favouriteservice-datatable', [FrontendController::class, 'favouriteServiceDatatable'])->name('favouriteservice.data');
 Route::get('/rating-datatable', [FrontendController::class, 'ratingDatatable'])->name('rating.data');
 Route::post('/user-subscribe', [FrontendController::class, 'userSubscribe'])->name('user.subscribe');
-
-
-
-
-
-
-
-
-
-
-

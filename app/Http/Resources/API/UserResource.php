@@ -15,6 +15,10 @@ class UserResource extends JsonResource
      */
     public function toArray($request)
     {
+        if (is_null($this->resource)) {
+            return [];
+        }
+        $viewer = auth('sanctum')->user() ?: auth()->user();
         $providers_service_rating = (float) 0;
         $handyman_rating = (float) 0;
         $total_service_rating = 0;
@@ -76,8 +80,9 @@ class UserResource extends JsonResource
             'handymantype' => optional($this->handymantype)->name,
             'known_languages' => $this->known_languages,
             'skills' => $this->skills,
-            'is_favourite'  => UserFavouriteProvider::where('user_id',$request->login_user_id)->where('provider_id',$request->id)->first() ? 1 : 0,
-            'player_ids' =>$this->playerids->pluck('player_id'),
+            'is_favourite'  => $viewer && in_array($viewer->user_type, ['user', 'customer'], true)
+                ? (UserFavouriteProvider::where('user_id', $viewer->id)->where('provider_id', $this->id)->exists() ? 1 : 0)
+                : 0,
             'total_services_booked' => Booking::where('provider_id',$this->id)->count('service_id'),
             'why_choose_me' => $this->why_choose_me,
             'is_subscribe' => $this->is_subscribe,

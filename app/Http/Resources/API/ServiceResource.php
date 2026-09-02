@@ -14,13 +14,31 @@ class ServiceResource extends JsonResource
      */
     public function toArray($request)
     {
-        $user_id = request()->customer_id;
+        $authenticatedCustomer = auth('sanctum')->user();
+        $user_id = $authenticatedCustomer && in_array($authenticatedCustomer->user_type, ['user', 'customer'], true)
+            ? $authenticatedCustomer->id
+            : null;
         $image = getSingleMedia($this,'service_attachment', null);
         $file_extention = config('constant.IMAGE_EXTENTIONS');
         $extention = in_array(strtolower(imageExtention($image)),$file_extention);
+        $serviceInstructions = json_decode($this->service_instructions, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($serviceInstructions)) {
+            $serviceInstructions = $this->service_instructions;
+        }
+
+        $isAr = str_starts_with((string) $request->header('Accept-Language'), 'ar') || $request->header('X-Localization') === 'ar';
+        $name = ($isAr && !empty($this->name_ar)) ? $this->name_ar : $this->name;
+        $categoryName = optional($this->category);
+        $categoryDisplayName = ($isAr && !empty($categoryName->name_ar)) ? $categoryName->name_ar : optional($categoryName)->name;
+        $subcategoryName = optional($this->subcategory);
+        $subcategoryDisplayName = ($isAr && !empty($subcategoryName->name_ar)) ? $subcategoryName->name_ar : optional($subcategoryName)->name;
+        $description = ($isAr && !empty($this->description_ar)) ? $this->description_ar : $this->description;
+
         return [
             'id'            => $this->id,
-            'name'          => $this->name,
+            'name'          => $name,
+            'name_ar'       => $this->name_ar,
+            'name_en'       => $this->name_en ?: $this->name,
             'category_id'   => $this->category_id,
             'subcategory_id'=> $this->subcategory_id,
             'provider_id'   => $this->provider_id,
@@ -30,13 +48,20 @@ class ServiceResource extends JsonResource
             'discount'      => $this->discount,
             'duration'      => $this->duration,
             'status'        => $this->status,
-            'description'   => $this->description,
+            'description'   => $description,
+            'government_entity' => $this->government_entity,
+            'required_documents' => $this->required_documents,
+            'estimated_completion_time' => $this->estimated_completion_time,
+            'government_fee' => $this->government_fee,
+            'service_fee' => $this->service_fee,
+            'service_instructions' => $serviceInstructions,
+            'terms_and_conditions' => $this->terms_and_conditions,
             'is_featured'   => $this->is_featured,
             'provider_name' => optional($this->providers)->display_name,
             'provider_image' => optional($this->providers)->login_type != null ?  optional($this->providers)->social_image : getSingleMedia(optional($this->providers), 'profile_image',null),
             'city_id' => optional($this->providers)->city_id,
-            'category_name'  => optional($this->category)->name,
-            'subcategory_name'  => optional($this->subcategory)->name,
+            'category_name'  => $categoryDisplayName,
+            'subcategory_name'  => $subcategoryDisplayName,
             'attchments' => getAttachments($this->getMedia('service_attachment')),
             'attchments_array' => getAttachmentArray($this->getMedia('service_attachment'),null),
             'total_review'  => $this->serviceRating->count('id'),

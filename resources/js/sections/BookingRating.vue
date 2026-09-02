@@ -17,7 +17,7 @@
                 </div>
                 <div class="mb-4">
                     <label class="form-label text-capitalize">{{ $t('messages.description') }}</label>
-                    <textarea class="form-control" v-model="review" id="description" name="review" rows="4" placeholder="Write Here..."></textarea>
+                    <textarea class="form-control" v-model="review" id="description" name="review" rows="4" :placeholder="$t('landingpage.write_here')"></textarea>
                 </div>
                 <div class="mb-4">
                     <button type="submit" class="btn btn-primary">{{ $t('messages.submit') }}</button>

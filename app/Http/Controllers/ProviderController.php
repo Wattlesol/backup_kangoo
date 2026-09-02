@@ -11,6 +11,9 @@ use App\Http\Requests\UserRequest;
 use App\Models\ProviderPayout;
 use App\Models\ProviderSubscription;
 use App\Models\PaymentGateway;
+use App\Models\ProviderDocument;
+use App\Models\Documents;
+use App\Services\SanadKnowledgeArabicTranslationService;
 use Carbon\Carbon;
 use Yajra\DataTables\DataTables;
 use Hash;
@@ -28,9 +31,9 @@ class ProviderController extends Controller
         $filter = [
             'status' => $request->status,
         ];
-        $pageTitle = __('messages.list_form_title',['form' => __('messages.provider')] );
+        $pageTitle = __('messages.provider');
         if($request->status === 'pending'){
-            $pageTitle = __('messages.pending_list_form_title',['form' => __('messages.provider')] );
+            $pageTitle = __('messages.pending_provider');
         }
         if($request->status === 'subscribe'){
             $pageTitle = __('messages.list_form_title',['form' => __('messages.subscribe')] );
@@ -39,7 +42,25 @@ class ProviderController extends Controller
         $auth_user = authSession();
         $assets = ['datatable'];
         $list_status = $request->status;
-        return view('provider.index', compact('list_status','pageTitle','auth_user','assets','filter'));
+        $sanadPartnerSummary = $this->sanadPartnerSummary();
+        return view('provider.index', compact('list_status','pageTitle','auth_user','assets','filter','sanadPartnerSummary'));
+    }
+
+    private function sanadPartnerSummary()
+    {
+        $providerQuery = User::where('user_type', 'provider');
+        $bookingQuery = Booking::whereNotNull('sanad_stage');
+
+        return [
+            'total_partners' => (clone $providerQuery)->count(),
+            'active_partners' => (clone $providerQuery)->where('status', 1)->count(),
+            'pending_partners' => (clone $providerQuery)->where('status', 0)->count(),
+            'subscribed_partners' => (clone $providerQuery)->where('is_subscribe', 1)->count(),
+            'assigned_requests' => (clone $bookingQuery)->whereNotNull('provider_id')->count(),
+            'unassigned_requests' => (clone $bookingQuery)->whereNull('provider_id')->count(),
+            'pending_documents' => ProviderDocument::where('is_verified', 0)->count(),
+            'provider_revenue' => ProviderPayout::sum('amount') ?? 0,
+        ];
     }
 
     public function index_data(DataTables $datatable,Request $request)
@@ -95,6 +116,33 @@ class ProviderController extends Controller
                 ? date(optional($datetime)->date_format, strtotime($query->created_at)) . ' / ' . date(optional($datetime)->time_format, strtotime($query->created_at))
                 : $query->created_at;
                 return $formattedDate;
+            })
+            ->addColumn('active_orders', function ($provider) {
+                return Booking::where('provider_id', $provider->id)
+                    ->whereNotIn('sanad_stage', ['completed', 'closed'])
+                    ->where('status', '!=', 'cancelled')->count();
+            })
+            ->addColumn('completed_orders', function ($provider) {
+                return Booking::where('provider_id', $provider->id)
+                    ->whereIn('sanad_stage', ['completed', 'closed'])->count();
+            })
+            ->addColumn('capacity', function ($provider) {
+                return $provider->sanad_daily_capacity ?? '-';
+            })
+            ->addColumn('sla_compliance', function ($provider) {
+                return $provider->sanad_sla_compliance_rate !== null ? $provider->sanad_sla_compliance_rate.'%' : '-';
+            })
+            ->addColumn('partner_score', function ($provider) {
+                return $provider->sanad_quality_score !== null ? $provider->sanad_quality_score : '-';
+            })
+            ->addColumn('acceptance_rate', function ($provider) {
+                return $provider->sanad_acceptance_rate;
+            })
+            ->addColumn('cancellation_rate', function ($provider) {
+                return $provider->sanad_cancellation_rate;
+            })
+            ->addColumn('average_completion', function ($provider) {
+                return $provider->sanad_average_completion_minutes;
             })
 
             ->filterColumn('providertype_id',function($query,$keyword){
@@ -159,15 +207,24 @@ class ProviderController extends Controller
         $id = $request->id;
         $auth_user = authSession();
 
-        $providerdata = User::with('Region')->find($id);
+        $providerdata = User::with(['Region', 'providerDocument'])->find($id);
         $pageTitle = __('messages.update_form_title',['form'=> __('messages.provider')]);
+        $partnerVerificationDocuments = Documents::where('status', 1)->orderBy('name')->get();
+        $selectedVerificationDocumentIds = $providerdata ? $providerdata->providerDocument->pluck('document_id')->all() : $partnerVerificationDocuments->where('is_required', 1)->pluck('id')->all();
+        $customVerificationDocumentRows = collect(old('custom_partner_verification_documents', []))
+            ->map(function ($document) {
+                return [
+                    'text' => $document['text'] ?? (app()->getLocale() === 'ar' ? ($document['name_ar'] ?? '') : ($document['name'] ?? '')),
+                ];
+            })
+            ->values();
 
         if($providerdata == null){
             $pageTitle = __('messages.add_button_form',['form' => __('messages.provider')]);
             $providerdata = new User;
         }
 
-        return view('provider.create', compact('pageTitle' ,'providerdata' ,'auth_user' ));
+        return view('provider.create', compact('pageTitle' ,'providerdata' ,'auth_user', 'partnerVerificationDocuments', 'selectedVerificationDocumentIds', 'customVerificationDocumentRows' ));
     }
 
     /**
@@ -176,13 +233,31 @@ class ProviderController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(UserRequest $request)
+    public function store(UserRequest $request, SanadKnowledgeArabicTranslationService $translator)
     {
         $loginuser = \Auth::user();
 
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
+
+        try {
+            $translatedCustomVerificationDocuments = collect($request->input('custom_partner_verification_documents', []))
+                ->pluck('text')
+                ->map(fn ($text) => trim((string) $text))
+                ->filter()
+                ->map(fn ($text) => $translator->bilingualText($text))
+                ->values();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->back()->withInput()->withErrors([
+                'custom_partner_verification_documents' => app()->getLocale() === 'ar'
+                    ? 'تعذرت ترجمة اسم المستند إلى الإنجليزية والعربية. لم يتم حفظ أي بيانات. يرجى المحاولة مرة أخرى.'
+                    : 'The document name could not be translated into both English and Arabic. Nothing was saved. Please try again.',
+            ]);
+        }
+
         $data = $request->all();
         $id = $data['id'];
         $data['user_type'] = $data['user_type'] ?? 'provider';
@@ -242,6 +317,68 @@ class ProviderController extends Controller
                     'region_id' => $region
                 ]);
             }
+        }
+        $verificationDocumentIds = collect($request->input('partner_verification_document_ids', []))
+            ->map(fn ($documentId) => (int) $documentId)
+            ->filter()
+            ->unique();
+
+        foreach ($translatedCustomVerificationDocuments as $customDocument) {
+            $name = $customDocument['text_en'];
+            $nameAr = $customDocument['text_ar'];
+
+            $document = Documents::withTrashed()->where('name', $name)->first();
+
+            if ($document) {
+                if ($document->trashed()) {
+                    $document->restore();
+                }
+                $document->update(['name_ar' => $nameAr, 'status' => 1]);
+            } else {
+                $document = Documents::create([
+                    'name' => $name,
+                    'name_ar' => $nameAr,
+                    'status' => 1,
+                    'is_required' => 0,
+                ]);
+            }
+
+            $verificationDocumentIds->push((int) $document->id);
+        }
+
+        $verificationDocumentIds = $verificationDocumentIds->unique()->values();
+        $assignedDocuments = ProviderDocument::withTrashed()->where('provider_id', $user->id)->get()->keyBy('document_id');
+
+        foreach ($verificationDocumentIds as $documentId) {
+            $providerDocument = $assignedDocuments->get($documentId);
+
+            if (!$providerDocument) {
+                ProviderDocument::create([
+                    'provider_id' => $user->id,
+                    'document_id' => $documentId,
+                    'is_verified' => 0,
+                    'verification_status' => 'pending',
+                ]);
+                continue;
+            }
+
+            if ($providerDocument->trashed()) {
+                $providerDocument->restore();
+                $providerDocument->update([
+                    'is_verified' => 0,
+                    'verification_status' => 'pending',
+                    'review_reason' => null,
+                    'reviewed_by' => null,
+                    'reviewed_at' => null,
+                ]);
+            }
+        }
+
+        $documentsToRemove = $assignedDocuments->keys()->diff($verificationDocumentIds);
+        if ($documentsToRemove->isNotEmpty()) {
+            ProviderDocument::where('provider_id', $user->id)
+                ->whereIn('document_id', $documentsToRemove->all())
+                ->delete();
         }
         if($request->is('api/*')) {
             return comman_message_response($message);
@@ -534,7 +671,7 @@ class ProviderController extends Controller
     }
     public function getProviderTimeSlot(Request $request){
 
-        $id = $request->id;
+        $id = $request->id ?? auth()->user()->id;
         $providerdata = User::with('providerslotsmapping')->where('user_type','provider')->where('id',$id)->first();
         date_default_timezone_set($admin->time_zone ?? 'UTC');
 
@@ -543,7 +680,7 @@ class ProviderController extends Controller
 
         $current_day = strtolower(date('D'));
 
-        $provider_id = $request->id ?? auth()->user()->id;
+        $provider_id = $id;
 
         $days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
@@ -568,7 +705,7 @@ class ProviderController extends Controller
     }
 
     public function editProviderTimeSlot(Request $request){
-        $id = $request->id;
+        $id = $request->id ?? auth()->user()->id;
         $providerdata = User::with('providerslotsmapping')->where('user_type','provider')->where('id',$id)->first();
         date_default_timezone_set($admin->time_zone ?? 'UTC');
 
@@ -577,7 +714,7 @@ class ProviderController extends Controller
 
         $current_day = strtolower(date('D'));
 
-        $provider_id = $request->id ?? auth()->user()->id;
+        $provider_id = $id;
 
         $days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 

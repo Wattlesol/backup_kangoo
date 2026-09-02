@@ -18,10 +18,10 @@
                 <table id="datatable" class="table table-striped border">
                     <thead>
                         <tr>
-                            <th>Package Name</th>
-                            <th>Date</th>
+                            @php $isAr = app()->getLocale() === 'ar'; @endphp<th>{{ $isAr ? 'اسم باقة الخدمات' : 'Service Bundle Name' }}</th>
+                            <th>{{ $isAr ? 'التاريخ' : 'Date' }}</th>
 
-                            <th>Action</th>
+                            <th>{{ $isAr ? 'الإجراء' : 'Action' }}</th>
                         </tr>
                         @foreach ($PackageComplaint as $package)
                         <tr>
@@ -30,7 +30,7 @@
                             <td>{{ $package->created_at }}</td>
 
                             <td>
-                                <a href="{{ route('users.complaint_show', $package->id) }}" class="btn btn-primary">Show</a>
+                                <a href="{{ route('users.complaint_show', $package->id) }}" class="btn btn-primary">{{ $isAr ? 'عرض' : 'Show' }}</a>
 
                             </td>
                         </tr>

@@ -12,6 +12,7 @@ use App\Models\CouponServiceMapping;
 use App\Models\ServiceFaq;
 use App\Http\Resources\API\ServiceResource;
 use App\Http\Resources\API\UserResource;
+use App\Http\Resources\API\PublicUserResource;
 use App\Http\Resources\API\ServiceDetailResource;
 use App\Http\Resources\API\BookingRatingResource;
 use App\Http\Resources\API\CouponResource;
@@ -150,8 +151,9 @@ class ServiceController extends Controller
 
 
         $userservices  = null;
-        if($request->customer_id != null){
-            $user_service = Service::where('status',1)->where('added_by',$request->customer_id)->get();
+        $authenticatedCustomer = auth('sanctum')->user();
+        if ($authenticatedCustomer && in_array($authenticatedCustomer->user_type, ['user', 'customer'], true)) {
+            $user_service = Service::where('status',1)->where('added_by', $authenticatedCustomer->id)->get();
             $userservices = ServiceResource::collection($user_service);
         }
         $response = [
@@ -212,8 +214,9 @@ class ServiceController extends Controller
         $rating_data = BookingRatingResource::collection($service_detail->serviceRating->take(5));
                 
         $customer_reviews = [];
-        if($request->customer_id != null){
-            $customer_review = BookingRating::where('customer_id',$request->customer_id)->where('service_id',$id)->get();
+        $authenticatedCustomer = auth('sanctum')->user();
+        if ($authenticatedCustomer && in_array($authenticatedCustomer->user_type, ['user', 'customer'], true)) {
+            $customer_review = BookingRating::where('customer_id', $authenticatedCustomer->id)->where('service_id',$id)->get();
             if (!empty($customer_review))
             {
                 $customer_reviews = BookingRatingResource::collection($customer_review);
@@ -232,11 +235,13 @@ class ServiceController extends Controller
         // $tax = Tax::where('status',1)->get();
         // $taxes = TaxResource::collection($tax);
         $servicefaq =  ServiceFaq::where('service_id',$id)->get();
-        $serviceAddon = ServiceAddon::where('service_id',$id)->where('status',1)->get();
+        $serviceAddon = ServiceAddon::with(['categories', 'services'])
+            ->forService($service)
+            ->get();
         $serviceaddon =  ServiceAddonResource::collection($serviceAddon);
         $response = [
             'service_detail'    => $service_detail,
-            'provider'          => new UserResource(optional($service->providers)),
+            'provider'          => new PublicUserResource(optional($service->providers)),
             'rating_data'       => $rating_data,
             'customer_review'   => $customer_reviews,
             'coupon_data'       => $coupon_data,

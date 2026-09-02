@@ -74,7 +74,7 @@ class ProductVariant extends BaseModel implements HasMedia
     // Accessors
     public function getFinalPriceAttribute()
     {
-        return $this->product->effective_price + $this->price_adjustment;
+        return ($this->product->selling_price ?? $this->product->base_price) + $this->price_adjustment;
     }
 
     public function getVariantImageAttribute()

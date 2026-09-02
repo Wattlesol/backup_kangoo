@@ -10,6 +10,11 @@ use Yajra\DataTables\DataTables;
 
 class SubCategoryController extends Controller
 {
+    private function ensureSanadCatalogAdmin(): void
+    {
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -23,7 +28,17 @@ class SubCategoryController extends Controller
         $pageTitle = trans('messages.list_form_title',['form' => trans('messages.subcategory')] );
         $auth_user = authSession();
         $assets = ['datatable'];
-        return view('subcategory.index',compact('pageTitle','auth_user','assets','filter'));
+
+        $subcategorySummary = [
+            'total' => SubCategory::count(),
+            'active' => SubCategory::where('status', 1)->count(),
+            'inactive' => SubCategory::where('status', 0)->count(),
+            'featured' => SubCategory::where('is_featured', 1)->count(),
+            'categories' => \App\Models\Category::count(),
+            'services' => \App\Models\Service::count(),
+        ];
+
+        return view('subcategory.index', compact('pageTitle', 'auth_user', 'assets', 'filter', 'subcategorySummary'));
     }
 
     public function index_data(DataTables $datatable,Request $request)
@@ -48,17 +63,35 @@ class SubCategoryController extends Controller
             })
 
 
-            ->editColumn('name', function($query){                
+            ->editColumn('name', function($query){
+                $image = getSingleMedia($query, 'subcategory_image', null);
+                $nameEn = $query->name_en ?: $query->name;
+                $nameAr = $query->name_ar ?: '';
+
+                $thumb = $image 
+                    ? '<img src="'.$image.'" alt="'.e($nameEn).'" class="quick-category-avatar" style="width:38px;height:38px;object-fit:cover;border-radius:10px;border:1px solid var(--quick-shell-line);flex-shrink:0;background:var(--quick-shell-surface);">'
+                    : '<div class="quick-category-avatar-placeholder" style="width:38px;height:38px;border-radius:10px;background:rgba(31,107,255,.09);color:var(--quick-blue);display:grid;place-items:center;font-weight:900;font-size:14px;border:1px solid rgba(31,107,255,.15);flex-shrink:0;">'.mb_substr($nameEn, 0, 1).'</div>';
+
                 if (auth()->user()->can('subcategory edit')) {
-                    $link = '<a class="btn-link btn-link-hover" href='.route('subcategory.create', ['id' => $query->id]).'>'.$query->name.'</a>';
+                    $link = '<a class="quick-category-title-link" style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);text-decoration:none;" href="'.route('subcategory.create', ['id' => $query->id]).'">'.e($nameEn).'</a>';
                 } else {
-                    $link = $query->name; 
+                    $link = '<span style="font-weight:800;font-size:13px;color:var(--quick-shell-ink);">'.e($nameEn).'</span>';
                 }
-                return $link;
+
+                $subtext = $nameAr ? '<span style="display:block;font-size:11px;color:var(--quick-shell-muted);margin-top:2px;">'.e($nameAr).'</span>' : '';
+
+                return '<div style="display:flex;align-items:center;gap:12px;">'.$thumb.'<div style="min-width:0;">'.$link.$subtext.'</div></div>';
+            })
+            ->editColumn('name_ar', function($query){
+                return '<span style="font-weight:700;font-size:13px;color:var(--quick-shell-ink);">'.e($query->name_ar ?: '-').'</span>';
             })
 
             ->editColumn('category_id' , function ($query){
-                return ($query->category_id != null && isset($query->category)) ? $query->category->name : '-';
+                if ($query->category_id != null && isset($query->category)) {
+                    $catName = app()->getLocale() === 'ar' && !empty($query->category->name_ar) ? $query->category->name_ar : ($query->category->name_en ?: $query->category->name);
+                    return '<span class="quick-order-badge" style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:8px;background:rgba(31,107,255,.08);color:var(--quick-blue);font-weight:700;font-size:12px;border:1px solid rgba(31,107,255,.14);">'.e($catName).'</span>';
+                }
+                return '<span style="color:var(--quick-shell-muted);">-</span>';
             })
             ->filterColumn('category_id',function($query,$keyword){
                 $query->whereHas('category',function ($q) use($keyword){
@@ -76,7 +109,7 @@ class SubCategoryController extends Controller
                 </div>';
             })
             ->addColumn('action', function ($data) {
-                return view('subcategory.action', compact('data'));
+                return view('subcategory.action', compact('data'))->render();
             })
             ->editColumn('status' , function ($query){
                 $disabled = $query->trashed() ? 'disabled': '';
@@ -88,7 +121,7 @@ class SubCategoryController extends Controller
                 </div>';
             })
 
-            ->rawColumns(['action', 'status', 'check','is_featured','name'])
+            ->rawColumns(['action', 'status', 'check','is_featured','name','name_ar','category_id'])
             ->toJson();
     }
 
@@ -164,10 +197,12 @@ class SubCategoryController extends Controller
      */
     public function store(SubCategoryRequest $request)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }
         $data = $request->all();
+        $data['name'] = $request->name_en;
        
         $data['is_featured'] = 0;
         if($request->has('is_featured')){
@@ -213,7 +248,7 @@ class SubCategoryController extends Controller
      */
     public function edit($id)
     {
-        //
+        return redirect()->route('subcategory.create', ['id' => $id]);
     }
 
     /**
@@ -225,7 +260,9 @@ class SubCategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $this->ensureSanadCatalogAdmin();
+        $request->merge(['id' => $id]);
+        return $this->store(app(SubCategoryRequest::class));
     }
 
     /**
@@ -236,6 +273,7 @@ class SubCategoryController extends Controller
      */
     public function destroy($id)
     {
+        $this->ensureSanadCatalogAdmin();
         if(demoUserPermission()){
             return  redirect()->back()->withErrors(trans('messages.demo_permission_denied'));
         }

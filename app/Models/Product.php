@@ -22,34 +22,52 @@ class Product extends BaseModel implements HasMedia
         'product_category_id',
         'created_by',
         'created_by_type',
+        'provider_id',
         'base_price',
-        'admin_override_price',
-        'admin_price_active',
-        'price_override_type',
+        'selling_price',
+        
+        
+        
         'weight',
         'dimensions',
         'track_inventory',
         'stock_quantity',
+        'minimum_order_quantity',
+        'maximum_order_quantity',
         'low_stock_threshold',
         'is_featured',
         'status',
+        'is_available',
+        'provider_notes',
         'meta_data',
-        'sort_order'
+        'sort_order',
+        // Approval fields
+        'approval_status',
+        'approved_at',
+        'approved_by',
+        'rejected_at',
+        'rejected_by',
+        'rejection_reason',
+        'admin_notes'
     ];
 
     protected $casts = [
         'base_price' => 'decimal:2',
-        'admin_override_price' => 'decimal:2',
-        'admin_price_active' => 'boolean',
+        'selling_price' => 'decimal:2',
         'weight' => 'decimal:2',
         'dimensions' => 'array',
         'track_inventory' => 'boolean',
         'stock_quantity' => 'integer',
+        'minimum_order_quantity' => 'integer',
+        'maximum_order_quantity' => 'integer',
         'low_stock_threshold' => 'integer',
         'is_featured' => 'boolean',
         'status' => 'boolean',
+        'is_available' => 'boolean',
         'meta_data' => 'array',
-        'sort_order' => 'integer'
+        'sort_order' => 'integer',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime'
     ];
 
     // Relationships
@@ -63,22 +81,33 @@ class Product extends BaseModel implements HasMedia
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function provider()
+    {
+        return $this->belongsTo(User::class, 'provider_id');
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function rejectedBy()
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
     public function variants()
     {
         return $this->hasMany(ProductVariant::class);
     }
 
-    public function storeProducts()
+    // In single-store architecture, products belong directly to the main store
+    public function store()
     {
-        return $this->hasMany(StoreProduct::class);
+        return $this->belongsTo(Store::class);
     }
 
-    public function stores()
-    {
-        return $this->belongsToMany(Store::class, 'store_products')
-                    ->withPivot(['store_price', 'stock_quantity', 'is_available'])
-                    ->withTimestamps();
-    }
+    // Removed stores relationship - using single store architecture
 
     public function orderItems()
     {
@@ -93,7 +122,9 @@ class Product extends BaseModel implements HasMedia
     // Scopes
     public function scopeActive($query)
     {
-        return $query->where('status', true);
+        return $query->where('status', true)
+                    ->where('is_available', true)
+                    ->where('approval_status', 'approved');
     }
 
     public function scopeFeatured($query)
@@ -126,12 +157,12 @@ class Product extends BaseModel implements HasMedia
     }
 
     // Accessors
+    
+
+
     public function getEffectivePriceAttribute()
     {
-        if ($this->admin_price_active && $this->admin_override_price) {
-            return $this->admin_override_price;
-        }
-        return $this->base_price;
+        return $this->selling_price ?? $this->base_price;
     }
 
     public function getMainImageAttribute()
@@ -160,45 +191,20 @@ class Product extends BaseModel implements HasMedia
         return $this->stock_quantity <= $this->low_stock_threshold;
     }
 
-    // Methods
+    // Methods for single-store architecture
     public function getLowestStorePrice($storeId = null)
     {
-        $query = $this->storeProducts()->where('is_available', true);
-
-        if ($storeId) {
-            $query->where('store_id', $storeId);
-        }
-
-        return $query->min('store_price') ?? $this->effective_price;
+        // In single-store architecture, return the selling price or base price
+        return $this->selling_price ?? $this->base_price;
     }
 
     public function getHighestStorePrice($storeId = null)
     {
-        $query = $this->storeProducts()->where('is_available', true);
-
-        if ($storeId) {
-            $query->where('store_id', $storeId);
-        }
-
-        return $query->max('store_price') ?? $this->effective_price;
+        // In single-store architecture, return the selling price or base price
+        return $this->selling_price ?? $this->base_price;
     }
 
-    public function getFinalPrice($storeId = null)
-    {
-        if ($this->admin_price_active && $this->admin_override_price) {
-            switch ($this->price_override_type) {
-                case 'lowest':
-                    return min($this->admin_override_price, $this->getLowestStorePrice($storeId));
-                case 'highest':
-                    return max($this->admin_override_price, $this->getHighestStorePrice($storeId));
-                case 'fixed':
-                default:
-                    return $this->admin_override_price;
-            }
-        }
-
-        return $this->getLowestStorePrice($storeId);
-    }
+    
 
     public function decreaseStock($quantity)
     {

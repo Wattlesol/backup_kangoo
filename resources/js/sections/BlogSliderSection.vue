@@ -5,7 +5,7 @@
         :slides-per-view="3"
         :space-between="30"
 
-        :loop="true"
+        :loop="blog_data.length >= 6"
         :autoplay="{ delay: 3000, disableOnInteraction: false }"
         :breakpoints="{
             320: { slidesPerView: 1 },

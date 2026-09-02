@@ -17,8 +17,13 @@ class ServicePackageResource extends JsonResource
         return [
             'id'=> $this->id,
             'name'=> $this->name,
+            'name_ar'=> $this->name_ar,
             'provider_id' => $this->provider_id,
             'price'=> $this->price,
+            'bundle_price'=> $this->price,
+            'original_price'=> $this->original_price,
+            'discount_amount'=> $this->discount_amount,
+            'discount_percentage'=> $this->discount_percentage,
             'status'=> $this->status,
             'description'=> $this->description,
             'start_date'=> $this->start_at,

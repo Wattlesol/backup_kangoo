@@ -1,3 +1,16 @@
+@if(config('sanad.ui.quick_public_shell', true))
+<footer class="quick-landing-footer" id="support">
+    <div class="quick-section-inner quick-footer-inner">
+        <x-quick-logo />
+        <p>{{ app()->getLocale() === 'ar' ? '© 2026 كويك. خدمات حكومية تُنجز بوضوح وأمان.' : '© 2026 Quick. Government services, completed clearly and securely.' }}</p>
+        <nav aria-label="{{ app()->getLocale() === 'ar' ? 'روابط السياسات' : 'Policy links' }}">
+            <a href="{{ route('user.privacy_policy') }}">{{ app()->getLocale() === 'ar' ? 'الخصوصية' : 'Privacy' }}</a>
+            <a href="{{ route('user.term_conditions') }}">{{ app()->getLocale() === 'ar' ? 'الشروط' : 'Terms' }}</a>
+            <a href="{{ route('user.help_support') }}">{{ app()->getLocale() === 'ar' ? 'تواصل معنا' : 'Contact us' }}</a>
+        </nav>
+    </div>
+</footer>
+@else
 <footer class="footer text-white">
     @php
     $settings = App\Models\Setting::whereIn('type', ['general-setting', 'social-media', 'site-setup'])
@@ -7,7 +20,7 @@
     $generalsetting = $settings->has('general-setting') ? json_decode($settings['general-setting']->value) : null;
     $socialmedia = $settings->has('social-media') ? json_decode($settings['social-media']->value) : null;
     $appsetting = $settings->has('site-setup') ? json_decode($settings['site-setup']->value) : null;
-        $copyright_text = $appsetting ? $appsetting->site_copyright : null;
+        $copyright_text = ($appsetting && isset($appsetting->site_copyright)) ? $appsetting->site_copyright : 'Copyright © 2026 Quick. All rights reserved.';
         $position = strpos($copyright_text, 'by');
         if ($position !== false) {
             $first_part = substr($copyright_text, 0, $position + 2);
@@ -111,68 +124,26 @@
                     </div>
                 </div>
                 @php
-                $footerSection = App\Models\FrontendSetting::where('key', 'footer-setting')->first();
-                $sectionData = $footerSection ? json_decode($footerSection->value, true) : null;
+                $isArabic = app()->getLocale() === 'ar';
+                $allServices = App\Models\Service::where('status', 1)->take(8)->get();
                 @endphp
-                @if ($sectionData && isset($sectionData['footer_setting']) && $sectionData['footer_setting'] == 1)
                 <div class="col-lg-7 custom-border-left mt-lg-0 mt-5 pt-lg-0 pt-3">
-                    @if ($sectionData['footer_setting'] == 1 && isset($sectionData['enable_popular_category']) && $sectionData['enable_popular_category'] == 1)
                     <div class="footer-inner-box position-relative ps-lg-5 h-100">
-                        <h5 class="text-white">{{__('landingpage.handyman_category')}}</h5>
-                        <div class="mt-3">
-                            <ul class="iq-footer-catogery-list d-flex align-items-center flex-wrap m-0 list-inline">
-                                @foreach ($sectionData['category_id'] as $categoryId)
-                                @php
-                                    $category = App\Models\Category::find($categoryId);
-                                  
-                                @endphp
-                                    @if($category)
-                                    @if($category->status==1)
-                                    <li class="me-3 pe-3">
-                                        <a href="{{ route('category.detail', $category->id) }}">
-                                            {{ $category->name }}
+                        <h5 class="text-white font-weight-bold">{{ $isArabic ? 'قائمة الخدمات' : 'Services List' }}</h5>
+                        <div class="mt-4">
+                            <ul class="iq-footer-catogery-list d-flex align-items-center flex-wrap m-0 list-inline gap-3">
+                                @foreach ($allServices as $serv)
+                                    <li class="me-3 pe-3 mb-2">
+                                        <a href="{{ route('service.detail', $serv->id) }}" class="text-white hover-text-primary font-size-14">
+                                            <i class="fas fa-chevron-left mr-1"></i>
+                                            {{ $isArabic && $serv->name_ar ? $serv->name_ar : $serv->name }}
                                         </a>
                                     </li>
-                                    @endif
-                                @endif
-
-                                @endforeach
-
-                            </ul>
-                        </div>
-                        @endif
-                        @php
-                        $footerServiceSection = App\Models\FrontendSetting::where('key', 'footer-setting')->first();
-                        $sectionData = $footerServiceSection ? json_decode($footerServiceSection->value, true) : null;
-                        @endphp
-                        @if ($sectionData && isset($sectionData['footer_setting']) && $sectionData['footer_setting'] == 1 && isset($sectionData['enable_popular_service']) && $sectionData['enable_popular_service'] == 1)
-                        <div class="mt-5">
-                            <h5 class="text-white">{{__('landingpage.popular_services')}}</h5>
-                            <ul class="list-inline mt-3 mb-0 d-flex flex-wrap gap-5 popular-service-list">
-                                @foreach ($sectionData['service_id'] as $serviceId)
-                                @php
-                                    $service = App\Models\Service::find($serviceId);
-                                   if($service){
-                                    $mediaServiceImages = @$service->getMedia('service_attachment');
-                                    }
-                                @endphp
-                                @if ($service && $mediaServiceImages->isNotEmpty())
-
-                                <li>
-                                    <div class="text-center">
-                                        <a href="{{ route('service.detail', $service->id) }}" class="text-body">
-                                            <img src="{{ url($mediaServiceImages->first()->getUrl()) }}" alt="service-image" style="width: 100px; height: auto;">
-                                            <span class="mt-2 line-count-2 popular-service-text">{{$service->name}}</span>
-                                        </a>
-                                    </div>
-                                </li>
-                                @endif
-
                                 @endforeach
                             </ul>
                         </div>
-                        @endif
-
+                    </div>
+                </div>
                         {{-- <div class="mt-5 pt-5 border-top">
                             <div class="row">
                                 <div class="col-lg-9">
@@ -201,7 +172,6 @@
                                 <div class="col-lg-3 d-lg-block d-none"></div>
                             </div>
                         </div> --}}
-                        @endif
                     </div>
                 </div>
             </div>
@@ -213,9 +183,7 @@
                 <div class="col-md-6 text-md-start text-center">
                    {{-- <p class="mb-0 text-white">{{ $appsetting->site_copyright }}
                     </p> --}}
-                    <p class="mb-0 text-white">{{ $first_part }}
-                    <a target="_blank" href="https://iqonic.design/">{{ $second_part }} </a>
-                    </p>
+                    <p class="mb-0 text-white">{{ $isArabic ? '© 2026 جميع الحقوق محفوظة لمنصة كويك للخدمات.' : ($first_part . ' ' . $second_part) }}</p>
                 </div>
                 <div class="col-md-6 text-md-end text-center">
                     <span class="d-inline-flex align-items-center gap-3 flex-wrap">
@@ -229,6 +197,7 @@
         </div>
     </div>
 </footer>
+@endif
 
 @include('partials._scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.1/dist/sweetalert2.all.min.js"></script>

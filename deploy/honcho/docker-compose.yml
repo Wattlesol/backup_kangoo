@@ -1,0 +1,110 @@
+services:
+  api:
+    build:
+      context: https://github.com/plastic-labs/honcho.git
+      dockerfile: Dockerfile
+      args:
+        INSTALL_LANCEDB: "false"
+    entrypoint: ["sh", "docker/entrypoint.sh"]
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      LOG_LEVEL: INFO
+      AUTH_USE_AUTH: "false"
+      DB_CONNECTION_URI: postgresql+psycopg://postgres:postgres@database:5432/postgres
+      CACHE_URL: redis://redis:6379/0?suppress=true
+      CACHE_ENABLED: "true"
+      VECTOR_STORE_TYPE: pgvector
+      VECTOR_STORE_MIGRATED: "false"
+      EMBED_MESSAGES: "false"
+      DERIVER_ENABLED: "false"
+      SUMMARY_ENABLED: "false"
+      DREAM_ENABLED: "false"
+      LLM_OPENAI_API_KEY: disabled-self-hosted-sanad
+    ports:
+      - "127.0.0.1:18000:8000"
+    networks:
+      default:
+      dokploy-network:
+        aliases:
+          - honcho
+    volumes:
+      - lancedb-data:/app/lancedb_data
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  deriver:
+    build:
+      context: https://github.com/plastic-labs/honcho.git
+      dockerfile: Dockerfile
+      args:
+        INSTALL_LANCEDB: "false"
+    entrypoint: ["/app/.venv/bin/python", "-m", "src.deriver"]
+    depends_on:
+      api:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      LOG_LEVEL: INFO
+      AUTH_USE_AUTH: "false"
+      DB_CONNECTION_URI: postgresql+psycopg://postgres:postgres@database:5432/postgres
+      CACHE_URL: redis://redis:6379/0?suppress=true
+      CACHE_ENABLED: "true"
+      VECTOR_STORE_TYPE: pgvector
+      VECTOR_STORE_MIGRATED: "false"
+      EMBED_MESSAGES: "false"
+      DERIVER_ENABLED: "false"
+      SUMMARY_ENABLED: "false"
+      DREAM_ENABLED: "false"
+      LLM_OPENAI_API_KEY: disabled-self-hosted-sanad
+    volumes:
+      - lancedb-data:/app/lancedb_data
+    restart: unless-stopped
+
+  database:
+    image: pgvector/pgvector:pg15
+    command: ["postgres", "-c", "max_connections=200"]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.2
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  pgdata:
+  redis-data:
+  lancedb-data:

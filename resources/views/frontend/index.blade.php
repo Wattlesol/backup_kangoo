@@ -6,7 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{csrf_token()}}">
         <meta name="baseUrl" content="{{env('APP_URL')}}" />
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <title>{{ config('sanad.brand.name', 'Quick') }}</title>
         <link rel="shortcut icon" class="site_favicon_preview" href="{{ getSingleMedia(imageSession('get'),'favicon',null) }}" />
         <link rel="stylesheet" href="{{ asset('vendor/@fortawesome/fontawesome-free/css/all.min.css')}}">
         <link href="{{ asset('css/frontend.min.css') }}" rel="stylesheet">

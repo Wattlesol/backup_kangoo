@@ -16,6 +16,9 @@ use App\Models\Coupon;
 use App\Models\Service;
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\SanadPartnerServicePerformance;
+use App\Models\SanadRequestAction;
+use App\Exports\BookingsExport;
 use App\Models\BookingStatus;
 use App\Models\PostJobRequest;
 use App\Models\ProviderAddressMapping;
@@ -28,12 +31,47 @@ use Carbon\Carbon;
 use App\Traits\NotificationTrait;
 
 use App\Models\ServiceAddon;
+use App\Models\BookingServiceAddonMapping;
 use App\Models\BookingRating;
 use App\Models\Setting;
 use App\Models\Country;
+use Illuminate\Support\Facades\Hash;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 class BookingController extends Controller
 {
     use NotificationTrait;
+
+    /**
+     * Add an Additional Service to a customer's active request.
+     */
+    public function addServiceAddon(Request $request, int $id)
+    {
+        $request->validate(['service_addon_id' => 'required|exists:service_addons,id']);
+
+        $booking = Booking::where('id', $id)
+            ->where('customer_id', auth()->id())
+            ->whereIn('status', ['pending', 'accept', 'accepted', 'in_progress', 'assigned_to_partner', 'assigned_to_employee'])
+            ->firstOrFail();
+
+        $service = Service::findOrFail($booking->service_id);
+        $addon = ServiceAddon::query()
+            ->where('id', $request->service_addon_id)
+            ->forService($service)
+            ->firstOrFail();
+
+        $mapping = BookingServiceAddonMapping::firstOrCreate(
+            ['booking_id' => $booking->id, 'service_addon_id' => $addon->id],
+            ['name' => $addon->name, 'price' => $addon->price, 'status' => 0]
+        );
+
+        return comman_custom_response([
+            'status' => true,
+            'message' => 'Additional Service added to the request.',
+            'data' => $mapping,
+        ]);
+    }
     /**
      * Display a listing of the resource.
      *
@@ -44,7 +82,7 @@ class BookingController extends Controller
         $filter = [
             'status' => $request->status,
         ];
-        $pageTitle = __('messages.list_form_title',['form' => __('messages.booking')] );
+        $pageTitle = __('messages.orders');
         $auth_user = authSession();
         $assets = ['datatable'];
 
@@ -54,7 +92,7 @@ class BookingController extends Controller
 
     public function index_data(DataTables $datatable,Request $request)
     {
-        $query = Booking::query()->myBooking();
+        $query = Booking::query()->myBooking()->with(['customer', 'service', 'provider', 'payment', 'handymanAdded.handyman']);
         $filter = $request->filter;
 
         if (isset($filter)) {
@@ -82,8 +120,15 @@ class BookingController extends Controller
                 });
             })
             ->editColumn('service_id' , function ($query){
-                $service_name = ($query->service_id != null && isset($query->service)) ? $query->service->name : "";
-                return "<a class='btn-link btn-link-hover' href=" .route('booking.show', $query->id).">".$service_name ."</a>";
+                if ($query->service_id != null && isset($query->service)) {
+                    $isAr = app()->getLocale() === 'ar';
+                    $service_name = $isAr && !empty($query->service->name_ar)
+                        ? $query->service->name_ar
+                        : ($query->service->name_en ?: $query->service->name);
+                } else {
+                    $service_name = "";
+                }
+                return "<a class='btn-link btn-link-hover' href=" .route('booking.show', $query->id).">".e($service_name)."</a>";
             })
             ->filterColumn('service_id',function($query,$keyword){
                 $query->whereHas('service',function ($q) use($keyword){
@@ -106,6 +151,20 @@ class BookingController extends Controller
             ->filterColumn('provider_id',function($query,$keyword){
                 $query->whereHas('provider',function ($q) use($keyword){
                     $q->where('display_name','like','%'.$keyword.'%');
+                });
+            })
+            ->addColumn('handyman_id', function ($query) {
+                $employees = $query->handymanAdded
+                    ->pluck('handyman.display_name')
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                return $employees->isNotEmpty() ? e($employees->join(', ')) : '-';
+            })
+            ->filterColumn('handyman_id', function ($query, $keyword) {
+                $query->whereHas('handymanAdded.handyman', function ($employeeQuery) use ($keyword) {
+                    $employeeQuery->where('display_name', 'like', '%'.$keyword.'%');
                 });
             })
             ->editColumn('status' , function ($query){
@@ -141,9 +200,50 @@ class BookingController extends Controller
                     return $query->updated_at->isoFormat('llll');
                 }
             })
+            ->addColumn('order_number', function ($query) {
+                return e($query->quick_reference);
+            })
+            ->addColumn('priority', function ($query) {
+                $priority = strtolower($query->sanad_priority ?: 'normal');
+                if (app()->getLocale() === 'ar') {
+                    $map = [
+                        'low' => 'منخفض',
+                        'normal' => 'عادي',
+                        'high' => 'مرتفع',
+                        'urgent' => 'طارئ',
+                        'critical' => 'حرج',
+                    ];
+                    return $map[$priority] ?? ucfirst($priority);
+                }
+                return e(ucfirst($priority));
+            })
+            ->addColumn('expected_completion_at', function ($query) {
+                return optional($query->expected_completion_at)->format('Y-m-d H:i') ?: '-';
+            })
             ->addIndexColumn()
             ->rawColumns(['action','status','payment_id','service_id','id','check'])
             ->toJson();
+    }
+
+    public function export(Request $request, string $format)
+    {
+        abort_unless(in_array($format, ['pdf', 'excel']), 404);
+
+        $bookings = $this->bookingExportQuery($request)->get();
+        $summary = $this->bookingSummary($bookings);
+        $filename = 'orders-report-'.now()->format('Y-m-d-His');
+
+        if ($format === 'excel') {
+            return Excel::download(new BookingsExport($bookings, $summary), $filename.'.xlsx');
+        }
+
+        $pdf = PDF::loadView('booking.exports.pdf', [
+            'bookings' => $bookings,
+            'summary' => $summary,
+            'generatedAt' => now(),
+        ]);
+
+        return $pdf->download($filename.'.pdf');
     }
 
     /* bulck action method */
@@ -212,7 +312,24 @@ class BookingController extends Controller
      */
     public function store(Request $request)
     {
+        $request->validate([
+            'service_id' => 'required|exists:services,id',
+            'customer_id' => 'nullable|exists:users,id',
+            'customer_name' => 'nullable|string|max:255',
+            'customer_phone' => 'nullable|string|max:255',
+            'customer_email' => 'nullable|email|max:255',
+            'customer_address' => 'nullable|string|max:1000',
+            'customer_password' => 'nullable|string|min:8|max:255|confirmed',
+            'date' => 'required',
+            'address' => 'nullable|string|max:2000',
+            'description' => 'nullable|string|max:4000',
+            'sanad_priority' => 'nullable|in:normal,high,urgent',
+            'service_addon_id' => 'nullable|array',
+            'service_addon_id.*' => 'integer|distinct|exists:service_addons,id',
+        ]);
+
         $data = $request->all();
+        $data['coupon_id'] = $data['coupon_id'] ?? null;
 
         $data['tax'] = null;
 
@@ -230,8 +347,38 @@ class BookingController extends Controller
             $data['date'] = isset($request->date) ? date('Y-m-d H:i:s',strtotime($request->date)) : date('Y-m-d H:i:s');
         }
         $service_data = Service::find($data['service_id']);
+        $requestedAddonIds = collect($request->input('service_addon_id', []))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        if ($requestedAddonIds->isNotEmpty()) {
+            $eligibleAddonIds = ServiceAddon::query()
+                ->forService($service_data)
+                ->whereIn('id', $requestedAddonIds)
+                ->pluck('id');
 
-        $data['provider_id'] = !empty($data['provider_id']) ? $data['provider_id']: $service_data->provider_id;
+            if ($eligibleAddonIds->count() !== $requestedAddonIds->count()) {
+                throw ValidationException::withMessages([
+                    'service_addon_id' => 'One or more selected add-ons are not available for this service.',
+                ]);
+            }
+        }
+        $customer = $this->resolveBookingCustomer($request);
+        $plainPassword = $customer->wasRecentlyCreated ? $customer->plain_password_for_admin ?? null : null;
+        $data['customer_id'] = $customer->id;
+        $data['address'] = $request->input('address') ?: $request->input('customer_address') ?: optional($customer)->address;
+        unset($data['customer_mode'], $data['customer_name'], $data['customer_phone'], $data['customer_email'], $data['customer_address'], $data['customer_password'], $data['customer_password_confirmation']);
+
+        // Customers never select or inherit a Partner. Assignment belongs to
+        // the Sanad Operations workflow and starts as Suggested/Unassigned.
+        $data['provider_id'] = null;
+        $data['status'] = $data['status'] ?? 'pending';
+        $data['sanad_stage'] = $data['sanad_stage'] ?? 'submitted';
+        $data['sanad_priority'] = $data['sanad_priority'] ?? 'normal';
+        $data['expected_completion_at'] = $data['expected_completion_at'] ?? $this->expectedCompletion($service_data);
+        $data['sla_due_at'] = $data['sla_due_at'] ?? $data['expected_completion_at'];
+        $data['amount'] = (float) ($service_data->service_fee ?? $service_data->price ?? 0);
 
         if($request->has('tax') && $request->tax != null) {
             $data['tax'] = json_encode($request->tax);
@@ -249,13 +396,13 @@ class BookingController extends Controller
                 $data['coupon_id'] = $coupons->id;
             }
         }
-        $subtotal = $bookingdata->getSubTotalValue() + $bookingdata->getServiceAddonValue();
-        $tax = $bookingdata->getTaxesValue();
-        $totalamount =   $subtotal + $bookingdata->getExtraChargeValue() + $tax;
-        $data['total_amount'] =round($totalamount,2);
-        $data['final_total_tax'] = round($tax,2);
-        $data['total_amount'] = Service::find($data['service_id'])->price;
+        $data['final_total_tax'] = 0;
+        $data['total_amount'] = (float) (($service_data->service_fee ?? $service_data->price ?? 0) + ($service_data->government_fee ?? 0));
         $result = Booking::updateOrCreate(['id' => $request->id], $data);
+        if (empty($result->sanad_reference)) {
+            $result->sanad_reference = $this->nextSanadReference($result->id);
+            $result->save();
+        }
 
         $activity_data = [
             'activity_type' => 'add_booking',
@@ -290,9 +437,9 @@ class BookingController extends Controller
             $result->addressAdded()->create($booking_address_data);
         }
 
-        if ($request->has('service_addon_id') && is_array($request->service_addon_id) != null) {
-            foreach ($request->service_addon_id as $serviceaddon) {
-                $booking_serviceaddon_mapping = ServiceAddon::find($serviceaddon);
+        if ($requestedAddonIds->isNotEmpty()) {
+            foreach ($requestedAddonIds as $serviceaddon) {
+                $booking_serviceaddon_mapping = ServiceAddon::query()->forService($service_data)->find($serviceaddon);
                 if ($booking_serviceaddon_mapping) {
                     $booking_serviceaddon_data = [
                         'booking_id' => $result->id,
@@ -336,9 +483,9 @@ class BookingController extends Controller
             $post_request->date = isset($request->date) ? date('Y-m-d H:i:s',strtotime($request->date)) : date('Y-m-d H:i:s');
             $post_request->update();
         }
-		if($result->wasRecentlyCreated){
-			$message = __('messages.save_form',[ 'form' => __('messages.booking') ] );
-		}
+        $message = $result->wasRecentlyCreated
+            ? __('messages.save_form',[ 'form' => __('messages.booking') ] )
+            : __('messages.update_form',[ 'form' => __('messages.booking') ] );
 
         if($request->is('api/*')) {
             $response = [
@@ -347,8 +494,138 @@ class BookingController extends Controller
             ];
             return comman_custom_response($response);
 		}
-		return  redirect(route('booking.index'))->withSuccess($message);
+        $redirect = redirect(route('booking.index'))->withSuccess($message);
+        if ($plainPassword) {
+            $redirect->with('created_customer_credentials', [
+                'name' => $customer->display_name,
+                'email' => $customer->email,
+                'password' => $plainPassword,
+            ]);
+        }
+		return  $redirect;
 
+    }
+
+    private function resolveBookingCustomer(Request $request): User
+    {
+        if (auth()->check() && in_array(auth()->user()->user_type, ['user', 'customer'], true)) {
+            return auth()->user();
+        }
+
+        if ($request->filled('customer_id')) {
+            $customer = User::whereIn('user_type', ['user', 'customer'])->findOrFail($request->customer_id);
+            $updates = [];
+            if ($request->filled('customer_phone')) {
+                $updates['contact_number'] = $request->customer_phone;
+            }
+            if ($request->filled('customer_address')) {
+                $updates['address'] = $request->customer_address;
+            }
+            if ($updates) {
+                $customer->fill($updates)->save();
+            }
+            return $customer;
+        }
+
+        $request->validate([
+            'customer_name' => 'required|string|max:255',
+            'customer_phone' => 'required_without:customer_email|string|max:255',
+            'customer_email' => 'required|email|max:255',
+            'customer_password' => 'nullable|string|min:8|max:255|confirmed',
+        ]);
+
+        $customer = null;
+        if ($request->filled('customer_email')) {
+            $emailOwner = User::where('email', $request->customer_email)->first();
+            if ($emailOwner && !in_array($emailOwner->user_type, ['user', 'customer'], true)) {
+                throw ValidationException::withMessages([
+                    'customer_email' => 'This email belongs to a non-customer account.',
+                ]);
+            }
+            $customer = $emailOwner;
+        }
+        if (!$customer && $request->filled('customer_phone')) {
+            $customer = User::where('contact_number', $request->customer_phone)->whereIn('user_type', ['user', 'customer'])->first();
+        }
+
+        if ($customer) {
+            $customer->fill([
+                'display_name' => $request->customer_name ?: $customer->display_name,
+                'contact_number' => $request->customer_phone ?: $customer->contact_number,
+                'address' => $request->customer_address ?: $customer->address,
+            ])->save();
+
+            return $customer;
+        }
+
+        $nameParts = preg_split('/\s+/', trim($request->customer_name), 2);
+        $firstName = $nameParts[0] ?: 'Customer';
+        $lastName = $nameParts[1] ?? '';
+        $email = $request->customer_email;
+        $plainPassword = $request->filled('customer_password') ? $request->customer_password : Str::random(12);
+
+        $customer = User::create([
+            'username' => $this->uniqueCustomerUsername($firstName),
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'display_name' => trim($request->customer_name),
+            'email' => $email,
+            'password' => Hash::make($plainPassword),
+            'user_type' => 'user',
+            'contact_number' => $request->customer_phone,
+            'address' => $request->customer_address,
+            'status' => 1,
+        ]);
+        $customer->plain_password_for_admin = $plainPassword;
+
+        if (method_exists($customer, 'assignRole')) {
+            try {
+                $customer->assignRole('user');
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return $customer;
+    }
+
+    public function customerDetails($id)
+    {
+        $customer = User::where('user_type', 'user')->where('status', 1)->findOrFail($id);
+
+        return response()->json([
+            'id' => $customer->id,
+            'display_name' => $customer->display_name,
+            'contact_number' => $customer->contact_number,
+            'email' => $customer->email,
+            'address' => $customer->address,
+        ]);
+    }
+
+    private function uniqueCustomerUsername(string $name): string
+    {
+        $base = Str::slug($name ?: 'customer', '_') ?: 'customer';
+        $username = $base;
+        $counter = 1;
+
+        while (User::where('username', $username)->exists()) {
+            $username = $base . '_' . $counter;
+            $counter++;
+        }
+
+        return $username;
+    }
+
+    private function nextSanadReference(int $id): string
+    {
+        return 'QUICK-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT);
+    }
+
+    private function expectedCompletion(Service $service)
+    {
+        preg_match('/\d+/', (string) $service->estimated_completion_time, $matches);
+        $days = isset($matches[0]) ? max(1, (int) $matches[0]) : 3;
+        return now()->addDays($days);
     }
 
     /**
@@ -531,17 +808,94 @@ class BookingController extends Controller
     }
 
     public function  bookingAssignForm(Request $request){
-
-        $bookingdata = Booking::find($request->id);
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin', 'provider']), 403);
+        $bookingdata = Booking::query()->myBooking()->findOrFail($request->id);
         $pageTitle = __('messages.assign_form_title',['form'=> __('messages.booking')]);
         return view('booking.assigned_form',compact('bookingdata','pageTitle'));
     }
 
     public function bookingAssigned(Request $request)
     {
-        $bookingdata =  Booking::find($request->id);
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin', 'provider']), 403);
+        $bookingdata = Booking::query()->myBooking()->findOrFail($request->id);
+        $previousProviderId = $bookingdata->provider_id;
+        $previousStatus = $bookingdata->status;
+        $previousStage = $bookingdata->sanad_stage;
+
+        $request->merge(['assignment_mode' => $request->assignment_mode ?: 'suggested']);
+        $request->validate([
+            'assignment_mode' => 'required|in:suggested,auto,manual',
+            'assignment_reason' => 'nullable|string|max:2000',
+            'partner_id' => 'nullable|integer|exists:users,id',
+            'handyman_id' => 'nullable|array',
+            'handyman_id.*' => 'integer|distinct|exists:users,id',
+        ]);
+        if (auth()->user()->hasRole('provider')) {
+            $request->merge([
+                'partner_id' => auth()->id(),
+                'assignment_mode' => 'manual',
+            ]);
+        }
+        if ($request->assignment_mode === 'manual' && empty($request->partner_id)) {
+            return response()->json(['status' => false, 'message' => 'A Partner is required for manual assignment.'], 422);
+        }
+        if ($bookingdata->provider_id && $request->partner_id && (int) $bookingdata->provider_id !== (int) $request->partner_id && empty($request->assignment_reason)) {
+            return response()->json(['status' => false, 'message' => __('messages.assignment_reason_required')], 422);
+        }
+
+        $partnerId = $request->partner_id ?: $bookingdata->provider_id;
+        if ($request->partner_id && !User::where('id', $partnerId)->where('user_type', 'provider')->where('status', 1)->exists()) {
+            return response()->json(['status' => false, 'message' => 'The selected Partner is not active.'], 422);
+        }
+        if ($partnerId && !User::where('id', $partnerId)->where('user_type', 'provider')->where('status', 1)->exists()) {
+            $partnerId = null;
+        }
+        if (!$partnerId) {
+            abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+            $candidates = User::query()
+                ->where('user_type', 'provider')
+                ->where('status', 1)
+                ->get();
+            $partnerId = $candidates->map(function ($candidate) use ($bookingdata) {
+                $servicePerformance = SanadPartnerServicePerformance::where('provider_id', $candidate->id)
+                    ->where('service_id', $bookingdata->service_id)
+                    ->first();
+                $activeOrders = Booking::where('provider_id', $candidate->id)
+                    ->whereNotIn('sanad_stage', ['completed', 'closed'])
+                    ->where('status', '!=', 'cancelled')->count();
+                $serviceExperience = $servicePerformance?->completed_orders ?? Booking::where('provider_id', $candidate->id)
+                    ->where('service_id', $bookingdata->service_id)
+                    ->whereIn('sanad_stage', ['completed', 'closed'])->count();
+                $capacity = (int) ($candidate->sanad_daily_capacity ?: 0);
+                $capacityScore = $capacity > 0 ? max(0, 100 - (($activeOrders / $capacity) * 100)) : 50;
+                $averageCompletion = $servicePerformance?->average_completion_minutes ?? $candidate->sanad_average_completion_minutes;
+                $qualityScore = $servicePerformance?->quality_score ?? $candidate->sanad_quality_score;
+                $slaCompliance = $servicePerformance?->sla_compliance_rate ?? $candidate->sanad_sla_compliance_rate;
+                $acceptanceRate = $servicePerformance?->acceptance_rate ?? $candidate->sanad_acceptance_rate;
+                $cancellationRate = $servicePerformance?->cancellation_rate ?? $candidate->sanad_cancellation_rate;
+                $speedScore = $averageCompletion
+                    ? max(0, 100 - min(100, ((float) $averageCompletion / 1440) * 100))
+                    : 50;
+                $score = ($serviceExperience * 5)
+                    + ((float) ($qualityScore ?: 0) * 0.25)
+                    + ((float) ($slaCompliance ?: 0) * 0.2)
+                    + ((float) ($acceptanceRate ?: 0) * 0.1)
+                    + ($capacityScore * 0.2)
+                    + ($speedScore * 0.1)
+                    - ((float) ($cancellationRate ?: 0) * 0.1)
+                    - ($activeOrders * 2);
+                $candidate->assignment_score = $score;
+                return $candidate;
+            })->sortByDesc('assignment_score')->first();
+            $partnerId = $partnerId?->id;
+        }
+        if (!$partnerId) {
+            return response()->json(['status' => false, 'message' => 'No active Partner is available for assignment.'], 422);
+        }
 
         $assigned_handyman_ids = [];
+        $isPartnerTransfer = $previousProviderId && $partnerId && (int) $previousProviderId !== (int) $partnerId;
+
         if($bookingdata->handymanAdded()->count() > 0){
             $assigned_handyman_ids = $bookingdata->handymanAdded()->pluck('handyman_id')->toArray();
             $bookingdata->handymanAdded()->delete();
@@ -554,7 +908,16 @@ class BookingController extends Controller
 
         $remove_notification_id = [];
         if($request->handyman_id != null) {
-            foreach($request->handyman_id as $handyman) {
+            $validEmployeeIds = User::query()
+                ->whereIn('id', $request->handyman_id)
+                ->where('user_type', 'handyman')
+                ->where('provider_id', $partnerId)
+                ->where('status', 1)
+                ->pluck('id');
+            if ($validEmployeeIds->count() !== count(array_unique($request->handyman_id))) {
+                return response()->json(['status' => false, 'message' => 'Every selected Employee must belong to the assigned Partner and be active.'], 422);
+            }
+            foreach($validEmployeeIds as $handyman) {
                 $assign_to_handyman = [
                     'booking_id'   => $bookingdata->id,
                     'handyman_id'  => $handyman
@@ -573,7 +936,40 @@ class BookingController extends Controller
         }
 
         $bookingdata->status = 'accept';
+        $bookingdata->provider_id = $partnerId;
+        $bookingdata->assignment_mode = $request->assignment_mode;
+        $bookingdata->assignment_reason = $request->assignment_reason;
+        $bookingdata->assigned_by = auth()->id();
+        $bookingdata->assigned_at = now();
+        if ($isPartnerTransfer) {
+            $bookingdata->sanad_stage = 'assigned_to_partner';
+            $bookingdata->chat_owner_type = 'partner_team';
+            $bookingdata->chat_owner_user_id = $partnerId;
+            $bookingdata->chat_assigned_by = auth()->id();
+            $bookingdata->chat_assigned_at = now();
+            $bookingdata->chat_assignment_note = $request->assignment_reason;
+            $bookingdata->sanadWorkflowStages()->delete();
+        }
         $bookingdata->save();
+
+        if ($isPartnerTransfer) {
+            SanadRequestAction::create([
+                'booking_id' => $bookingdata->id,
+                'actor_id' => auth()->id(),
+                'actor_role' => optional(auth()->user())->user_type,
+                'action' => 'transfer_partner',
+                'previous_status' => $previousStatus,
+                'current_status' => $bookingdata->status,
+                'previous_stage' => $previousStage,
+                'current_stage' => $bookingdata->sanad_stage,
+                'reason' => $request->assignment_reason,
+                'internal_note' => 'Order transferred to a different partner. Documents, chats, add-ons, payments, and request history remain attached to the same order.',
+                'metadata' => [
+                    'previous_provider_id' => $previousProviderId,
+                    'new_provider_id' => $partnerId,
+                ],
+            ]);
+        }
 
         $activity_data = [
             'activity_type' => $activity_type,
@@ -1085,5 +1481,47 @@ if ( in_array($package->package_type,['Breaks','specific_place']) && count($pack
 
 
     }
-}
 
+    private function bookingExportQuery(Request $request)
+    {
+        $query = Booking::query()
+            ->myBooking()
+            ->with(['customer', 'service', 'provider', 'payment']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('sanad_reference', 'like', "%{$search}%")
+                    ->orWhere('id', $search)
+                    ->orWhereHas('service', fn ($serviceQuery) => $serviceQuery->where('name', 'like', "%{$search}%")->orWhere('name_en', 'like', "%{$search}%"))
+                    ->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('display_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
+                    ->orWhereHas('provider', fn ($providerQuery) => $providerQuery->where('display_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+            });
+        }
+
+        if (auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
+            $query->withTrashed();
+        }
+
+        return $query->latest();
+    }
+
+    private function bookingSummary($bookings): array
+    {
+        return [
+            'total_orders' => $bookings->count(),
+            'unassigned_orders' => $bookings->whereNull('provider_id')->count(),
+            'high_priority_orders' => $bookings->where('sanad_priority', 'high')->count(),
+            'completed_orders' => $bookings->whereIn('sanad_stage', ['completed', 'closed'])->count(),
+            'cancelled_orders' => $bookings->where('status', 'cancelled')->count(),
+            'pending_orders' => $bookings->whereIn('sanad_stage', ['submitted', 'pending_review'])->count(),
+            'in_progress_orders' => $bookings->whereIn('sanad_stage', ['assigned_to_partner', 'assigned_to_employee', 'in_progress'])->count(),
+            'overdue_orders' => $bookings->filter(fn ($booking) => $booking->expected_completion_at && $booking->expected_completion_at->isPast() && !in_array($booking->sanad_stage, ['completed', 'closed']))->count(),
+            'total_value' => $bookings->sum(fn ($booking) => (float) ($booking->total_amount ?: $booking->amount)),
+        ];
+    }
+}

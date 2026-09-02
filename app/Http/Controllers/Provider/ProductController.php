@@ -8,7 +8,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Models\Store;
-use App\Models\StoreProduct;
+// Removed StoreProduct import - using direct product-provider relationships
 use Yajra\DataTables\DataTables;
 use Illuminate\Support\Str;
 
@@ -19,9 +19,20 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
+        // Debug logging
+        \Log::info('Provider Product Controller - Index called', [
+            'user_id' => $auth_user ? $auth_user->id : 'null',
+            'user_type' => $auth_user ? $auth_user->user_type : 'null',
+            'email' => $auth_user ? $auth_user->email : 'null'
+        ]);
+
         if ($auth_user->user_type !== 'provider') {
+            \Log::error('Provider Product Controller - Unauthorized access', [
+                'user_type' => $auth_user->user_type,
+                'expected' => 'provider'
+            ]);
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
 
@@ -32,13 +43,13 @@ class ProductController extends Controller
         $pageTitle = trans('messages.my_products');
         $assets = ['datatable'];
         $categories = ProductCategory::active()->get();
-        
+
         return view('provider.product.index', compact('pageTitle', 'auth_user', 'assets', 'filter', 'categories'));
     }
 
     public function index_data(DataTables $datatable, Request $request)
     {
-        $auth_user = authSession();
+        $auth_user = auth()->user();
         
         $query = Product::with(['category'])
                        ->where('created_by', $auth_user->id)
@@ -46,11 +57,14 @@ class ProductController extends Controller
         
         $filter = $request->filter;
         if (isset($filter)) {
-            if (isset($filter['column_status'])) {
-                $query->where('status', $filter['column_status']);
+            if (isset($filter['status']) && $filter['status'] !== '') {
+                $query->where('status', $filter['status']);
             }
-            if (isset($filter['category_id']) && $filter['category_id'] != '') {
+            if (isset($filter['category_id']) && $filter['category_id'] !== '') {
                 $query->where('product_category_id', $filter['category_id']);
+            }
+            if (isset($filter['approval_status']) && $filter['approval_status'] !== '') {
+                $query->where('approval_status', $filter['approval_status']);
             }
         }
 
@@ -61,15 +75,23 @@ class ProductController extends Controller
             ->editColumn('category', function($query) {
                 return $query->category ? $query->category->name : '-';
             })
-            ->editColumn('base_price', function($query) {
+            ->editColumn('sku', function($query) {
+                return $query->sku;
+            })
+            ->editColumn('price', function($query) {
                 return getPriceFormat($query->base_price);
             })
-            ->editColumn('effective_price', function($query) {
-                return getPriceFormat($query->effective_price);
-            })
-            ->editColumn('stock_quantity', function($query) {
-                $stockClass = $query->is_low_stock ? 'text-warning' : ($query->is_in_stock ? 'text-success' : 'text-danger');
+            ->editColumn('stock', function($query) {
+                $stockClass = $query->stock_quantity <= 0 ? 'text-danger' : ($query->stock_quantity <= ($query->low_stock_threshold ?? 5) ? 'text-warning' : 'text-success');
                 return '<span class="'.$stockClass.'">'.$query->stock_quantity.'</span>';
+            })
+            ->editColumn('approval_status', function($query) {
+                $status = $query->approval_status ?? 'pending';
+                $badgeClass = $status == 'approved' ? 'success' : ($status == 'rejected' ? 'danger' : 'warning');
+                return '<span class="badge badge-'.$badgeClass.'">'.ucfirst($status).'</span>';
+            })
+            ->editColumn('created_at', function($query) {
+                return $query->created_at->format('M d, Y');
             })
             ->editColumn('status' , function ($query){
                 return '<div class="custom-control custom-switch custom-switch-text custom-switch-color custom-control-inline">
@@ -83,7 +105,7 @@ class ProductController extends Controller
                 return view('provider.product.action',compact('product'))->render();
             })
             ->addIndexColumn()
-            ->rawColumns(['action','status','name','stock_quantity'])
+            ->rawColumns(['action','status','name','stock','approval_status'])
             ->toJson();
     }
 
@@ -92,8 +114,8 @@ class ProductController extends Controller
      */
     public function create()
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -109,8 +131,8 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -137,19 +159,17 @@ class ProductController extends Controller
             $data['dimensions'] = json_encode($data['dimensions']);
         }
 
+        // Set provider_id for provider products
+        $data['provider_id'] = $auth_user->id;
+
+        // Provider products need approval before being available
+        $data['approval_status'] = 'pending';
+        $data['is_available'] = false; // Not available until approved
+        $data['status'] = false; // Inactive until approved
+
         $product = Product::create($data);
 
-        // Automatically add to provider's store if exists
-        $store = Store::where('provider_id', $auth_user->id)->where('status', 'approved')->first();
-        if ($store) {
-            StoreProduct::create([
-                'store_id' => $store->id,
-                'product_id' => $product->id,
-                'store_price' => $product->base_price,
-                'stock_quantity' => $product->stock_quantity,
-                'is_available' => true
-            ]);
-        }
+        // In single-store architecture, products need admin approval before being available
 
         return redirect()->route('provider.product.index')->withSuccess('Product created successfully');
     }
@@ -159,8 +179,8 @@ class ProductController extends Controller
      */
     public function show($id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -180,8 +200,8 @@ class ProductController extends Controller
      */
     public function edit($id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -202,8 +222,8 @@ class ProductController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -233,19 +253,7 @@ class ProductController extends Controller
 
         $product->update($data);
 
-        // Update store product price if exists
-        $store = Store::where('provider_id', $auth_user->id)->first();
-        if ($store) {
-            $storeProduct = StoreProduct::where('store_id', $store->id)
-                                      ->where('product_id', $product->id)
-                                      ->first();
-            if ($storeProduct) {
-                $storeProduct->update([
-                    'store_price' => $product->base_price,
-                    'stock_quantity' => $product->stock_quantity
-                ]);
-            }
-        }
+        // In single-store architecture, product updates are automatically reflected
 
         return redirect()->route('provider.product.index')->withSuccess('Product updated successfully');
     }
@@ -255,8 +263,8 @@ class ProductController extends Controller
      */
     public function destroy($id)
     {
-        $auth_user = authSession();
-        
+        $auth_user = auth()->user();
+
         if ($auth_user->user_type !== 'provider') {
             return redirect()->route('home')->withErrors('Unauthorized access');
         }
@@ -270,40 +278,5 @@ class ProductController extends Controller
         return comman_custom_response(['message'=> 'Product deleted successfully' , 'status' => true]);
     }
 
-    /**
-     * Get available products to add to store
-     */
-    public function availableProducts(Request $request)
-    {
-        $auth_user = authSession();
-        $store = Store::where('provider_id', $auth_user->id)->firstOrFail();
-        
-        // Get products not already in store
-        $existingProductIds = StoreProduct::where('store_id', $store->id)->pluck('product_id');
-        
-        $query = Product::with(['category'])
-                       ->active()
-                       ->whereNotIn('id', $existingProductIds);
-        
-        // Include admin products and provider's own products
-        $query->where(function($q) use ($auth_user) {
-            $q->where('created_by_type', 'admin')
-              ->orWhere(function($sq) use ($auth_user) {
-                  $sq->where('created_by', $auth_user->id)
-                     ->where('created_by_type', 'provider');
-              });
-        });
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%");
-            });
-        }
-
-        $products = $query->limit(20)->get();
-
-        return response()->json($products);
-    }
+    // Removed availableProducts method - not needed in single-store architecture
 }

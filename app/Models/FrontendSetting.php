@@ -23,6 +23,15 @@ class FrontendSetting extends Model implements  HasMedia
     {
         $setting = self::where('key', $key)->first();
 
-        return $setting ? json_decode($setting->value) : null;
+        if ($setting) {
+            $decoded = json_decode($setting->value);
+            // Ensure we always return an object for consistency
+            if (is_array($decoded)) {
+                return (object) $decoded;
+            }
+            return $decoded;
+        }
+
+        return null;
     }
 }

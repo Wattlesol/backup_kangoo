@@ -6,7 +6,9 @@ use Illuminate\Http\Request;
 
 use App\Models\PaymentHistory;
 use App\Models\Payment;
+use App\Models\ProviderPayout;
 use App\Models\Setting;
+use App\Models\Wallet;
 use Yajra\DataTables\DataTables;
 
 class PaymentController extends Controller
@@ -23,8 +25,129 @@ class PaymentController extends Controller
         ];
         $pageTitle = __('messages.list_form_title',['form' => __('messages.payment')] );
         $assets = ['datatable'];
+        $sanadPaymentSummary = $this->sanadPaymentSummary();
 
-        return view('payment.index', compact('pageTitle','assets','filter'));
+        return view('payment.index', compact('pageTitle','assets','filter','sanadPaymentSummary'));
+    }
+
+    private function sanadPaymentSummary()
+    {
+        $user = auth()->user();
+        $paymentQuery = Payment::query()->myPayment();
+        $paidPaymentQuery = (clone $paymentQuery)->where('payment_status', 'paid');
+        $pendingStatuses = ['pending', 'advanced_paid', 'pending_by_admin'];
+        $refundStatuses = ['refund', 'refunded'];
+        $paidPayments = (clone $paidPaymentQuery)->with('booking.provider.providertype')->get();
+        $payoutQuery = ProviderPayout::query()->myPayout();
+        $walletQuery = Wallet::query();
+
+        if (! $this->isSanadFinanceAdmin($user)) {
+            $walletQuery->where('user_id', $user->id);
+        }
+
+        $paidAmount = $paidPayments->sum('total_amount');
+        $settledAmount = (clone $payoutQuery)->whereIn('status', ['paid', 'completed', 'approved'])->sum('amount') ?? 0;
+        $commissionAmount = $this->sanadPlatformCommissionAmount($paidPayments);
+        $vatAmount = $paidPayments->sum(function ($payment) {
+            return optional($payment->booking)->final_total_tax ?? 0;
+        });
+        $pendingAmount = (clone $paymentQuery)->whereIn('payment_status', $pendingStatuses)->sum('total_amount') ?? 0;
+        $refundAmount = (clone $paymentQuery)->whereIn('payment_status', $refundStatuses)->sum('total_amount') ?? 0;
+        $pendingSettlement = max(($paidAmount - $settledAmount), 0);
+
+        return [
+            'total_payments' => (clone $paymentQuery)->count(),
+            'paid_payments' => (clone $paymentQuery)->where('payment_status', 'paid')->count(),
+            'pending_payments' => (clone $paymentQuery)->whereIn('payment_status', $pendingStatuses)->count(),
+            'failed_payments' => (clone $paymentQuery)->where('payment_status', 'failed')->count(),
+            'cash_payments' => (clone $paymentQuery)->where('payment_type', 'cash')->count(),
+            'total_amount' => (clone $paymentQuery)->sum('total_amount') ?? 0,
+            'paid_amount' => $paidAmount,
+            'pending_amount' => $pendingAmount,
+            'customer_payments' => (clone $paymentQuery)->whereNotNull('customer_id')->count(),
+            'settlements_count' => (clone $payoutQuery)->count(),
+            'settled_amount' => $settledAmount,
+            'pending_settlement' => $pendingSettlement,
+            'platform_commission' => $commissionAmount,
+            'vat_amount' => $vatAmount,
+            'refunds_count' => (clone $paymentQuery)->whereIn('payment_status', $refundStatuses)->count(),
+            'refund_amount' => $refundAmount,
+            'wallet_current_balance' => (clone $walletQuery)->sum('amount') ?? 0,
+            'wallet_pending_balance' => $pendingAmount,
+            'wallet_released_balance' => $settledAmount,
+            'upcoming_settlement' => $pendingSettlement,
+            'recent_settlements' => (clone $payoutQuery)->with('providers')->orderBy('id', 'desc')->take(5)->get(),
+            'recent_transactions' => (clone $paymentQuery)->with('customer', 'booking.service')->orderBy('id', 'desc')->take(5)->get(),
+            'role_scope' => $this->sanadFinanceRoleScope($user),
+        ];
+    }
+
+    private function sanadFinanceRoleScope($user)
+    {
+        if ($this->isSanadFinanceAdmin($user)) {
+            return [
+                'label' => 'Admin finance scope',
+                'description' => 'Admins can review all customer payments, invoices, refunds, wallet balances, partner settlements, VAT, and platform commission. Admin-only bulk actions are enabled.',
+                'can_bulk_manage' => true,
+            ];
+        }
+
+        if ($this->isSanadFinancePartner($user)) {
+            return [
+                'label' => 'Partner finance scope',
+                'description' => 'Partners see only payments and settlements connected to their assigned Quick requests. Admin-only delete and bulk actions are hidden.',
+                'can_bulk_manage' => false,
+            ];
+        }
+
+        if ($this->isSanadFinanceEmployee($user)) {
+            return [
+                'label' => 'Employee finance scope',
+                'description' => 'Employees see only payment context for assigned Sanad work when finance access is granted. Partner settlement and admin wallet controls are not exposed.',
+                'can_bulk_manage' => false,
+            ];
+        }
+
+        return [
+            'label' => 'Customer finance scope',
+            'description' => 'Customers see only their own Quick payment, invoice, refund, and wallet context. Internal partner settlement and commission data are not exposed.',
+            'can_bulk_manage' => false,
+        ];
+    }
+
+    private function isSanadFinanceAdmin($user)
+    {
+        return $user->hasAnyRole(['admin', 'demo_admin']) || in_array($user->user_type, ['admin', 'demo_admin'], true);
+    }
+
+    private function isSanadFinancePartner($user)
+    {
+        return $user->hasRole('provider') || $user->user_type === 'provider';
+    }
+
+    private function isSanadFinanceEmployee($user)
+    {
+        return $user->hasRole('handyman') || $user->user_type === 'handyman';
+    }
+
+    private function sanadPlatformCommissionAmount($payments)
+    {
+        return $payments->sum(function ($payment) {
+            $booking = $payment->booking;
+            $providerType = optional(optional($booking)->provider)->providertype;
+            $commission = (float) optional($providerType)->commission;
+            $commissionType = optional($providerType)->type;
+
+            if ($commission <= 0) {
+                return 0;
+            }
+
+            if ($commissionType === 'percent') {
+                return ((float) $payment->total_amount) * $commission / 100;
+            }
+
+            return $commission;
+        });
     }
 
     public function cashIndex($id)
@@ -90,6 +213,10 @@ class PaymentController extends Controller
 
         return $datatable->eloquent($query)
             ->addColumn('check', function ($row) {
+                if (! $this->isSanadFinanceAdmin(auth()->user())) {
+                    return '';
+                }
+
                 return '<input type="checkbox" class="form-check-input select-table-row"  id="datatable-row-'.$row->id.'"  name="datatable_ids[]" value="'.$row->id.'" onclick="dataTableRowCheck('.$row->id.')">';
             })
             ->editColumn('id', function($payment) {

@@ -394,15 +394,33 @@ class CustomerController extends Controller
 
         $user = \Auth::user();
 
-        if($request->login == 'user_login' && $user->user_type === 'user'){
-            return redirect(RouteServiceProvider::FRONTEND);
+        if($request->login == 'user_login' && in_array($user->user_type, ['user', 'customer'], true)){
+            return redirect()->intended(route('customer-portal.dashboard'));
         }
-        elseif($request->login == 'user_login' && $user->user_type !== 'user') {
+        elseif($request->login == 'user_login' && !in_array($user->user_type, ['user', 'customer'], true)) {
             Auth::logout();
             return redirect()->back()->withErrors(['message' => 'You are not allowed to log in from here.']);
         }
         else{
+            // For admin/provider login, always go to dashboard
             return redirect(RouteServiceProvider::HOME);
         }
+    }
+
+    /**
+     * Handle user logout for frontend users
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function userLogout(Request $request)
+    {
+        Auth::guard('web')->logout();
+
+        $request->session()->invalidate();
+
+        $request->session()->regenerateToken();
+
+        return redirect(RouteServiceProvider::FRONTEND)->with('message', 'You have been logged out successfully.');
     }
 }

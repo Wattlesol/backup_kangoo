@@ -5,16 +5,18 @@
                 <div class="card card-block card-stretch">
                     <div class="card-body p-0">
                         <div class="d-flex justify-content-between align-items-center p-3 flex-wrap gap-3">
-                            <h5 class="font-weight-bold">{{ $pageTitle ?? trans('messages.list') }}</h5>
-                            <div class="d-flex gap-2">
-                                @if($auth_user->can('store add'))
-                                    <a href="{{ route('store.create') }}" class="btn btn-sm btn-primary">
-                                        <i class="fa fa-plus-circle"></i> {{ trans('messages.add_form_title',['form' => trans('messages.store')]) }}
+                            <h5 class="font-weight-bold">{{ $pageTitle ?? 'Store Management' }}</h5>
+                            <div class="d-flex gap-2 align-items-center">
+                                @if($store)
+                                    <a href="{{ route('store.edit', $store->id) }}" class="btn btn-sm btn-primary">
+                                        @php $isAr = app()->getLocale() === 'ar'; @endphp<i class="fa fa-edit"></i> {{ $isAr ? 'تعديل المتجر' : 'Edit Store' }}
                                     </a>
-                                @endif
-                                @if($auth_user->can('store approve'))
-                                    <a href="{{ route('store.pending') }}" class="btn btn-sm btn-warning">
-                                        <i class="fa fa-clock"></i> {{ __('messages.pending_approvals') }}
+                                    <a href="{{ url('/store') }}" target="_blank" class="btn btn-sm btn-success">
+                                        <i class="fa fa-external-link-alt"></i> {{ $isAr ? 'عرض المتجر' : 'View Store' }}
+                                    </a>
+                                @else
+                                    <a href="{{ route('store.create') }}" class="btn btn-sm btn-primary">
+                                        <i class="fa fa-plus-circle"></i> {{ $isAr ? 'إنشاء متجر' : 'Create Store' }}
                                     </a>
                                 @endif
                             </div>
@@ -24,107 +26,200 @@
             </div>
         </div>
     </div>
-    <div class="card">
-        <div class="card-body">
-            <div class="row justify-content-between">
-                <div>
-                    <div class="col-md-12">
-                        <form action="{{ route('store.action') }}" id="quick-action-form" class="form-disabled d-flex gap-3 align-items-center">
-                            @csrf
-                            <select name="action_type" class="form-control select2" id="quick-action-type" style="width:100%" disabled>
-                                <option value="">{{ __('messages.no_action') }}</option>
-                                <option value="approve">{{ __('messages.approve') }}</option>
-                                <option value="reject">{{ __('messages.reject') }}</option>
-                                <option value="suspend">{{ __('messages.suspend') }}</option>
-                                <option value="delete">{{ __('messages.delete') }}</option>
-                            </select>
 
-                            <button id="quick-action-apply" class="btn btn-primary" data-ajax="true"
-                                    data-size="small" data-type="form" data-container="#quick-action-form"
-                                    data-title="{{ __('messages.are_you_sure') }}" disabled>{{ __('messages.apply') }}</button>
-                        </form>
+    @if($store)
+        <!-- Store Information Card -->
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Store Name</label>
+                                    <p class="form-control-plaintext">{{ $store->name }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Status</label>
+                                    <p class="form-control-plaintext">
+                                        @if($store->is_active)
+                                            <span class="badge bg-soft-success text-success">Active</span>
+                                        @else
+                                            <span class="badge bg-soft-danger text-danger">Inactive</span>
+                                        @endif
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label class="form-label">Description</label>
+                                    <p class="form-control-plaintext">{{ $store->description ?? 'No description provided' }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Email</label>
+                                    <p class="form-control-plaintext">{{ $store->email ?? 'Not provided' }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Phone</label>
+                                    <p class="form-control-plaintext">{{ $store->phone ?? 'Not provided' }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label class="form-label">Address</label>
+                                    <p class="form-control-plaintext">{{ $store->address ?? 'Not provided' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <label class="form-label">Store Logo</label>
+                            <div class="store-logo-display">
+                                @if($store->logo)
+                                    <img src="{{ $store->logo }}" alt="Store Logo" class="img-fluid rounded" style="max-height: 200px;">
+                                @else
+                                    <div class="bg-soft-primary rounded d-flex align-items-center justify-content-center" style="height: 200px;">
+                                        <i class="fa fa-store fa-3x text-primary"></i>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="d-flex gap-3 align-items-center">
-                    <div class="form-group">
-                        <select class="form-control select2" id="column_status">
-                            <option value="">{{ __('messages.all') }}</option>
-                            <option value="pending" {{ $filter['status'] == 'pending' ? 'selected' : '' }}>{{ __('messages.pending') }}</option>
-                            <option value="approved" {{ $filter['status'] == 'approved' ? 'selected' : '' }}>{{ __('messages.approved') }}</option>
-                            <option value="rejected" {{ $filter['status'] == 'rejected' ? 'selected' : '' }}>{{ __('messages.rejected') }}</option>
-                            <option value="suspended" {{ $filter['status'] == 'suspended' ? 'selected' : '' }}>{{ __('messages.suspended') }}</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <select class="form-control select2" id="column_provider">
-                            <option value="">{{ __('messages.all') }} {{ __('messages.providers') }}</option>
-                            @foreach($providers as $provider)
-                                <option value="{{ $provider->id }}" {{ $filter['provider_id'] == $provider->id ? 'selected' : '' }}>
-                                    {{ $provider->display_name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table id="datatable" class="table table-striped" data-toggle="data-table">
-                    <thead>
-                        <tr>
-                            <th><input type="checkbox" class="form-check-input" id="select-all-table"></th>
-                            <th>{{ __('messages.store') }}</th>
-                            <th>{{ __('messages.provider') }}</th>
-                            <th>{{ __('messages.address') }}</th>
-                            <th>{{ __('messages.phone') }}</th>
-                            <th>{{ __('messages.products_count') }}</th>
-                            <th>{{ __('messages.orders_count') }}</th>
-                            <th>{{ __('messages.status') }}</th>
-                            <th>{{ __('messages.created_at') }}</th>
-                            <th>{{ __('messages.action') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
             </div>
         </div>
-    </div>
+
+        <!-- Store Statistics -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="d-flex align-items-center justify-content-center mb-2">
+                            <div class="avatar-60 bg-soft-primary rounded">
+                                <i class="fa fa-box fa-2x text-primary"></i>
+                            </div>
+                        </div>
+                        <h4 class="mb-1">{{ $totalProducts ?? 0 }}</h4>
+                        <p class="mb-0 text-muted">Total Products</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="d-flex align-items-center justify-content-center mb-2">
+                            <div class="avatar-60 bg-soft-success rounded">
+                                <i class="fa fa-check-circle fa-2x text-success"></i>
+                            </div>
+                        </div>
+                        <h4 class="mb-1">{{ $activeProducts ?? 0 }}</h4>
+                        <p class="mb-0 text-muted">Active Products</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="d-flex align-items-center justify-content-center mb-2">
+                            <div class="avatar-60 bg-soft-warning rounded">
+                                <i class="fa fa-clock fa-2x text-warning"></i>
+                            </div>
+                        </div>
+                        <h4 class="mb-1">{{ $pendingProducts ?? 0 }}</h4>
+                        <p class="mb-0 text-muted">Pending Approval</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="d-flex align-items-center justify-content-center mb-2">
+                            <div class="avatar-60 bg-soft-info rounded">
+                                <i class="fa fa-shopping-cart fa-2x text-info"></i>
+                            </div>
+                        </div>
+                        <h4 class="mb-1">{{ $totalOrders ?? 0 }}</h4>
+                        <p class="mb-0 text-muted">Total Orders</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="{{ route('product.index') }}" class="btn btn-outline-primary btn-block">
+                            <i class="fa fa-box"></i> Manage Products
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ route('productcategory.index') }}" class="btn btn-outline-info btn-block">
+                            <i class="fa fa-tags"></i> Manage Categories
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ route('order.index') }}" class="btn btn-outline-success btn-block">
+                            <i class="fa fa-shopping-cart"></i> View Orders
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ route('product-approval.pending') }}" class="btn btn-outline-warning btn-block">
+                            <i class="fa fa-clock"></i> Product Approvals
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @else
+        <!-- No Store Created -->
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <div class="mb-4">
+                    <i class="fa fa-store fa-5x text-muted"></i>
+                </div>
+                <h4 class="mb-3">No Store Created</h4>
+                <p class="text-muted mb-4">Create your store to start selling products and managing your e-commerce business.</p>
+                <a href="{{ route('store.create') }}" class="btn btn-primary">
+                    <i class="fa fa-plus-circle"></i> {{ $isAr ? 'إنشاء متجر' : 'Create Store' }} Now
+                </a>
+            </div>
+        </div>
+    @endif
 
 @section('bottom_script')
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        window.renderedDataTable = $('#datatable').DataTable({
-            processing: true,
-            serverSide: true,
-            ajax: {
-                url: "{{ route('store.index_data') }}",
-                data: function(d) {
-                    d.filter = {
-                        status: $('#column_status').val(),
-                        provider_id: $('#column_provider').val(),
-                        location: $('#location_filter').val()
-                    };
-                }
-            },
-            columns: [
-                {data: 'check', name: 'check', orderable: false, searchable: false},
-                {data: 'name', name: 'name'},
-                {data: 'provider', name: 'provider'},
-                {data: 'address', name: 'address'},
-                {data: 'phone', name: 'phone'},
-                {data: 'products_count', name: 'products_count'},
-                {data: 'orders_count', name: 'orders_count'},
-                {data: 'status', name: 'status'},
-                {data: 'created_at', name: 'created_at'},
-                {data: 'action', name: 'action', orderable: false, searchable: false}
-            ]
-        });
-
-        $('#column_status, #column_provider').on('change', function() {
-            window.renderedDataTable.ajax.reload();
-        });
-    });
-</script>
+<style>
+.avatar-60 {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+}
+.bg-soft-primary {
+    background-color: rgba(108, 117, 125, 0.1);
+}
+.bg-soft-success {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+.bg-soft-info {
+    background-color: rgba(23, 162, 184, 0.1);
+}
+.bg-soft-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+.bg-soft-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+</style>
 @endsection
 </x-master-layout>

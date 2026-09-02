@@ -5,7 +5,7 @@
     :slides-per-view="3"
     :space-between="30"
     :pagination="{ clickable: true  }"
-    :loop="true"
+    :loop="testimonial_data.length >= 6"
     :autoplay="{ delay: 3000, disableOnInteraction: false }"
     :breakpoints="{
           320: { slidesPerView: 1 },
@@ -51,7 +51,7 @@
     </SwiperSlide>
 </Swiper> -->
 <div v-if="testimonial_data.length==0 && loading==0" class="row row-cols-xl-4 row-cols-md-3 row-cols-sm-2 row-cols-1 justify-content-center mt-5 " >
-    <span> Data Not Available </span>
+    <span>{{ $t('messages.data') }}</span>
 </div>
 
 </section>
@@ -78,7 +78,7 @@ const loading = ref(1);
 const store = useSection()
 const testimonial_data = computed(() => store.testimonial_list_data)
 const [testimonialsection] = useObserveSection(async () => {
-    
+
     try {
         await store.get_testimonial_list();
     } catch (error) {
@@ -88,5 +88,4 @@ const [testimonialsection] = useObserveSection(async () => {
     }
 });
 </script>
-
 

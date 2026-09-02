@@ -225,15 +225,14 @@
                                 </div>
                             </div>
                         </div>
-                    </form>
+                        {{ Form::close() }}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-@endsection
 
-@section('bottom_script')
+    @section('bottom_script')
 <script>
 $(document).ready(function() {
     // Auto-generate slug from name (only if slug is empty)
@@ -321,3 +320,4 @@ function showAlert(type, message) {
 }
 </script>
 @endsection
+</x-master-layout>

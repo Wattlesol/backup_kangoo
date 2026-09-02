@@ -34,15 +34,25 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = \Auth::user();
+        if ($user && !empty($user->language_option)) {
+            session(['locale' => $user->language_option]);
+            $dir = in_array($user->language_option, ['ar', 'dv', 'ff', 'ur', 'he', 'ku', 'fa']) ? 'rtl' : 'ltr';
+            session(['dir' => $dir]);
+            \App::setLocale($user->language_option);
+        } else {
+            session(['locale' => 'ar', 'dir' => 'rtl']);
+            \App::setLocale('ar');
+        }
 
-        if($request->login == 'user_login' && $user->user_type === 'user'){
-            return redirect(RouteServiceProvider::FRONTEND);
-        } 
-        elseif($request->login == 'user_login' && $user->user_type !== 'user') {
+        if($request->login == 'user_login' && in_array($user->user_type, ['user', 'customer'], true)){
+            return redirect()->intended(route('customer-portal.dashboard'));
+        }
+        elseif($request->login == 'user_login' && !in_array($user->user_type, ['user', 'customer'], true)) {
             Auth::logout();
             return redirect()->back()->withErrors(['message' => 'You are not allowed to log in from here.']);
         }
         else{
+            // For admin/provider login, always go to dashboard
             return redirect(RouteServiceProvider::HOME);
         }
     }
@@ -55,13 +65,18 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request)
     {
-        Auth::guard('web')->logout();
+        try {
+            Auth::guard('web')->logout();
+        } catch (\Throwable $exception) {
+            // Logging out must remain available during a transient database outage.
+            // Invalidating the session below removes the authenticated session key.
+            report($exception);
+        }
 
         $request->session()->invalidate();
 
         $request->session()->regenerateToken();
 
-        return redirect(RouteServiceProvider::FRONTEND);
-        // return redirect('/');
+        return redirect()->route('auth.login');
     }
 }

@@ -5,7 +5,7 @@
     :slides-per-view="5"
     :space-between="30"
     :pagination="{ clickable: true  }"
-    :loop="false"
+    :loop="serviceDetails.length >= 10"
     :autoplay="{ delay: 3000, disableOnInteraction: false }"
     :breakpoints="{
           320: { slidesPerView: 1 },
@@ -19,21 +19,21 @@
         }"
       @slide-change-transition-start="changeSlide"
     >
-    
+
     <SwiperSlide v-for="service in serviceDetails" :key="service.id">
     <div class=" mt-5 justify-content-center  service-slide-items-4">
         <div class="col">
-            <ServiceCard 
-              :user_id="user_id" 
-              :service_id="service.id"  
-              :provider_id="service.provider_id" 
-              :title="service.name" 
-              :image="service.attchments[0]" 
-              :userName="service.provider_name" 
-              :userImage="service.provider_image" 
-              :reviewNo="service.total_rating" 
+            <ServiceCard
+              :user_id="user_id"
+              :service_id="service.id"
+              :provider_id="service.provider_id"
+              :title="service.name"
+              :image="service.attchments[0]"
+              :userName="service.provider_name"
+              :userImage="service.provider_image"
+              :reviewNo="service.total_rating"
               :reviewCount="service.total_review"
-              :price="service.price" 
+              :price="service.price"
               :duration="service.duration"
               :favourite="isFavourite(service.id)"
               :visit_type="service.visit_type"
@@ -49,7 +49,7 @@
     :slides-per-view="4"
     :space-between="30"
     :pagination="{ clickable: true  }"
-    :loop="true"
+    :loop="false"
     :autoplay="{ delay: 3000, disableOnInteraction: false }"
     :breakpoints="{
           320: { slidesPerView: 1 },
@@ -70,7 +70,7 @@
     </div>
 </SwiperSlide>
 </Swiper>
-<span v-if="IS_LOADER ==false && serviceDetails.length == 0"> Data Not Available </span>
+<span v-if="IS_LOADER ==false && serviceDetails.length == 0">{{ $t('messages.data') }}</span>
 </section>
 </template>
 
@@ -94,7 +94,7 @@ import { computed} from 'vue';
 import { onMounted,ref} from 'vue';
 import {useSection} from '../store/index'
 import {useObserveSection} from '../hooks/Observer'
-import { SERVICE_API,PROVIDER_API} from '../data/api'; 
+import { SERVICE_API,PROVIDER_API} from '../data/api';
 
 const store = useSection()
 const service_data = computed(() => store.service_list_data)
@@ -127,7 +127,7 @@ const fetchService = async () => {
       const data = await response.json();
 
       if (data && Array.isArray(data.data)) {
-        return data.data; 
+        return data.data;
       } else {
         console.error('Invalid data structure or missing array of providers.');
         return [];
@@ -141,13 +141,13 @@ const fetchService = async () => {
   const defaultEarningType = async () => {
     try {
         const response = await fetch(`${baseUrl}/api/configurations`, {
-            method: 'POST', 
+            method: 'POST',
             headers: {
-                'Content-Type': 'application/json' 
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({}) 
+            body: JSON.stringify({})
         });
-        
+
         const data = await response.json();
 
         console.log( data );
@@ -155,7 +155,7 @@ const fetchService = async () => {
         return earningType;
     } catch (error) {
         console.error('Error fetching or processing AppSetting:', error);
-        return 'commission'; 
+        return 'commission';
     }
 };
 
@@ -164,10 +164,10 @@ const fetchService = async () => {
     await store.get_landing_page_setting_list({ per_page: 10, page: 1 });
 
     const settings = store.landing_page_setting_list_data.data.find(
-      setting => 
+      setting =>
         (props.type === 'ac' && setting.key === 'section_3') ||
         (props.type === 'cleaning' && setting.key === 'section_4') ||
-        (props.type === 'recently_view' && setting.key === 'section_8') && 
+        (props.type === 'recently_view' && setting.key === 'section_8') &&
         setting.status === 1
     );
 
@@ -228,14 +228,14 @@ const fetchRecentlyViewed = async () => {
     const data = await response.json();
 
     if (data && Array.isArray(data)) {
-      return data; 
+      return data;
     } else {
       console.error('Invalid data structure or missing array of recently viewed service IDs.');
       return [];
     }
   } catch (error) {
     console.error('Error fetching or processing recently viewed services:', error);
-    return []; 
+    return [];
   }
 };
 

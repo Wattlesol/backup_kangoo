@@ -9,6 +9,7 @@ class Booking extends Model
 {
     use HasFactory,SoftDeletes;
     protected $table = 'bookings';
+    protected $appends = ['quick_reference'];
     protected $fillable = [
         'customer_id', 
         'service_id',
@@ -36,7 +37,26 @@ class Booking extends Model
         'final_total_tax',
         'final_sub_total',
         'final_discount_amount',
-        'final_coupon_discount_amount'
+        'final_coupon_discount_amount',
+        'sanad_reference',
+        'sanad_stage',
+        'sanad_priority',
+        'sla_due_at',
+        'assigned_by',
+        'assigned_at',
+        'assignment_mode',
+        'assignment_reason',
+        'expected_completion_at',
+        'escalated_at',
+        'closed_at',
+        'ai_first_responder_enabled',
+        'ai_first_responder_disabled_by',
+        'ai_first_responder_disabled_at',
+        'chat_owner_type',
+        'chat_owner_user_id',
+        'chat_assigned_by',
+        'chat_assigned_at',
+        'chat_assignment_note',
     ];
 
     protected $casts = [
@@ -57,7 +77,26 @@ class Booking extends Model
         'final_sub_total'=> 'double',
         'final_discount_amount'=> 'double',
         'final_coupon_discount_amount'=> 'double',
+        'assigned_by' => 'integer',
+        'sla_due_at' => 'datetime',
+        'assigned_at' => 'datetime',
+        'expected_completion_at' => 'datetime',
+        'escalated_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'ai_first_responder_enabled' => 'boolean',
+        'ai_first_responder_disabled_by' => 'integer',
+        'ai_first_responder_disabled_at' => 'datetime',
+        'chat_owner_user_id' => 'integer',
+        'chat_assigned_by' => 'integer',
+        'chat_assigned_at' => 'datetime',
     ];
+
+    public function getQuickReferenceAttribute(): string
+    {
+        $reference = (string) ($this->sanad_reference ?: 'QUICK-' . str_pad((string) $this->id, 6, '0', STR_PAD_LEFT));
+
+        return preg_replace('/^SANAD-/i', 'QUICK-', $reference);
+    }
     public function customer(){
         return $this->belongsTo(User::class,'customer_id', 'id')->withTrashed();
     }
@@ -98,27 +137,88 @@ class Booking extends Model
         return $this->hasMany(BookingActivity::class,'booking_id','id');
     }
 
+    public function sanadChatThreads(){
+        return $this->hasMany(SanadChatThread::class, 'booking_id', 'id');
+    }
+
+    public function sanadDocuments(){
+        return $this->hasMany(SanadDocumentVaultItem::class, 'booking_id', 'id');
+    }
+
+    public function sanadDocumentRequests(){
+        return $this->hasMany(SanadDocumentRequest::class, 'booking_id', 'id');
+    }
+
+    public function sanadBuzzAlerts(){
+        return $this->hasMany(SanadBuzzAlert::class, 'booking_id', 'id');
+    }
+
+    public function sanadRequestActions(){
+        return $this->hasMany(SanadRequestAction::class, 'booking_id', 'id');
+    }
+
+    public function sanadAiInteractions(){
+        return $this->hasMany(SanadAiInteraction::class, 'booking_id', 'id');
+    }
+
+    public function sanadWorkflowStages(){
+        return $this->hasMany(SanadPartnerWorkflowStage::class, 'booking_id', 'id')->orderBy('execution_order')->orderBy('id');
+    }
+
     public function scopeMyBooking($query){
         $user = auth()->user();
-        if($user->hasRole('admin') || $user->hasRole('demo_admin')) {
+        if (!$user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if($user->hasAnyRole(['admin', 'demo_admin']) || in_array($user->user_type, ['admin', 'demo_admin'], true)) {
             return $query;
         }
 
-        if($user->hasRole('provider')) {
-            return $query->where('provider_id', $user->id);
-        }
-
-        if($user->hasRole('user')) {
-            return $query->where('customer_id', $user->id);
-        }
-
-        if($user->hasRole('handyman')) {
-            return $query->whereHas('handymanAdded',function ($q) use($user){
-                $q->where('handyman_id',$user->id);
+        if($user->hasAnyRole(['provider', 'partner']) || in_array($user->user_type, ['provider', 'partner'], true)) {
+            return $query->where(function ($assignmentQuery) use ($user) {
+                $assignmentQuery->where('provider_id', $user->id)
+                    ->orWhere('chat_owner_user_id', $user->id)
+                    ->orWhere(function ($teamQuery) use ($user) {
+                        $teamQuery->where('chat_owner_type', 'partner_team')
+                            ->where('provider_id', $user->id);
+                    });
             });
         }
 
-        return $query;
+        if($user->hasAnyRole(['user', 'customer']) || in_array($user->user_type, ['user', 'customer'], true)) {
+            return $query->where('customer_id', $user->id);
+        }
+
+        if($user->hasAnyRole(['handyman', 'employee']) || in_array($user->user_type, ['handyman', 'employee'], true)) {
+            if (!empty($user->provider_id)) {
+                return $query->where(function ($assignmentQuery) use ($user) {
+                    $assignmentQuery->where('chat_owner_user_id', $user->id)
+                        ->orWhere(function ($partnerQuery) use ($user) {
+                            $partnerQuery->where('provider_id', $user->provider_id)
+                                ->where(function ($visibleQuery) use ($user) {
+                                    $visibleQuery->where('chat_owner_type', 'partner_team')
+                                        ->orWhereHas('handymanAdded',function ($q) use($user){
+                                            $q->where('handyman_id',$user->id);
+                                        });
+                                });
+                        });
+                });
+            }
+
+            if ($user->can('booking list')) {
+                return $query;
+            }
+
+            return $query->where(function ($assignmentQuery) use ($user) {
+                $assignmentQuery->where('chat_owner_user_id', $user->id)
+                    ->orWhereHas('handymanAdded',function ($q) use($user){
+                        $q->where('handyman_id',$user->id);
+                    });
+            });
+        }
+
+        return $query->whereRaw('1 = 0');
     }
 
     public function categoryService(){

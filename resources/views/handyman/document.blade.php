@@ -71,10 +71,10 @@
             <thead>
             <tr>
                 <th>#</th>
-                <th>اسم المستند </th>
-                <th>المستند</th>
-                <th>تاريخ الانتهاء</th>
-                <th>ملاحظات </th>
+                <th>{{ __('messages.document_name') }}</th>
+                <th>{{ __('messages.document') }}</th>
+                <th>{{ __('messages.expiry_date') }}</th>
+                <th>{{ __('messages.notes') }}</th>
             </tr>
             </thead>
             <tbody>
@@ -83,7 +83,7 @@
                     <td>{{$key+1}}</td>
                     <td>{{$item->name}}</td>
                     <td>   @if($item->file != "")
-                            <a class="btn btn-warning" href="{{asset($item->file)}}">File</a>
+                            <a class="btn btn-warning" href="{{asset($item->file)}}">{{ __('messages.file') }}</a>
                         @endif</td>
                     <td>{{$item->expired_date}}</td>
                     <td>{{$item->note}}</td>
@@ -100,7 +100,7 @@
         <br>
         @if($data->count()>0)
             <div class="row">
-                <div class="col-md-5 col-sm-3 "> Count {{$data->total()}} </div>
+                <div class="col-md-5 col-sm-3 "> {{ __('messages.count') }} {{$data->total()}} </div>
                 <div class="col-md-7 col-sm-7">{{$data->appends(\Request::except('_token'))->render()}}</div>
             </div>
         @endif

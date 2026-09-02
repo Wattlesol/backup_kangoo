@@ -10,6 +10,7 @@ use App\Http\Requests\UserRequest;
 use Hash;
 Use Auth;
 use App\Http\Resources\API\UserResource;
+use App\Http\Resources\API\PublicUserResource;
 use App\Http\Resources\API\ServiceResource;
 use Illuminate\Support\Facades\Password;
 use App\Models\Booking;
@@ -203,6 +204,17 @@ class UserController extends Controller
     {
         $user_type = isset($request['user_type']) ? $request['user_type'] : 'handyman';
         $status = isset($request['status']) ? $request['status'] : 1;
+        $isOperationalAdminRequest = $request->is('api/get-user-list')
+            && auth()->check()
+            && auth()->user()->hasAnyRole(['admin', 'demo_admin']);
+        $apiViewer = auth('sanctum')->user();
+        if (!$isOperationalAdminRequest && !in_array($user_type, ['provider', 'handyman'], true)) {
+            abort(404);
+        }
+        if (!$isOperationalAdminRequest && $user_type === 'handyman') {
+            abort_unless($apiViewer && $apiViewer->user_type === 'provider', 403);
+            $request->merge(['provider_id' => $apiViewer->id]);
+        }
 
         $user_list = User::orderBy('id','desc')->where('user_type',$user_type);
         if(!empty($status)){
@@ -239,7 +251,7 @@ class UserController extends Controller
         {
             $user_list = $user_list->where('display_name','like','%'.$request->keyword.'%');
         }
-        if($request->has('booking_id')){
+        if($request->has('booking_id') && $isOperationalAdminRequest){
             $booking_data = Booking::find($request->booking_id);
 
             $service_address = $booking_data->handymanByAddress;
@@ -260,7 +272,9 @@ class UserController extends Controller
 
         $user_list = $user_list->paginate($per_page);
 
-        $items = UserResource::collection($user_list);
+        $items = $isOperationalAdminRequest
+            ? UserResource::collection($user_list)
+            : PublicUserResource::collection($user_list);
 
         $response = [
             'pagination' => [
@@ -281,13 +295,29 @@ class UserController extends Controller
 
     public function userDetail(Request $request)
     {
-        $id = $request->id;
-
-        $user = User::find($id);
+        $validated = $request->validate([
+            'id' => 'required|integer',
+        ]);
+        $id = $validated['id'];
+        $user = User::whereIn('user_type', ['provider', 'handyman'])
+            ->where('status', 1)
+            ->find($validated['id']);
         $message = __('messages.detail');
         if(empty($user)){
             $message = __('messages.user_not_found');
             return comman_message_response($message,400);
+        }
+
+        if ($user->user_type === 'handyman') {
+            $viewer = auth('sanctum')->user();
+            abort_unless(
+                $viewer && (
+                    (int) $viewer->id === (int) $user->id
+                    || ($viewer->user_type === 'provider' && (int) $user->provider_id === (int) $viewer->id)
+                    || $viewer->hasAnyRole(['admin', 'demo_admin'])
+                ),
+                403
+            );
         }
 
         $service = [];
@@ -302,7 +332,7 @@ class UserController extends Controller
             $handyman_rating = HandymanRating::where('handyman_id',$id)->orderBy('id','desc')->paginate(10);
             $handyman_rating = HandymanRatingResource::collection($handyman_rating);
             $handyman_staff = User::where('user_type','handyman')->where('provider_id',$id)->where('is_available',1)->get();
-            $handyman = UserResource::collection($handyman_staff);
+            $handyman = PublicUserResource::collection($handyman_staff);
 
             if(!empty($handyman_staff)){
                 foreach ($handyman_staff as $image) {
@@ -310,7 +340,7 @@ class UserController extends Controller
                 }
             }
         }
-        $user_detail = new UserResource($user);
+        $user_detail = new PublicUserResource($user);
         if($user->user_type == 'handyman'){
             $handyman_rating = HandymanRating::where('handyman_id',$id)->orderBy('id','desc')->paginate(10);
             $handyman_rating = HandymanRatingResource::collection($handyman_rating);
@@ -364,14 +394,37 @@ class UserController extends Controller
     public function updateProfile(Request $request)
     {
         $user = \Auth::user();
-        if($request->has('id') && !empty($request->id)){
-            $user = User::where('id',$request->id)->first();
-        }
         if($user == null){
             return comman_message_response(__('messages.no_record_found'),400);
         }
 
-        $data=$request->all();
+        $validated = $request->validate([
+            'first_name' => 'nullable|string|max:100',
+            'last_name' => 'nullable|string|max:100',
+            'username' => 'nullable|string|max:100|unique:users,username,'.$user->id,
+            'email' => 'nullable|email|max:255|unique:users,email,'.$user->id,
+            'contact_number' => 'nullable|string|max:30',
+            'address' => 'nullable|string|max:1000',
+            'country_id' => 'nullable|integer|exists:countries,id',
+            'state_id' => 'nullable|integer',
+            'city_id' => 'nullable|integer',
+            'time_zone' => 'nullable|string|max:100',
+            'language' => 'nullable|string|max:10',
+            'designation' => 'nullable|string|max:150',
+            'known_languages' => 'nullable',
+            'skills' => 'nullable',
+            'description' => 'nullable|string|max:4000',
+            'why_choose_me_title' => 'nullable|string|max:255',
+            'why_choose_me_reason' => 'nullable|string|max:10000',
+            'profile_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
+            'player_id' => 'nullable|string|max:255',
+        ]);
+        $data = collect($validated)->except([
+            'profile_image',
+            'player_id',
+            'why_choose_me_title',
+            'why_choose_me_reason',
+        ])->all();
 
         $why_choose_me=[
 
@@ -385,6 +438,10 @@ class UserController extends Controller
         ];
 
         $data['why_choose_me']=($why_choose_me);
+
+        if (array_key_exists('first_name', $data) || array_key_exists('last_name', $data)) {
+            $data['display_name'] = trim(($data['first_name'] ?? $user->first_name).' '.($data['last_name'] ?? $user->last_name));
+        }
 
         $user->fill($data)->update();
 
@@ -548,14 +605,22 @@ class UserController extends Controller
 
     public function userStatusUpdate(Request $request)
     {
-        $user_id =  $request->id;
-        $user = User::where('id',$user_id)->first();
+        abort_unless(auth()->check() && auth()->user()->hasAnyRole(['admin', 'demo_admin', 'provider']), 403);
+        $validated = $request->validate([
+            'id' => 'required|integer',
+            'status' => 'required|boolean',
+        ]);
+        $user = User::query()
+            ->when(auth()->user()->hasRole('provider'), function ($query) {
+                $query->where('provider_id', auth()->id())->where('user_type', 'handyman');
+            })
+            ->find($validated['id']);
 
         if($user == "") {
             $message = __('messages.user_not_found');
             return comman_message_response($message,400);
         }
-        $user->status = $request->status;
+        $user->status = $validated['status'];
         $user->save();
 
         $message = __('messages.update_form',['form' => __('messages.status') ]);
@@ -589,14 +654,17 @@ class UserController extends Controller
 
     }
     public function handymanAvailable(Request $request){
-        $user_id =  $request->id;
-        $user = User::where('id',$user_id)->first();
+        abort_unless(auth()->check() && auth()->user()->user_type === 'handyman', 403);
+        $validated = $request->validate([
+            'is_available' => 'required|boolean',
+        ]);
+        $user = auth()->user();
 
         if($user == "") {
             $message = __('messages.user_not_found');
             return comman_message_response($message,400);
         }
-        $user->is_available = $request->is_available;
+        $user->is_available = $validated['is_available'];
         $user->save();
 
         $message = __('messages.update_form',['form' => __('messages.status') ]);

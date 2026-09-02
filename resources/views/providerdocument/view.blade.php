@@ -5,6 +5,7 @@
     </head>
     <div class="container-fluid">
     @include('partials._provider')
+    @include('providerdocument.partials.sanad-provider-verification-summary')
         <div class="row">
             <div class="col-lg-12">
                 <div class="card card-block card-stretch">
@@ -63,7 +64,7 @@
                 </div>
                 <div class="input-group ml-2">
                     <span class="input-group-text" id="addon-wrapping"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control dt-search" placeholder="Search..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
+                    <input type="text" class="form-control dt-search" placeholder="{{ __("messages.search") }}..." aria-label="Search" aria-describedby="addon-wrapping" aria-controls="dataTableBuilder">
                   </div>
               </div>
                

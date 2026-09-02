@@ -10,6 +10,7 @@ use App\Http\Controllers\API\PostJobRequestController;
 use App\Models\Districts;
 use App\Models\PriceCity;
 use App\Models\PriceList;
+use App\Models\Product;
 use App\Models\Region;
 use App\Models\ServicePacakgeServiceSubscription;
 use App\Models\ServicePacakgeSubscription;
@@ -41,27 +42,76 @@ class FrontendController extends Controller
 {
 
     public function index(Request $request){
+        // Start with minimal data to identify the issue
         $auth_user_id = null;
         $favourite = null;
+        $postjobservice = null;
+        $totalRating = "0.00";
+        $providers_service_rating = "0.00";
 
-        if(auth()->check() && auth()->user()->hasRole('user')){
-            $auth_user_id = auth()->user()->id;
-            $favourite = UserFavouriteService::where('user_id', $auth_user_id)->get();
-        }
+        // Load sections but optimize section_1 to prevent hanging
         $sectionData = [];
-        $sectionKeys = ['section_1', 'section_2', 'section_3', 'section_4', 'section_5', 'section_6', 'section_7', 'section_9'];
 
-        foreach ($sectionKeys as $key) {
-            $section = FrontendSetting::where('key', $key)->first();
-            $sectionData[$key] = $section ? json_decode($section->value, true) : null;
+        try {
+            // Load all sections
+            $sectionKeys = ['section_1', 'section_2', 'section_3', 'section_4', 'section_5', 'section_6', 'section_7', 'section_9'];
+            $sections = FrontendSetting::whereIn('key', $sectionKeys)->get()->keyBy('key');
+
+            foreach ($sectionKeys as $key) {
+                if (isset($sections[$key])) {
+                    $data = json_decode($sections[$key]->value, true);
+
+                    if ($key === 'section_1' && isset($data['provider_id']) && is_array($data['provider_id'])) {
+                        $data['provider_id'] = [];
+                        $data['enable_popular_provider'] = 0;
+                    }
+
+                    $sectionData[$key] = $data;
+                } else {
+                    $sectionData[$key] = null;
+                }
+            }
+
+        } catch (Exception $e) {
+            // If there's an error, use empty data
+            foreach ($sectionKeys as $key) {
+                $sectionData[$key] = null;
+            }
         }
-        $settings = Setting::where('type', 'service-configurations')->where('key','service-configurations')->first();
-        $serviceconfig = $settings ? json_decode($settings->value) : null;
-        $postjobservice = $serviceconfig ? $serviceconfig->post_services : null;
-        $ratings = BookingRating::pluck('rating')->toArray();
-        $averageRating = count($ratings) > 0 ? array_sum($ratings) / count($ratings) : 0;
-        $totalRating = number_format($averageRating, 2);
-        return view('landing-page.index',compact('sectionData','postjobservice','auth_user_id','favourite','totalRating'));
+
+        $landingCategories = Category::query()
+            ->where('status', 1)
+            ->withCount(['services' => fn ($query) => $query->where('status', 1)])
+            ->orderBy('display_order')
+            ->orderBy('name')
+            ->limit(4)
+            ->get();
+
+        $landingServices = Service::query()
+            ->where('status', 1)
+            ->with('category:id,name,name_ar,name_en')
+            ->orderByDesc('is_featured')
+            ->orderByDesc('updated_at')
+            ->limit(3)
+            ->get();
+
+        $landingMetrics = [
+            'completed' => Booking::query()->whereIn('status', ['completed', 'done'])->count(),
+            'services' => Service::query()->where('status', 1)->count(),
+            'categories' => Category::query()->where('status', 1)->count(),
+        ];
+
+        return view('landing-page.index', compact(
+            'sectionData',
+            'postjobservice',
+            'auth_user_id',
+            'favourite',
+            'totalRating',
+            'providers_service_rating',
+            'landingCategories',
+            'landingServices',
+            'landingMetrics'
+        ));
     }
 
     public function userLoginView(Request $request){
@@ -98,11 +148,7 @@ class FrontendController extends Controller
     }
 
     public function serviceList(Request $request){
-        if($request->provider_id){
-            $id = $request->provider_id;
-            $type = "provider-service";
-        }
-        else if($request->subcategory_id){
+        if($request->subcategory_id){
             $id = $request->subcategory_id;
             $type = 'subcategory-service';
         }
@@ -132,7 +178,7 @@ class FrontendController extends Controller
     }
 
     public function providerList(Request $request){
-        return view('landing-page.provider');
+        return redirect()->route('service.list');
     }
 
     public function blogList(Request $request){
@@ -143,8 +189,49 @@ class FrontendController extends Controller
         return view('landing-page.booking');
     }
 
+    public function customerOrders(Request $request){
+        $user = auth()->user();
+
+        // Ensure only customers can access this
+        if ($user->user_type !== 'user') {
+            abort(403, 'Access denied. Only customers can view orders.');
+        }
+
+        $user_id = $user->id;
+        $orders = [];
+        $orderStats = [
+            'total_orders' => 0,
+            'pending_orders' => 0,
+            'completed_orders' => 0,
+            'total_spent' => 0
+        ];
+
+        // Check if Order model exists
+        if (class_exists('App\Models\Order')) {
+            $orders = \App\Models\Order::where('customer_id', $user->id)
+                ->with(['items.product', 'items.product.category', 'store'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $orderStats = [
+                'total_orders' => $orders->count(),
+                'pending_orders' => $orders->where('status', 'pending')->count(),
+                'completed_orders' => $orders->where('status', 'completed')->count(),
+                'total_spent' => $orders->where('payment_status', 'paid')->sum('total_amount')
+            ];
+        }
+
+        return view('customer.orders.index', compact('user_id', 'orders', 'orderStats'));
+    }
+
+    // Keep the old method for backward compatibility (deprecated)
+    public function orderList(Request $request){
+        // Redirect to the new customer orders route
+        return redirect()->route('customer.orders');
+    }
+
     public function postJobList(Request $request){
-        return view('landing-page.post-job');
+        return redirect()->route('service.list');
     }
 
     public function relatedService(Request $request){
@@ -181,62 +268,13 @@ class FrontendController extends Controller
     }
 
     public function providerDetail(Request $request){
-        $provider_id = $request->id;
-        $userController = app(UserController::class);
-        $apiRequest = new Request(['id' => $provider_id]);
-        $providerData = $userController->userDetail($apiRequest);
-        $providerData = json_decode($providerData->content(), true);
-        $why_choose_me = json_decode($providerData['data']['why_choose_me'], true);
-
-        $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-        $datetime = json_decode($sitesetup->value);
-
-        $completed_services = Booking::where('provider_id', $providerData['data']['id'])->where('status', 'completed')->count();
-
-        $servicerating = Service::where('provider_id', $providerData['data']['id'])->with('serviceRating')->get();
-        $allRatings = $servicerating->flatMap(function ($service) {
-            return $service->serviceRating->filter(function ($rating){
-                return in_array($rating->rating, [4,5]);
-            });
-        });
-        $satisfy_customers = $allRatings->pluck('customer_id')->unique()->count();
-
-        if(!empty(auth()->user()) && auth()->user()->hasRole('user')){
-            $auth_user_id=auth()->user()->id;
-            $favourite = UserFavouriteService::where('user_id',$auth_user_id)->get();
-         }
-         else{
-            $auth_user_id=null;
-            $favourite=null;
-         }
-        return view('landing-page.ProviderDetails', compact('providerData','why_choose_me','datetime','completed_services','satisfy_customers','auth_user_id','favourite'));
+        return redirect()->route('service.list');
     }
 
 
 
     public function handymanDetail(Request $request){
-        $handyman_id = $request->id;
-        $userController = app(UserController::class);
-        $apiRequest = new Request(['id' => $handyman_id]);
-        $handymanData = $userController->userDetail($apiRequest);
-        $handymanData = json_decode($handymanData->content(), true);
-        $why_choose_me = json_decode($handymanData['data']['why_choose_me'], true);
-
-        $handyman_rating = HandymanRating::where('handyman_id', $handymanData['data']['id'])->orderBy('created_at', 'desc')->get();
-        $total_handyman_rating = $handyman_rating->count();
-
-        $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
-        $datetime = json_decode($sitesetup->value);
-
-        $completed_services = BookingHandymanMapping::whereHas('bookings', function($query){
-            $query->where('status', 'completed');
-        })->where('handyman_id', $handymanData['data']['id'])->count();
-
-        $satisfy_customers = $handyman_rating->filter(function ($rating) {
-           return in_array($rating->rating, [4, 5]);
-        })->pluck('customer_id')->unique()->count();
-
-        return view('landing-page.HandymanDetails', compact('handymanData','why_choose_me','handyman_rating','total_handyman_rating','datetime','completed_services','satisfy_customers'));
+        return redirect()->route('service.list');
     }
 
     public function serviceDetail(Request $request){
@@ -429,7 +467,7 @@ class FrontendController extends Controller
         $serviceaddon = null;
         if($request->addons){
             $addon_id = explode(',', $request->addons);
-            $serviceaddons = ServiceAddon::whereIn('id', $addon_id)->get();
+            $serviceaddons = ServiceAddon::forService(Service::findOrFail($service_id))->whereIn('id', $addon_id)->get();
             $serviceaddon = $serviceaddons->map(function ($addon) {
                 return [
                     'id' => $addon->id,
@@ -448,20 +486,60 @@ class FrontendController extends Controller
         return view('landing-page.BookService',compact('service','coupons','taxes','user_id','availableserviceslot','serviceaddon','googlemapkey','wallet_amount'));
     }
 
-    public function bookPostJobView(Request $request){
+    public function orderProductView(Request $request){
+        $product_id = $request->id;
+        $product = Product::where('id', $product_id)
+            ->where('approval_status', 'approved')
+            ->with(['category'])
+            ->first();
+
+        if (!$product) {
+            abort(404, 'Product not found or not available');
+        }
+
+        // Get product images (simplified for now)
+        $product->product_image = null; // Will be handled by the view
+        $product->gallery_images = [];
+
+        // Get category name
+        $product->category_name = optional($product->category)->name;
+
+        // Calculate ratings (simplified for now)
+        $product->total_reviews = 0;
+        $product->total_rating = 0;
+
+        // Set price for the order form (use effective_price accessor)
+        $product->price = $product->effective_price;
+
+        // Get available coupons for this product (if any)
+        $coupons = collect(); // For now, no product-specific coupons
+
         $user_id = Auth::id();
-        $post_job_id = $request->id;
-        $postJobController = app(PostJobRequestController::class);
-        $apiRequest = new Request(['post_request_id' => $post_job_id]);
-        $postJob = $postJobController->getPostRequestDetail($apiRequest);
-        return view('landing-page.BookPostJob',compact('postJob','user_id'));
+
+        // Get taxes (simplified for products)
+        $taxes = collect();
+
+        // Get user wallet amount
+        $user = auth()->user();
+        $wallet = $user->wallet ?? null;
+        $wallet_amount = (isset($wallet->amount)) ? $wallet->amount : 0;
+
+        // Get Google Maps key for delivery address
+        $sitesetup = Setting::where('type','site-setup')->where('key', 'site-setup')->first();
+        $sitesetupdata = json_decode($sitesetup->value);
+        $googlemapkey = $sitesetupdata->google_map_keys ?? '';
+
+        return view('landing-page.OrderProduct', compact('product','coupons','taxes','user_id','googlemapkey','wallet_amount'));
+    }
+
+    public function bookPostJobView(Request $request){
+        return redirect()->route('service.list');
     }
 
 
     public function postJob()
     {
-        $user_id=Auth::id();
-        return view('landing-page.post-job-show',compact('user_id'));
+        return redirect()->route('service.list');
     }
 
     public function bookingDetail(Request $request){
@@ -480,11 +558,7 @@ class FrontendController extends Controller
     }
 
     public function postJobDetail(Request $request){
-        $post_job_id = $request->id;
-        $postJobController = app(PostJobRequestController::class);
-        $apiRequest = new Request(['post_request_id' => $post_job_id]);
-        $postJob = $postJobController->getPostRequestDetail($apiRequest);
-        return view('landing-page.post-job-detail',compact('postJob'));
+        return redirect()->route('service.list');
     }
 
     public function favouriteServiceList(Request $request){
@@ -769,6 +843,8 @@ class FrontendController extends Controller
 
     public function postJobDatatable(Datatables $datatable, Request $request)
     {
+        abort(404);
+
         $query = PostJobRequest::myPostJob()->whereIn('status',['requested','accepted','assigned']);
         $filter = $request->filter;
         if (isset($filter['search'])) {

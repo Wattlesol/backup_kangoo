@@ -1,12 +1,19 @@
 @php 
    $cookie = App\Models\Setting::where('type','cookie-setup')->where('key', 'cookie-setup')->first();
    $cookiesetup = $cookie ? json_decode($cookie->value, true) : null;
+   $isArabic = app()->getLocale() === 'ar';
+   $cookieTitle = $isArabic
+      ? ($cookiesetup['title_ar'] ?? 'إشعار ملفات تعريف الارتباط')
+      : ($cookiesetup['title'] ?? '');
+   $cookieDescription = $isArabic
+      ? ($cookiesetup['description_ar'] ?? 'نستخدم ملفات تعريف الارتباط لتحسين تجربتك وتخصيص المحتوى والخدمات داخل المنصة.')
+      : ($cookiesetup['description'] ?? '');
 @endphp
 <div id="cookiePopup" class="px-5 py-4 bg-light cookiePopup position-fixed w-100 bottom-0 start-0 end-0">
    <div class="row align-items-center">
       <div class="col-md-6">
-         <h5 class="mb-1">{{$cookiesetup['title'] ?? ''}}</h5>
-         <p class="m-0">{{$cookiesetup['description'] ?? ''}}</p>
+         <h5 class="mb-1">{{ $cookieTitle }}</h5>
+         <p class="m-0">{{ $cookieDescription }}</p>
       </div>
       <div class="col-md-6 text-md-end mt-md-0 mt-3">
          <button id="acceptCookie" class="btn btn-primary">{{__('landingpage.accept_all')}}</button>

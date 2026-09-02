@@ -43,55 +43,55 @@
                 </div>
                 <div class="col-md-12">
                     <div class="form-group">
-                        <h1>Weekly Schedule</h1>
+                        @php $isAr = app()->getLocale() === 'ar'; @endphp<h1>{{ $isAr ? 'الجدول الأسبوعي' : 'Weekly Schedule' }}</h1>
                         <table>
                             <thead>
                             <tr>
-                                <th>Day</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
-                                <th>Off Day</th>
+                                <th>{{ $isAr ? 'اليوم' : 'Day' }}</th>
+                                <th>{{ $isAr ? 'وقت البدء' : 'Start Time' }}</th>
+                                <th>{{ $isAr ? 'وقت الانتهاء' : 'End Time' }}</th>
+                                <th>{{ $isAr ? 'يوم عطلة' : 'Off Day' }}</th>
                             </tr>
                             </thead>
                             <tbody>
                             <tr>
-                                <td>Monday (1)</td>
+                                <td>{{ $isAr ? 'الاثنين (1)' : 'Monday (1)' }}</td>
                                 <td><input type="time" name="start_at[1]"></td>
                                 <td><input type="time" name="end_at[1]"></td>
                                 <td class="off-day"><input value="1" type="checkbox" name="off[1]"></td>
                             </tr>
                             <tr>
-                                <td>Tuesday (2)</td>
+                                <td>{{ $isAr ? 'الثلاثاء (2)' : 'Tuesday (2)' }}</td>
                                 <td><input type="time" name="start_at[2]"></td>
                                 <td><input type="time" name="end_at[2]"></td>
                                 <td class="off-day"><input value="1" type="checkbox" name="off[2]"></td>
                             </tr>
                             <tr>
-                                <td>Wednesday (3)</td>
+                                <td>{{ $isAr ? 'الأربعاء (3)' : 'Wednesday (3)' }}</td>
                                 <td><input type="time" name="start_at[3]"></td>
                                 <td><input type="time" name="end_at[3]"></td>
                                 <td class="off-day"><input value="1" type="checkbox" name="off[3]"></td>
                             </tr>
                             <tr>
-                                <td>Thursday (4)</td>
+                                <td>{{ $isAr ? 'الخميس (4)' : 'Thursday (4)' }}</td>
                                 <td><input type="time" name="start_at[4]"></td>
                                 <td><input type="time" name="end_at[4]"></td>
                                 <td class="off-day"><input value="1" type="checkbox" name="off[4]"></td>
                             </tr>
                             <tr>
-                                <td>Friday (5)</td>
+                                <td>{{ $isAr ? 'الجمعة (5)' : 'Friday (5)' }}</td>
                                 <td><input type="time" name="start_at[5]"></td>
                                 <td><input type="time" name="end_at[5]"></td>
                                 <td class="off-day"><input value="1" type="checkbox" name="off[5]"></td>
                             </tr>
                             <tr>
-                                <td>Saturday (6)</td>
+                                <td>{{ $isAr ? 'السبت (6)' : 'Saturday (6)' }}</td>
                                 <td><input type="time" name="start_at[6]"></td>
                                 <td><input type="time" name="end_at[6]"></td>
                                 <td class="off-day"><input value="1" type="checkbox" name="off[6]"></td>
                             </tr>
                             <tr>
-                                <td>Sunday (7)</td>
+                                <td>{{ $isAr ? 'الأحد (7)' : 'Sunday (7)' }}</td>
                                 <td><input type="time" name="start_at[7]"></td>
                                 <td><input type="time" name="end_at[7]"></td>
                                 <td class="off-day"><input value="1" type="checkbox" name="off[7]"></td>

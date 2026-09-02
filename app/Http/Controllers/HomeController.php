@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\Service;
 use App\Models\Slider;
 use App\Models\Category;
+use App\Models\SubCategory;
 use App\Models\ProviderDocument;
 use App\Models\AppSetting;
 use App\Models\Setting;
@@ -18,8 +19,16 @@ use App\Models\HandymanPayout;
 use App\Models\ServiceAddon;
 use App\Models\AppDownload;
 use App\Models\FrontendSetting;
+use App\Models\Bank;
+use App\Models\SanadAiInteraction;
+use App\Models\SanadBuzzAlert;
+use App\Models\SanadChatThread;
+use App\Models\SanadDocumentVaultItem;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use App\Models\BookingRating;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class HomeController extends Controller
 {
@@ -51,7 +60,21 @@ class HomeController extends Controller
         $data['dashboard'] = [
             'count_total_booking'               => Booking::myBooking()->count(),
             'count_total_service'               => Service::myService()->count(),
-            'count_total_provider'              => User::myUsers('get_provider')->count(),
+            'count_total_provider'              => User::myUsers('get_provider')->where('status', 1)->count(),
+            'count_active_service'              => Service::myService()->where('status', 1)->count(),
+            'count_pending_orders'               => Booking::myBooking()->where(function ($query) {
+                $query->whereIn('sanad_stage', ['submitted', 'pending_review'])
+                    ->orWhere(function ($legacy) { $legacy->whereNull('sanad_stage')->where('status', 'pending'); });
+            })->count(),
+            'count_in_progress_orders'           => Booking::myBooking()->where(function ($query) {
+                $query->whereIn('sanad_stage', ['assigned_to_partner', 'assigned_to_employee', 'in_progress'])
+                    ->orWhere(function ($legacy) { $legacy->whereNull('sanad_stage')->whereIn('status', ['accept', 'in_progress']); });
+            })->count(),
+            'count_completed_orders'            => Booking::myBooking()->where(function ($query) {
+                $query->whereIn('sanad_stage', ['completed', 'closed'])
+                    ->orWhere(function ($legacy) { $legacy->whereNull('sanad_stage')->where('status', 'completed'); });
+            })->count(),
+            'count_cancelled_orders'            => Booking::myBooking()->where('status', 'cancelled')->count(),
             'new_customer'                      => User::myUsers('get_customer')->orderBy('id', 'DESC')->take(5)->get(),
             'new_provider'                      => User::myUsers('get_provider')->with('getServiceRating')->orderBy('id', 'DESC')->take(5)->get(),
             'upcomming_booking'                 => Booking::myBooking()->with('customer')->where('status', 'pending')->orderBy('id', 'DESC')->take(5)->get(),
@@ -60,6 +83,7 @@ class HomeController extends Controller
             'count_handyman_complete_booking'   => Booking::myBooking()->where('status', 'completed')->count(),
             'count_handyman_cancelled_booking'  => Booking::myBooking()->where('status', 'cancelled')->count()
         ];
+        $data['sanad'] = $this->sanadDashboardData();
 
         $data['category_chart'] = [
             'chartdata'     => Booking::myBooking()->showServiceCount()->take(4)->get()->pluck('count_pid'),
@@ -71,7 +95,11 @@ class HomeController extends Controller
             $data['revenueData']    =  adminEarning();
         }
         if ($user->hasRole('provider')) {
-            $revenuedata = ProviderPayout::selectRaw('sum(amount) as total , DATE_FORMAT(created_at , "%m") as month')
+            $monthExpression = DB::connection()->getDriverName() === 'sqlite'
+                ? "strftime('%m', created_at)"
+                : 'DATE_FORMAT(created_at , "%m")';
+
+            $revenuedata = ProviderPayout::selectRaw("sum(amount) as total , {$monthExpression} as month")
                 ->where('provider_id', auth()->user()->id)
                 ->whereYear('created_at', date('Y'))
                 ->groupBy('month');
@@ -94,6 +122,7 @@ class HomeController extends Controller
             }
 
             $data['currency_data']=currency_data();
+            $data['sanad_partner'] = $this->sanadPartnerDashboardData($user);
         }
 
 
@@ -105,8 +134,12 @@ class HomeController extends Controller
         }
         if ($user->hasRole('handyman')) {
             $data['total_revenue']  = HandymanPayout::where('handyman_id', $user->id)->sum('amount') ?? 0;
+            $data['sanad_employee'] = $this->sanadEmployeeDashboardData($user);
 
 
+        }
+        if ($user->hasRole('user')) {
+            $data['sanad_customer'] = $this->sanadCustomerDashboardData($user);
         }
 
         if (auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
@@ -128,12 +161,11 @@ class HomeController extends Controller
      */
     public function adminDashboard($data)
     {
-        return view('dashboard.dashboard', compact('data'));
+        return app(\App\Http\Controllers\SanadWebController::class)->dashboard();
     }
     public function providerDashboard($data)
     {
-
-        return view('dashboard.provider-dashboard', compact('data'));
+        return redirect()->route('provider.dashboard');
     }
     public function handymanDashboard($data)
     {
@@ -142,7 +174,304 @@ class HomeController extends Controller
     }
     public function userDashboard($data)
     {
-        return view('dashboard.user-dashboard', compact('data'));
+        return redirect()->route('customer-portal.dashboard');
+    }
+
+    private function sanadEmployeeDashboardData(User $user)
+    {
+        $requestQuery = Booking::myBooking()->whereNotNull('sanad_stage');
+        $today = now()->toDateString();
+
+        $actionStages = [
+            'assigned_to_employee',
+            'in_progress',
+            'awaiting_customer_action',
+            'awaiting_quality_review',
+            'escalated',
+        ];
+
+        return [
+            'assigned_tasks' => (clone $requestQuery)->count(),
+            'active_tasks' => (clone $requestQuery)->whereIn('sanad_stage', $actionStages)->count(),
+            'in_progress_tasks' => (clone $requestQuery)->where('sanad_stage', 'in_progress')->count(),
+            'awaiting_review_tasks' => (clone $requestQuery)->where('sanad_stage', 'awaiting_quality_review')->count(),
+            'completed_tasks' => (clone $requestQuery)->whereIn('sanad_stage', ['completed', 'closed'])->count(),
+            'today_tasks' => (clone $requestQuery)->whereDate('date', $today)->count(),
+            'pending_evidence' => SanadDocumentVaultItem::whereIn('booking_id', (clone $requestQuery)->pluck('id'))
+                ->where('verification_status', 'pending')
+                ->count(),
+            'unread_buzz' => SanadBuzzAlert::whereIn('booking_id', (clone $requestQuery)->pluck('id'))
+                ->where('status', 'unread')
+                ->where(function ($query) use ($user) {
+                    $query->where('recipient_id', $user->id)
+                        ->orWhere('recipient_role', $user->user_type);
+                })
+                ->count(),
+            'open_chats' => SanadChatThread::whereIn('booking_id', (clone $requestQuery)->pluck('id'))
+                ->where('status', 'open')
+                ->count(),
+            'paid_tasks' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })->count(),
+            'pending_payment_tasks' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->whereIn('payment_status', ['pending', 'advanced_paid', 'pending_by_admin', 'failed']);
+            })->count(),
+            'next_tasks' => Booking::myBooking()
+                ->with(['customer', 'provider', 'service', 'payment'])
+                ->whereNotNull('sanad_stage')
+                ->whereIn('sanad_stage', $actionStages)
+                ->orderByRaw('CASE WHEN sla_due_at IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('sla_due_at')
+                ->orderBy('date')
+                ->take(5)
+                ->get(),
+        ];
+    }
+
+    private function sanadCustomerDashboardData(User $user)
+    {
+        $requestQuery = Booking::myBooking()->whereNotNull('sanad_stage');
+        $requestIds = (clone $requestQuery)->pluck('id');
+
+        return [
+            'total_requests' => (clone $requestQuery)->count(),
+            'active_requests' => (clone $requestQuery)->whereIn('sanad_stage', [
+                'submitted',
+                'pending_review',
+                'assigned_to_partner',
+                'assigned_to_employee',
+                'in_progress',
+                'awaiting_customer_action',
+                'awaiting_quality_review',
+                'escalated',
+            ])->count(),
+            'awaiting_customer_action' => (clone $requestQuery)->where('sanad_stage', 'awaiting_customer_action')->count(),
+            'completed_requests' => (clone $requestQuery)->whereIn('sanad_stage', ['completed', 'closed'])->count(),
+            'pending_documents' => SanadDocumentVaultItem::whereIn('booking_id', $requestIds)
+                ->where('verification_status', 'pending')
+                ->count(),
+            'approved_documents' => SanadDocumentVaultItem::whereIn('booking_id', $requestIds)
+                ->where('verification_status', 'approved')
+                ->count(),
+            'unread_buzz' => SanadBuzzAlert::whereIn('booking_id', $requestIds)
+                ->where('status', 'unread')
+                ->where(function ($query) use ($user) {
+                    $query->where('recipient_id', $user->id)
+                        ->orWhere('recipient_role', $user->user_type);
+                })
+                ->count(),
+            'open_chats' => SanadChatThread::whereIn('booking_id', $requestIds)
+                ->where('status', 'open')
+                ->count(),
+            'paid_requests' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })->count(),
+            'pending_payment_requests' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->whereIn('payment_status', ['pending', 'advanced_paid', 'pending_by_admin', 'failed']);
+            })->count(),
+            'next_requests' => Booking::myBooking()
+                ->with(['provider', 'service', 'payment'])
+                ->whereNotNull('sanad_stage')
+                ->orderByRaw('CASE WHEN sla_due_at IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('sla_due_at')
+                ->latest()
+                ->take(5)
+                ->get(),
+        ];
+    }
+
+    private function sanadPartnerDashboardData(User $user)
+    {
+        $requestQuery = Booking::myBooking()->whereNotNull('sanad_stage');
+
+        $activeStages = [
+            'submitted',
+            'pending_review',
+            'assigned_to_partner',
+            'assigned_to_employee',
+            'in_progress',
+            'awaiting_customer_action',
+            'awaiting_quality_review',
+            'escalated',
+        ];
+
+        $completedStages = [
+            'completed',
+            'closed',
+        ];
+
+        $employees = User::where('provider_id', $user->id)
+            ->where('user_type', 'handyman');
+
+        $services = Service::myService();
+
+        return [
+            'assigned_requests' => (clone $requestQuery)->whereIn('sanad_stage', $activeStages)->count(),
+            'completed_requests' => (clone $requestQuery)->whereIn('sanad_stage', $completedStages)->count(),
+            'employee_count' => (clone $employees)->count(),
+            'active_employee_count' => (clone $employees)->where('status', 1)->count(),
+            'service_count' => (clone $services)->count(),
+            'active_service_count' => (clone $services)->where('status', 1)->count(),
+            'unassigned_employee_requests' => (clone $requestQuery)->whereDoesntHave('handymanAdded')->count(),
+            'in_progress_requests' => (clone $requestQuery)->where('sanad_stage', 'in_progress')->count(),
+            'awaiting_customer_requests' => (clone $requestQuery)->where('sanad_stage', 'awaiting_customer_action')->count(),
+            'quality_review_requests' => (clone $requestQuery)->where('sanad_stage', 'awaiting_quality_review')->count(),
+            'paid_requests' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })->count(),
+            'pending_payment_requests' => (clone $requestQuery)->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->whereIn('payment_status', ['pending', 'advanced_paid', 'pending_by_admin', 'failed']);
+            })->count(),
+            'recent_workload' => Booking::myBooking()
+                ->with(['customer', 'service', 'handymanAdded.handyman'])
+                ->whereNotNull('sanad_stage')
+                ->latest()
+                ->take(4)
+                ->get(),
+        ];
+    }
+
+    private function sanadDashboardData()
+    {
+        $user = auth()->user();
+        $bookingQuery = Booking::myBooking();
+        $now = now();
+        $dueSoon = now()->addHours(config('sanad.sla.due_soon_hours', 24));
+
+        $stageCounts = [];
+        foreach (config('sanad.request_lifecycle', []) as $stage) {
+            $stageCounts[$stage] = (clone $bookingQuery)->where('sanad_stage', $stage)->count();
+        }
+
+        $buzzQuery = Schema::hasTable('sanad_buzz_alerts') ? SanadBuzzAlert::query() : null;
+        $documentQuery = Schema::hasTable('sanad_document_vault_items') ? SanadDocumentVaultItem::query() : null;
+        $chatQuery = Schema::hasTable('sanad_chat_threads') ? SanadChatThread::query() : null;
+        $aiQuery = Schema::hasTable('sanad_ai_interactions') ? SanadAiInteraction::query() : null;
+
+        if (!$user->hasAnyRole(['admin', 'demo_admin'])) {
+            if ($buzzQuery) {
+                $buzzQuery->where(function ($q) use ($user) {
+                    $q->where('recipient_id', $user->id)
+                        ->orWhere('recipient_role', $user->user_type);
+                });
+            }
+            if ($documentQuery) {
+                $documentQuery->where(function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                        ->orWhere('uploaded_by', $user->id)
+                        ->orWhere(function ($visibilityQuery) use ($user) {
+                            $this->whereJsonArrayContains($visibilityQuery, 'visible_to', $user->user_type);
+                        });
+                });
+            }
+            if ($chatQuery) {
+                $chatQuery->where(function ($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                        ->orWhere(function ($visibilityQuery) use ($user) {
+                            $this->whereJsonArrayContains($visibilityQuery, 'participant_roles', $user->user_type);
+                        });
+                });
+            }
+            if ($aiQuery) {
+                $aiQuery->where('user_id', $user->id);
+            }
+        }
+
+        $needsActionStages = [
+            'pending_review',
+            'awaiting_customer_action',
+            'awaiting_quality_review',
+            'escalated',
+        ];
+
+        $paymentPendingStatuses = [
+            'pending',
+            'advanced_paid',
+            'pending_by_admin',
+            'failed',
+        ];
+
+        $attentionRequests = Booking::myBooking()
+            ->with(['customer', 'provider', 'service', 'payment'])
+            ->whereNotNull('sanad_stage')
+            ->where(function ($query) use ($needsActionStages, $paymentPendingStatuses, $now) {
+                $query->whereIn('sanad_stage', $needsActionStages)
+                    ->orWhereNull('provider_id')
+                    ->orWhere(function ($slaQuery) use ($now) {
+                        $slaQuery->whereNotNull('sla_due_at')->where('sla_due_at', '<', $now);
+                    })
+                    ->orWhereHas('sanadDocuments', function ($documentQuery) {
+                        $documentQuery->where('verification_status', 'pending');
+                    })
+                    ->orWhereHas('sanadBuzzAlerts', function ($buzzAlertQuery) {
+                        $buzzAlertQuery->where('status', 'unread');
+                    })
+                    ->orWhereHas('payment', function ($paymentQuery) use ($paymentPendingStatuses) {
+                        $paymentQuery->whereIn('payment_status', $paymentPendingStatuses);
+                    });
+            })
+            ->orderByRaw("CASE WHEN sanad_stage = 'escalated' THEN 0 ELSE 1 END")
+            ->orderByRaw('CASE WHEN sla_due_at IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('sla_due_at')
+            ->orderBy('updated_at', 'desc')
+            ->take(5)
+            ->get();
+
+        $paidRevenue = Booking::myBooking()
+            ->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })
+            ->with('payment')
+            ->get()
+            ->sum(function ($booking) {
+                return optional($booking->payment)->total_amount ?: 0;
+            });
+
+        return [
+            'terminology' => config('sanad.terminology', []),
+            'stage_counts' => $stageCounts,
+            'active_requests' => (clone $bookingQuery)->whereIn('sanad_stage', [
+                'submitted',
+                'pending_review',
+                'assigned_to_partner',
+                'assigned_to_employee',
+                'in_progress',
+                'awaiting_customer_action',
+                'awaiting_quality_review',
+                'escalated',
+            ])->count(),
+            'unread_buzz' => $buzzQuery ? (clone $buzzQuery)->where('status', 'unread')->count() : 0,
+            'pending_documents' => $documentQuery ? (clone $documentQuery)->where('verification_status', 'pending')->count() : 0,
+            'open_chats' => $chatQuery ? (clone $chatQuery)->where('status', 'open')->count() : 0,
+            'ai_escalations' => $aiQuery ? (clone $aiQuery)->where('requires_escalation', true)->count() : 0,
+            'needs_action' => (clone $bookingQuery)->whereIn('sanad_stage', $needsActionStages)->count(),
+            'unassigned_requests' => (clone $bookingQuery)->whereNotNull('sanad_stage')->whereNull('provider_id')->count(),
+            'overdue_sla' => (clone $bookingQuery)->whereNotNull('sla_due_at')->where('sla_due_at', '<', $now)->count(),
+            'due_soon_sla' => (clone $bookingQuery)->whereNotNull('sla_due_at')->whereBetween('sla_due_at', [$now, $dueSoon])->count(),
+            'payment_pending' => Booking::myBooking()->whereHas('payment', function ($paymentQuery) use ($paymentPendingStatuses) {
+                $paymentQuery->whereIn('payment_status', $paymentPendingStatuses);
+            })->count(),
+            'paid_requests' => Booking::myBooking()->whereHas('payment', function ($paymentQuery) {
+                $paymentQuery->where('payment_status', 'paid');
+            })->count(),
+            'paid_revenue' => $paidRevenue,
+            'attention_requests' => $attentionRequests,
+            'recent_requests' => Booking::myBooking()
+                ->with(['customer', 'provider', 'service', 'payment'])
+                ->whereNotNull('sanad_stage')
+                ->orderBy('updated_at', 'desc')
+                ->take(5)
+                ->get(),
+        ];
+    }
+
+    private function whereJsonArrayContains(EloquentBuilder $query, $column, $value)
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return $query->where($column, 'like', '%"' . $value . '"%');
+        }
+
+        return $query->whereJsonContains($column, $value);
     }
     public function changeStatus(Request $request)
     {
@@ -180,6 +509,12 @@ class HomeController extends Controller
                 $service->status = $request->status;
                 $service->save();
                 break;
+            case 'service_featured':
+                $message_form = __('messages.service');
+                $service = \App\Models\Service::find($request->id);
+                $service->is_featured = $request->status;
+                $service->save();
+                break;
             case 'coupon_status':
                 $coupon = \App\Models\Coupon::find($request->id);
                 $coupon->status = $request->status;
@@ -200,6 +535,10 @@ class HomeController extends Controller
                 $message_form = __('messages.providerdocument');
                 $document = \App\Models\ProviderDocument::find($request->id);
                 $document->is_verified = $request->status;
+                $document->verification_status = $request->status ? 'approved' : 'pending';
+                $document->review_reason = null;
+                $document->reviewed_by = auth()->id();
+                $document->reviewed_at = now();
                 $document->save();
                 break;
             case 'tax_status':
@@ -318,24 +657,44 @@ class HomeController extends Controller
                 $items = $items->get();
                 break;
             case 'category':
-                $items = \App\Models\Category::select('id', 'name as text')->where('status', 1);
+                $isAr = app()->getLocale() === 'ar';
+                $itemsQuery = \App\Models\Category::where('status', 1);
                 if (isset($request->is_featured)) {
-                    $items->where('is_featured', $request->is_featured);
+                    $itemsQuery->where('is_featured', $request->is_featured);
                 }
                 if ($value != '') {
-                    $items->where('name', 'LIKE', '%' . $value . '%');
+                    $itemsQuery->where(function ($q) use ($value) {
+                        $q->where('name', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_ar', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_en', 'LIKE', '%' . $value . '%');
+                    });
                 }
-
-                $items = $items->get();
+                $items = $itemsQuery->get()->map(function ($row) use ($isAr) {
+                    return [
+                        'id' => $row->id,
+                        'text' => ($isAr && !empty($row->name_ar)) ? $row->name_ar : ($row->name_en ?: $row->name),
+                    ];
+                });
                 break;
             case 'subcategory':
-                $items = \App\Models\SubCategory::select('id', 'name as text')->where('status', 1);
-
-                if ($value != '') {
-                    $items->where('name', 'LIKE', '%' . $value . '%');
+                $isAr = app()->getLocale() === 'ar';
+                $itemsQuery = \App\Models\SubCategory::where('status', 1);
+                if (isset($request->category_id)) {
+                    $itemsQuery->where('category_id', $request->category_id);
                 }
-
-                $items = $items->get();
+                if ($value != '') {
+                    $itemsQuery->where(function ($q) use ($value) {
+                        $q->where('name', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_ar', 'LIKE', '%' . $value . '%')
+                          ->orWhere('name_en', 'LIKE', '%' . $value . '%');
+                    });
+                }
+                $items = $itemsQuery->get()->map(function ($row) use ($isAr) {
+                    return [
+                        'id' => $row->id,
+                        'text' => ($isAr && !empty($row->name_ar)) ? $row->name_ar : ($row->name_en ?: $row->name),
+                    ];
+                });
                 break;
             case 'sub_araeas':
                 $items = \App\Models\Region::select('city_id', 'name as text');
@@ -574,11 +933,17 @@ class HomeController extends Controller
                 break;
 
             case 'documents':
-                $items = \App\Models\Documents::select('id', 'name', 'status', 'is_required', \DB::raw('(CASE WHEN is_required = 1 THEN CONCAT(name," * ") ELSE CONCAT(name,"") END) AS text'))->where('status', 1);
+                $items = \App\Models\Documents::select('id', 'name', 'name_ar', 'status', 'is_required')->where('status', 1);
                 if ($value != '') {
-                    $items->where('name', 'LIKE', $value . '%');
+                    $items->where(function ($query) use ($value) {
+                        $query->where('name', 'LIKE', $value . '%')
+                            ->orWhere('name_ar', 'LIKE', $value . '%');
+                    });
                 }
-                $items = $items->get();
+                $items = $items->get()->map(function ($document) {
+                    $document->text = $document->localized_name . ($document->is_required ? ' * ' : '');
+                    return $document;
+                });
                 break;
             case 'handymantype':
                 $items = \App\Models\HandymanType::select('id', 'name as text')
@@ -618,7 +983,31 @@ class HomeController extends Controller
 
     public function removeFile(Request $request)
     {
-        if (demoUserPermission()) {
+        $allowedTypes = [
+            'slider_image', 'profile_image', 'service_attachment', 'category_image', 'category_icon',
+            'subcategory_image', 'provider_document', 'booking_attachment', 'bank_attachment',
+            'app_image', 'app_image_full', 'package_attachment', 'blog_attachment',
+            'serviceaddon_image', 'section5_attachment', 'main_image', 'google_play',
+            'app_store', 'vimage', 'login_register_image', 'logo', 'favicon', 'footer_logo', 'loader',
+        ];
+        $validated = $request->validate([
+            'id' => 'required|integer',
+            'type' => 'required|string|in:'.implode(',', $allowedTypes),
+        ]);
+        $this->authorizeFileRemoval($validated['type'], $validated['id']);
+
+        // Demo admin is allowed to add/remove catalog media during QA. Keep the
+        // legacy demo restriction for unrelated destructive settings/actions.
+        $demoMediaTypes = [
+            'category_image',
+            'category_icon',
+            'subcategory_image',
+            'service_attachment',
+            'package_attachment',
+            'serviceaddon_image',
+        ];
+
+        if (demoUserPermission() && !in_array($request->type, $demoMediaTypes, true)) {
             $message = __('messages.demo_permission_denied');
             $response = [
                 'status'    => false,
@@ -628,7 +1017,7 @@ class HomeController extends Controller
             return comman_custom_response($response);
         }
 
-        $type = $request->type;
+        $type = $validated['type'];
         $data = null;
         switch ($type) {
             case 'slider_image':
@@ -640,25 +1029,33 @@ class HomeController extends Controller
                 $message = __('messages.msg_removed', ['name' => __('messages.profile_image')]);
                 break;
             case 'service_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
             case 'category_image':
                 $data = Category::find($request->id);
-                $message = __('messages.msg_removed', ['name' => __('messages.category')]);
+                $message = __('messages.msg_removed', ['name' => __('messages.category') . ' image']);
+                break;
+            case 'category_icon':
+                $data = Category::find($request->id);
+                $message = __('messages.msg_removed', ['name' => __('messages.category') . ' icon']);
+                break;
+            case 'subcategory_image':
+                $data = SubCategory::find($request->id);
+                $message = __('messages.msg_removed', ['name' => __('messages.subcategory') . ' image']);
                 break;
             case 'provider_document':
                 $data = ProviderDocument::find($request->id);
                 $message = __('messages.msg_removed', ['name' => __('messages.providerdocument')]);
                 break;
             case 'booking_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
             case 'bank_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
@@ -671,12 +1068,12 @@ class HomeController extends Controller
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
             case 'package_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
             case 'blog_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
@@ -685,7 +1082,7 @@ class HomeController extends Controller
                 $message = __('messages.msg_removed', ['name' => __('messages.service_addon')]);
                 break;
             case 'section5_attachment':
-                $media = Media::find($request->id);
+                $media = Media::findOrFail($request->id);
                 $media->delete();
                 $message = __('messages.msg_removed', ['name' => __('messages.attachments')]);
                 break;
@@ -746,8 +1143,53 @@ class HomeController extends Controller
         return comman_custom_response($response);
     }
 
+    private function authorizeFileRemoval(string $type, int $id): void
+    {
+        $user = auth()->user();
+        abort_unless($user, 401);
+
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return;
+        }
+
+        if ($type === 'profile_image') {
+            abort_unless((int) $id === (int) $user->id, 403);
+            return;
+        }
+
+        if ($type === 'provider_document') {
+            abort_unless(
+                $user->hasRole('provider')
+                && ProviderDocument::where('provider_id', $user->id)->whereKey($id)->exists(),
+                403
+            );
+            return;
+        }
+
+        if (in_array($type, ['booking_attachment', 'bank_attachment'], true)) {
+            $media = Media::findOrFail($id);
+            $model = $media->model;
+            if ($model instanceof Booking) {
+                abort_unless(Booking::query()->myBooking()->whereKey($model->id)->exists(), 403);
+                return;
+            }
+            if ($model instanceof Bank) {
+                abort_unless($user->hasRole('provider') && (int) $model->provider_id === (int) $user->id, 403);
+                return;
+            }
+            if (isset($model->booking_id)) {
+                abort_unless(Booking::query()->myBooking()->whereKey($model->booking_id)->exists(), 403);
+                return;
+            }
+        }
+
+        abort(403);
+    }
+
     public function lang($locale)
     {
+        abort_unless(in_array($locale, ['ar', 'en'], true), 404);
+
         \App::setLocale($locale);
         session()->put('locale', $locale);
         \Artisan::call('cache:clear');
@@ -762,11 +1204,21 @@ class HomeController extends Controller
             $user->language_option = $locale;
             $user->save();
         }
-        return redirect()->back();
+
+        $prev = url()->previous();
+        if (str_contains($prev, '.css') || str_contains($prev, '.js') || str_contains($prev, 'switch-language') || str_contains($prev, '/lang/')) {
+            return redirect()->route('frontend.index');
+        }
+
+        return redirect()->back()->withCookie(cookie('quick_locale', $locale, 60 * 24 * 365, '/', null, false, false, false, 'lax'));
     }
 
-    function authLogin()
+    function authLogin(\Illuminate\Http\Request $request)
     {
+        if ($request->hasAny(['email', 'password'])) {
+            return redirect()->route('auth.login');
+        }
+
         return view('auth.login');
     }
     function authRegister()

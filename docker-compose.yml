@@ -1,0 +1,109 @@
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "${CRAWL4AI_PUBLIC_PORT:-11235}:11235"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:11235/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "${CHROMA_PUBLIC_PORT:-8001}:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kangoo:local
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8091}:8091"
+    environment:
+      APP_NAME: "${APP_NAME:-Kangoo}"
+      APP_ENV: "${APP_ENV:-local}"
+      APP_KEY: "${APP_KEY:-}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+      APP_URL: "${APP_URL:-http://localhost:${APP_PORT:-8091}}"
+      ASSET_URL: "${ASSET_URL:-${APP_URL:-http://localhost:${APP_PORT:-8091}}}"
+      LOG_CHANNEL: "${LOG_CHANNEL:-stderr}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
+      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      DB_HOST: "${DB_HOST:-mysql}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_DATABASE: "${DB_DATABASE:-kangoo}"
+      DB_USERNAME: "${DB_USERNAME:-kangoo}"
+      DB_PASSWORD: "${DB_PASSWORD:-kangoo}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+      CACHE_DRIVER: "${CACHE_DRIVER:-file}"
+      SESSION_DRIVER: "${SESSION_DRIVER:-file}"
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-sync}"
+      RESTORE_DB_ON_BOOT: "${RESTORE_DB_ON_BOOT:-false}"
+      RESTORE_DB_IF_EMPTY: "${RESTORE_DB_IF_EMPTY:-true}"
+      RESTORE_DB_FRESH: "${RESTORE_DB_FRESH:-false}"
+      RESTORE_DB_DUMP: "${RESTORE_DB_DUMP:-database/dumps/kangoo_sa.sql.gz}"
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-false}"
+      RUN_SEEDERS: "${RUN_SEEDERS:-false}"
+      SANAD_AI_ENABLED: "${SANAD_AI_ENABLED:-true}"
+      SANAD_AI_PROVIDER: "${SANAD_AI_PROVIDER:-nvidia}"
+      SANAD_AI_TEMPERATURE: "${SANAD_AI_TEMPERATURE:-0.2}"
+      SANAD_AI_MAX_TOKENS: "${SANAD_AI_MAX_TOKENS:-2048}"
+      SANAD_AI_ESCALATION_THRESHOLD: "${SANAD_AI_ESCALATION_THRESHOLD:-0.65}"
+      SANAD_VECTOR_STORE: "${SANAD_VECTOR_STORE:-database}"
+      SANAD_RAG_CHUNK_SIZE: "${SANAD_RAG_CHUNK_SIZE:-900}"
+      SANAD_RAG_CHUNK_OVERLAP: "${SANAD_RAG_CHUNK_OVERLAP:-120}"
+      NVIDIA_AI_BASE_URL: "${NVIDIA_AI_BASE_URL:-https://integrate.api.nvidia.com/v1}"
+      NVIDIA_API_KEY: "${NVIDIA_API_KEY:-}"
+      NVIDIA_AI_MODEL: "${NVIDIA_AI_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}"
+      NVIDIA_AI_EMBEDDING_MODEL: "${NVIDIA_AI_EMBEDDING_MODEL:-nvidia/nv-embedqa-e5-v5}"
+      CHROMA_URL: "http://chroma:8000"
+      CHROMA_COLLECTION: "${CHROMA_COLLECTION:-sanad_knowledge_base}"
+      CRAWL4AI_BASE_URL: "http://crawl4ai:11235"
+      CRAWL4AI_API_TOKEN: "${CRAWL4AI_API_TOKEN:-}"
+      CRAWL4AI_TIMEOUT: "${CRAWL4AI_TIMEOUT:-15}"
+      CRAWL4AI_MAX_PAGES: "${CRAWL4AI_MAX_PAGES:-50}"
+      LANGSMITH_TRACING: "${LANGSMITH_TRACING:-true}"
+      LANGSMITH_ENDPOINT: "${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}"
+      LANGSMITH_PROJECT: "${LANGSMITH_PROJECT:-sanad-rag}"
+      LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
+      HONCHO_ENABLED: "${HONCHO_ENABLED:-false}"
+      HONCHO_API_KEY: "${HONCHO_API_KEY:-}"
+      HONCHO_BASE_URL: "${HONCHO_BASE_URL:-https://api.honcho.dev}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      crawl4ai:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: "${DB_DATABASE:-kangoo}"
+      MYSQL_USER: "${DB_USERNAME:-kangoo}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-kangoo}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+    ports:
+      - "${MYSQL_PUBLIC_PORT:-3306}:3306"
+    volumes:
+      - kangoo-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  chroma_data:
+  kangoo-mysql:

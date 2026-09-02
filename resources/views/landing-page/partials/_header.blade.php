@@ -1,3 +1,32 @@
+@if(config('sanad.ui.quick_public_shell', true))
+<header class="quick-marketing-header">
+   <nav class="quick-marketing-navbar" aria-label="{{ app()->getLocale() === 'ar' ? 'التنقل الرئيسي' : 'Main navigation' }}">
+      <a href="#home" class="quick-marketing-logo" aria-label="Quick home"><x-quick-logo /></a>
+      <button class="quick-marketing-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#quickMarketingNavigation" aria-controls="quickMarketingNavigation" aria-expanded="false" aria-label="{{ app()->getLocale() === 'ar' ? 'فتح القائمة' : 'Open menu' }}">
+         <span></span><span></span><span></span>
+      </button>
+      <div class="collapse quick-marketing-collapse" id="quickMarketingNavigation">
+         <ul class="quick-marketing-links">
+            <li><a class="active" href="#home">{{ app()->getLocale() === 'ar' ? 'الرئيسية' : 'Home' }}</a></li>
+            <li><a href="#services">{{ app()->getLocale() === 'ar' ? 'الخدمات' : 'Services' }}</a></li>
+            <li><a href="#how">{{ app()->getLocale() === 'ar' ? 'كيف تعمل؟' : 'How it works' }}</a></li>
+            <li><a href="#trust">{{ app()->getLocale() === 'ar' ? 'الأمان' : 'Security' }}</a></li>
+            <li><a href="{{ route('user.help_support') }}">{{ app()->getLocale() === 'ar' ? 'الدعم' : 'Support' }}</a></li>
+         </ul>
+         <div class="quick-marketing-actions">
+            <a class="quick-language-link" href="{{ route('switch-language', ['locale' => app()->getLocale() === 'ar' ? 'en' : 'ar'], false) }}" lang="{{ app()->getLocale() === 'ar' ? 'en' : 'ar' }}">
+               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 5h12M9 3v2m1.5 0c-.8 3.7-3.3 6.6-7.5 8m3-4c1.5 2.2 3.5 3.8 6 4.8M14 20l4-9 4 9m-6.5-3h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+               {{ app()->getLocale() === 'ar' ? 'EN' : 'العربية' }}
+            </a>
+            <button type="button" class="quick-theme-button" data-quick-theme-toggle aria-label="{{ app()->getLocale() === 'ar' ? 'تغيير المظهر' : 'Change theme' }}">
+               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 019.8 3.5 8.5 8.5 0 1020.5 14.2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+            </button>
+            <a class="quick-login-button" href="{{ auth()->check() ? route('home') : route('login') }}">{{ auth()->check() ? (app()->getLocale() === 'ar' ? 'لوحة التحكم' : 'Dashboard') : (app()->getLocale() === 'ar' ? 'تسجيل الدخول' : 'Sign in') }}</a>
+         </div>
+      </div>
+   </nav>
+</header>
+@else
 <header>
       @php
          $headerSection = App\Models\FrontendSetting::where('key', 'heder-menu-setting')->first();
@@ -50,14 +79,17 @@
                            French
                         </a> -->
                         <?php
-                              $language_option = sitesetupSession('get')->language_option ?? ["nl","fr","it","pt","es","en"];
+                              $language_option = sitesetupSession('get')->language_option ?? ["ar","nl","fr","it","pt","es","en"];
+                              if (!in_array('ar', $language_option)) {
+                                 array_unshift($language_option, 'ar');
+                              }
                               if (!empty($language_option)) {
                                  $language_array = languagesArray($language_option);
                               }
                         ?>
                         @if(count($language_array) > 0 )
                         @foreach( $language_array as $lang )
-                           <a class="dropdown-item d-block" href="{{ route('switch-language',['locale'=> $lang['id'] ]) }}">
+                           <a class="dropdown-item d-block" href="{{ route('switch-language',['locale'=> $lang['id'] ], false) }}">
                               {{ $lang['title'] }}
                            </a>
                         @endforeach
@@ -100,6 +132,14 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                    <ul class="navbar-nav align-items-center ms-auto mb-2 mb-xl-0 p-0">
+                      @if(request()->routeIs('frontend.index'))
+                      <li class="nav-item quick-header-language">
+                         <a class="nav-link" href="{{ route('switch-language', ['locale' => app()->getLocale() === 'ar' ? 'en' : 'ar'], false) }}" lang="{{ app()->getLocale() === 'ar' ? 'en' : 'ar' }}">
+                            <i class="fas fa-language" aria-hidden="true"></i>
+                            {{ app()->getLocale() === 'ar' ? 'EN' : 'العربية' }}
+                         </a>
+                      </li>
+                      @endif
                       <!-- Dropdown Notificaton -->
                      @if ($sectionData && isset($sectionData['header_setting']) && $sectionData['header_setting'] == 1)
                      @if($sectionData['enable_darknight_mode'] == 1)
@@ -144,7 +184,7 @@
                       <!-- Wishlist -->
                       @if(empty(auth()->user()) || auth()->user()->user_type !== 'user')
                         <li class="ms-sm-3 ms-2">
-                           <a href="{{route('user.login')}}" class="btn btn btn-outline-primary" role="button">
+                           <a href="{{route('login')}}" class="btn btn btn-outline-primary" role="button">
                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16"
                                  fill="none">
                                  <path fill-rule="evenodd" clip-rule="evenodd"
@@ -156,7 +196,7 @@
                                     stroke="currentColor" stroke-width="1.42857" stroke-linecap="round"
                                     stroke-linejoin="round" />
                               </svg>
-                              Login
+                              {{ __('auth.login') }}
                            </a>
                         </li>
                       @else
@@ -277,3 +317,4 @@
        </div>
     </nav>
  </header>
+@endif

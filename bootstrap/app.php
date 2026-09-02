@@ -1,13 +1,21 @@
 <?php
 
-// Suppress deprecation warnings in production
-if (env('APP_ENV') === 'production' || env('APP_DEBUG') === 'false' || env('APP_DEBUG') === false) {
-    error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
-    ini_set('display_errors', '0');
-    ini_set('log_errors', '1');
+/*
+|--------------------------------------------------------------------------
+| Suppress PHP 8.4 Deprecation Warnings for Laravel 8 Compatibility
+|--------------------------------------------------------------------------
+|
+| Laravel 8 was not designed for PHP 8.4, so we suppress deprecation warnings
+| to prevent console spam while maintaining functionality.
+|
+*/
+
+if (isset($_ENV['PHP_ERROR_REPORTING'])) {
+    error_reporting(eval('return ' . $_ENV['PHP_ERROR_REPORTING'] . ';'));
+} elseif (version_compare(PHP_VERSION, '8.4.0', '>=')) {
+    // Suppress deprecation warnings for PHP 8.4+ with Laravel 8
+    error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 }
-
-
 
 /*
 |--------------------------------------------------------------------------

@@ -6,6 +6,7 @@
       :auth_user_id="auth_user_id"
       :servicetitle="data.name"
       :serviceprice="data.price"
+      :originalprice="data.original_price"
       :servicetime="data.servicetime"
       :servicedesc="data.description"
       :serviceimage="data.attchments[0]"

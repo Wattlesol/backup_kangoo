@@ -78,7 +78,12 @@ class Setting extends Model implements  HasMedia
             if ($key === 'privacy_policy' || $key === 'terms_condition' || $key === 'earning-setting') {
                 return $setting->value;
             } else {
-                return json_decode($setting->value);
+                $decoded = json_decode($setting->value);
+                // Ensure we always return an object for consistency
+                if (is_array($decoded)) {
+                    return (object) $decoded;
+                }
+                return $decoded;
             }
         }
 

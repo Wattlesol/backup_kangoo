@@ -7,7 +7,10 @@ use App\Models\Order;
 use App\Models\OrderStatusHistory;
 use App\Models\User;
 use App\Models\Store;
+use App\Exports\OrdersExport;
 use Yajra\DataTables\DataTables;
+use Maatwebsite\Excel\Facades\Excel;
+use PDF;
 
 class OrderController extends Controller
 {
@@ -38,7 +41,8 @@ class OrderController extends Controller
         $auth_user = authSession();
         $assets = ['datatable'];
         $stores = Store::where('status', 'approved')->get();
-        return view('order.index', compact('pageTitle','auth_user','assets','filter','stores','statistics'));
+        $partners = $this->partnerOptions();
+        return view('order.index', compact('pageTitle','auth_user','assets','filter','stores','statistics','partners'));
     }
 
     public function index_data(DataTables $datatable, Request $request)
@@ -129,7 +133,8 @@ class OrderController extends Controller
 
         $pageTitle = trans('messages.view_form_title',['form'=>trans('messages.order')]);
         $auth_user = authSession();
-        return view('order.view', compact('pageTitle','order','auth_user'));
+        $partners = $this->partnerOptions();
+        return view('order.view', compact('pageTitle','order','auth_user','partners'));
     }
 
     /**
@@ -153,21 +158,54 @@ class OrderController extends Controller
     /**
      * Update payment status
      */
-    public function updatePaymentStatus(Request $request)
+    public function updatePaymentStatus(Request $request, $id = null)
     {
+        // Handle both URL parameter and request body for order_id
+        $orderId = $id ?? $request->order_id;
+
         $data = $request->validate([
-            'order_id' => 'required|exists:orders,id',
             'payment_status' => 'required|in:pending,paid,failed,refunded',
-            'payment_transaction_id' => 'nullable|string'
+            'payment_method' => 'nullable|string',
+            'transaction_id' => 'nullable|string'
         ]);
 
-        $order = Order::findOrFail($data['order_id']);
-        $order->update([
-            'payment_status' => $data['payment_status'],
-            'payment_transaction_id' => $data['payment_transaction_id'] ?? $order->payment_transaction_id
-        ]);
+        if (!$orderId) {
+            $data['order_id'] = 'required|exists:orders,id';
+            $request->validate($data);
+            $orderId = $request->order_id;
+        }
+
+        $order = Order::findOrFail($orderId);
+
+        $updateData = [
+            'payment_status' => $data['payment_status']
+        ];
+
+        if (isset($data['payment_method'])) {
+            $updateData['payment_method'] = $data['payment_method'];
+        }
+
+        if (isset($data['transaction_id'])) {
+            $updateData['payment_transaction_id'] = $data['transaction_id'];
+        }
+
+        $order->update($updateData);
 
         $message = trans('messages.payment_status_updated_successfully');
+
+        if($request->is('api/*')) {
+            return comman_custom_response([
+                'message' => $message,
+                'data' => [
+                    'order_id' => $order->id,
+                    'payment_status' => $order->payment_status,
+                    'payment_method' => $order->payment_method,
+                    'transaction_id' => $order->payment_transaction_id
+                ],
+                'status' => true
+            ]);
+        }
+
         return comman_custom_response(['message'=> $message , 'status' => true]);
     }
 
@@ -217,11 +255,88 @@ class OrderController extends Controller
      */
     public function export(Request $request)
     {
-        // Implementation for exporting orders to CSV/Excel
-        // This would typically use Laravel Excel or similar package
+        $format = $request->get('format', 'excel');
+        abort_unless(in_array($format, ['pdf', 'excel']), 404);
 
-        $message = trans('messages.export_feature_coming_soon');
-        return comman_custom_response(['message'=> $message , 'status' => false]);
+        $orders = $this->orderExportQuery($request)->get();
+        $summary = $this->orderSummary($orders);
+        $filename = 'orders-summary-report-'.now()->format('Y-m-d-His');
+
+        if ($format === 'pdf') {
+            $pdf = PDF::loadView('order.exports.pdf', [
+                'orders' => $orders,
+                'summary' => $summary,
+                'generatedAt' => now(),
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download($filename.'.pdf');
+        }
+
+        return Excel::download(new OrdersExport($orders, $summary), $filename.'.xlsx');
+    }
+
+    public function reassignPartner(Request $request, $id)
+    {
+        $data = $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $order = Order::with('store.provider')->findOrFail($id);
+        $newStore = Store::with('provider')->where('status', 'approved')->findOrFail($data['store_id']);
+        $oldPartner = optional(optional($order->store)->provider)->display_name ?: 'Unassigned';
+        $newPartner = optional($newStore->provider)->display_name ?: $newStore->name;
+
+        if ((int) $order->store_id === (int) $newStore->id) {
+            return comman_custom_response([
+                'message' => 'Order is already assigned to this partner.',
+                'status' => false,
+            ]);
+        }
+
+        $order->update([
+            'store_id' => $newStore->id,
+            'order_type' => 'store',
+        ]);
+
+        $notes = 'Partner reassigned from '.$oldPartner.' to '.$newPartner;
+        if (!empty($data['reason'])) {
+            $notes .= '. Reason: '.$data['reason'];
+        }
+
+        $order->statusHistories()->create([
+            'status' => $order->status,
+            'notes' => $notes,
+            'changed_by' => auth()->id(),
+            'changed_at' => now(),
+        ]);
+
+        return comman_custom_response([
+            'message' => 'Order partner reassigned successfully. Order data, items, documents, and chats remain attached to the same order.',
+            'status' => true,
+        ]);
+    }
+
+    /**
+     * Print order as PDF
+     */
+    public function print($id)
+    {
+        $order = Order::with([
+            'customer',
+            'store.provider',
+            'items.product',
+            'items.productVariant',
+            'statusHistories.changedBy'
+        ])->findOrFail($id);
+
+        $data = \App\Models\AppSetting::first();
+
+        // Return view for printing instead of PDF download
+        return view('order.print', [
+            'order' => $order,
+            'data' => $data
+        ]);
     }
 
     /**
@@ -248,5 +363,331 @@ class OrderController extends Controller
         }
 
         return comman_custom_response(['message'=> trans('messages.invalid_action') , 'status' => false]);
+    }
+
+    private function orderExportQuery(Request $request)
+    {
+        $query = Order::with(['customer', 'store.provider', 'items']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        if ($request->filled('store_id')) {
+            $request->store_id === 'admin'
+                ? $query->whereNull('store_id')
+                : $query->where('store_id', $request->store_id);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        return $query->latest();
+    }
+
+    private function orderSummary($orders): array
+    {
+        return [
+            'total_orders' => $orders->count(),
+            'pending_orders' => $orders->where('status', 'pending')->count(),
+            'processing_orders' => $orders->whereIn('status', ['confirmed', 'processing', 'shipped'])->count(),
+            'delivered_orders' => $orders->where('status', 'delivered')->count(),
+            'cancelled_orders' => $orders->where('status', 'cancelled')->count(),
+            'paid_orders' => $orders->where('payment_status', 'paid')->count(),
+            'unpaid_orders' => $orders->where('payment_status', '!=', 'paid')->count(),
+            'total_revenue' => $orders->where('payment_status', 'paid')->sum('total_amount'),
+            'total_value' => $orders->sum('total_amount'),
+        ];
+    }
+
+    private function partnerOptions()
+    {
+        return Store::with('provider')
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Get orders for API (JSON format)
+     */
+    public function getOrdersAPI(Request $request)
+    {
+        try {
+            $perPage = $request->get('per_page', 15);
+            $status = $request->get('status');
+            $paymentStatus = $request->get('payment_status');
+            $storeId = $request->get('store_id');
+            $search = $request->get('search');
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+
+            $query = Order::with(['customer', 'store', 'items.product']);
+
+            // Apply role-based filtering for security
+            $user = auth()->user();
+            if ($user->user_type === 'provider') {
+                // Providers can only see orders containing their own products
+                $query->whereHas('items.product', function($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                      ->where('created_by_type', 'provider');
+                });
+            }
+            // Admin users can see all orders (no additional filtering needed)
+
+            // Apply filters
+            if ($status) {
+                $query->where('status', $status);
+            }
+
+            if ($paymentStatus) {
+                $query->where('payment_status', $paymentStatus);
+            }
+
+            if ($storeId) {
+                $query->where('store_id', $storeId);
+            }
+
+            if ($search) {
+                $query->where(function($q) use ($search) {
+                    $q->where('order_number', 'like', "%{$search}%")
+                      ->orWhereHas('customer', function($customerQuery) use ($search) {
+                          $customerQuery->where('first_name', 'like', "%{$search}%")
+                                       ->orWhere('last_name', 'like', "%{$search}%")
+                                       ->orWhere('email', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            // Apply sorting
+            $query->orderBy($sortBy, $sortOrder);
+
+            $orders = $query->paginate($perPage);
+
+            // Transform data for API response
+            $transformedOrders = $orders->getCollection()->map(function($order) {
+                return [
+                    'id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer' => $order->customer ? [
+                        'id' => $order->customer->id,
+                        'name' => $order->customer->display_name,
+                        'email' => $order->customer->email
+                    ] : null,
+                    'store' => $order->store ? [
+                        'id' => $order->store->id,
+                        'name' => $order->store->name
+                    ] : null,
+                    'status' => $order->status,
+                    'payment_status' => $order->payment_status,
+                    'payment_method' => $order->payment_method,
+                    'subtotal' => $order->subtotal,
+                    'tax_amount' => $order->tax_amount,
+                    'delivery_fee' => $order->delivery_fee,
+                    'discount_amount' => $order->discount_amount,
+                    'total_amount' => $order->total_amount,
+                    'currency' => $order->currency ?? 'USD',
+                    'items_count' => $order->items->count(),
+                    'delivery_address' => $this->formatDeliveryAddress($order->delivery_address),
+                    'delivery_phone' => $order->delivery_phone,
+                    'created_at' => $order->created_at,
+                    'updated_at' => $order->updated_at
+                ];
+            });
+
+            $response = [
+                'data' => $transformedOrders,
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+                'from' => $orders->firstItem(),
+                'to' => $orders->lastItem()
+            ];
+
+            return comman_custom_response([
+                'message' => 'Orders retrieved successfully',
+                'data' => $response,
+                'status' => true
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get orders API error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+
+            return comman_message_response('Failed to retrieve orders: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get single order for API (JSON format)
+     */
+    public function getOrderAPI($id)
+    {
+        try {
+            $user = auth()->user();
+            $query = Order::with([
+                'customer',
+                'store.provider',
+                'items.product',
+                'items.productVariant',
+                'statusHistories.changedBy'
+            ]);
+
+            // Apply role-based filtering for security
+            if ($user->user_type === 'provider') {
+                // Providers can only see orders containing their own products
+                $query->whereHas('items.product', function($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                      ->where('created_by_type', 'provider');
+                });
+            }
+            // Admin users can see all orders (no additional filtering needed)
+
+            $order = $query->findOrFail($id);
+
+            $orderData = [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'customer' => $order->customer ? [
+                    'id' => $order->customer->id,
+                    'name' => $order->customer->display_name,
+                    'email' => $order->customer->email,
+                    'phone' => $order->customer->mobile
+                ] : null,
+                'store' => $order->store ? [
+                    'id' => $order->store->id,
+                    'name' => $order->store->name,
+                    'provider' => $order->store->provider ? [
+                        'id' => $order->store->provider->id,
+                        'name' => $order->store->provider->display_name,
+                        'email' => $order->store->provider->email
+                    ] : null
+                ] : null,
+                'status' => $order->status,
+                'payment_status' => $order->payment_status,
+                'payment_method' => $order->payment_method,
+                'payment_transaction_id' => $order->payment_transaction_id,
+                'subtotal' => $order->subtotal,
+                'tax_amount' => $order->tax_amount,
+                'delivery_fee' => $order->delivery_fee,
+                'discount_amount' => $order->discount_amount,
+                'total_amount' => $order->total_amount,
+                'currency' => $order->currency ?? 'USD',
+                'delivery_address' => $this->formatDeliveryAddress($order->delivery_address),
+                'delivery_phone' => $order->delivery_phone,
+                'delivery_notes' => $order->delivery_notes,
+                'items' => $order->items->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'product' => $item->product ? [
+                            'id' => $item->product->id,
+                            'name' => $item->product->name,
+                            'sku' => $item->product->sku,
+                            'image' => $item->product->featured_image
+                        ] : [
+                            'name' => $item->product_name
+                        ],
+                        'quantity' => $item->quantity,
+                        'unit_price' => $item->unit_price,
+                        'total_price' => $item->total_price
+                    ];
+                }),
+                'status_history' => $order->statusHistories->map(function($history) {
+                    return [
+                        'status' => $history->status,
+                        'notes' => $history->notes,
+                        'changed_by' => $history->changedBy ? $history->changedBy->display_name : 'System',
+                        'created_at' => $history->created_at
+                    ];
+                }),
+                'created_at' => $order->created_at,
+                'updated_at' => $order->updated_at
+            ];
+
+            return comman_custom_response([
+                'message' => 'Order details retrieved successfully',
+                'data' => $orderData,
+                'status' => true
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get order API error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'order_id' => $id
+            ]);
+
+            return comman_message_response('Failed to retrieve order: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Format delivery address to ensure consistent JSON object format
+     */
+    private function formatDeliveryAddress($deliveryAddress)
+    {
+        if (is_null($deliveryAddress)) {
+            return null;
+        }
+
+        // If it's already an array (properly cast), check for double-encoded data
+        if (is_array($deliveryAddress)) {
+            // Check if it's a migrated format with double-encoded JSON
+            if (isset($deliveryAddress['address']) && isset($deliveryAddress['note']) &&
+                $deliveryAddress['note'] === 'Migrated from legacy format') {
+
+                // Try to decode the double-encoded JSON
+                $doubleDecoded = json_decode($deliveryAddress['address'], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($doubleDecoded)) {
+                    return $doubleDecoded;
+                }
+            }
+            return $deliveryAddress;
+        }
+
+        // If it's a JSON string, decode it
+        if (is_string($deliveryAddress)) {
+            $decoded = json_decode($deliveryAddress, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                // Check if the decoded result contains double-encoded JSON
+                if (isset($decoded['address']) && is_string($decoded['address'])) {
+                    $doubleDecoded = json_decode($decoded['address'], true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($doubleDecoded)) {
+                        return $doubleDecoded;
+                    }
+                }
+                return $decoded;
+            }
+
+            // If JSON decode failed, treat as plain text address
+            return [
+                'address' => $deliveryAddress,
+                'note' => 'Legacy address format'
+            ];
+        }
+
+        // If it's an object, convert to array
+        if (is_object($deliveryAddress)) {
+            return (array) $deliveryAddress;
+        }
+
+        // Fallback for any other type
+        return [
+            'address' => (string) $deliveryAddress,
+            'note' => 'Unknown address format'
+        ];
     }
 }

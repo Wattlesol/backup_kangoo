@@ -120,3 +120,37 @@
  <!-- app JavaScript -->
    <script src="{{ asset('js/app.js')}}"></script>
  @include('helper.app_message')
+
+
+<script>
+    // DataTables Global Arabic / English Localization
+    if (typeof jQuery !== 'undefined' && jQuery.fn.dataTable) {
+        var isArabicLocale = <?php echo app()->getLocale() === 'ar' ? 'true' : 'false'; ?>;
+        if (isArabicLocale) {
+            jQuery.extend(true, jQuery.fn.dataTable.defaults, {
+                language: {
+                    "emptyTable": "لا توجد بيانات متاحة في الجدول",
+                    "info": "إظهار _START_ إلى _END_ من أصل _TOTAL_ مدخل",
+                    "infoEmpty": "يعرض 0 إلى 0 من أصل 0 سجل",
+                    "infoFiltered": "(منتقاة من مجموع _MAX_ مُدخل)",
+                    "infoThousands": ",",
+                    "lengthMenu": "عرض _MENU_ مدخلات",
+                    "loadingRecords": "جارٍ التحميل...",
+                    "processing": "جارٍ المعالجة...",
+                    "search": "بحث:",
+                    "zeroRecords": "لم يعثر على أية سجلات مطابقة",
+                    "paginate": {
+                        "first": "الأول",
+                        "last": "الأخير",
+                        "next": "التالي",
+                        "previous": "السابق"
+                    },
+                    "aria": {
+                        "sortAscending": ": تفعيل لترتيب العمود تصاعدياً",
+                        "sortDescending": ": تفعيل لترتيب العمود تنازلياً"
+                    }
+                }
+            });
+        }
+    }
+</script>

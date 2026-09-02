@@ -5,9 +5,9 @@
                 <div class="iq-error position-relative">
                         <img src="{{ asset('images/error/500.png')}}" class="img-fluid iq-error-img iq-error-img-dark mx-auto" alt="">
                         <img src="{{ asset('images/error/500-dark.png')}}" class="img-fluid iq-error-img" alt="">
-                        <h2 class="mb-0">Oops! This Page is Not Working.</h2>
-                        <p>The requested is Internal Server Error.</p>
-                        <a class="btn btn-primary d-inline-flex align-items-center mt-3" href="{{route('home')}}"><i class="ri-home-4-line"></i>Back to Home</a>
+                        @php $isAr = app()->getLocale() === "ar"; @endphp<h2 class="mb-0">{{ $isAr ? "عذراً! حدث خطأ في الخادم." : "Oops! This Page is Not Working." }}</h2>
+                        <p>{{ $isAr ? "حدث خطأ غير متوقع أثناء معالجة طلبك." : "The requested is Internal Server Error." }}</p>
+                        <a class="btn btn-primary d-inline-flex align-items-center mt-3" href="{{route('home')}}"><i class="ri-home-4-line"></i> {{ $isAr ? "العودة للرئيسية" : "Back to Home" }}</a>
                 </div>
             </div>
         </div>
