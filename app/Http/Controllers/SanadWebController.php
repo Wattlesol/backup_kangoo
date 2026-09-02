@@ -1370,6 +1370,10 @@ class SanadWebController extends Controller
             return redirect()->back()->withErrors('A reason is required for this Sanad action.');
         }
 
+        if (auth()->user()->hasAnyRole(['admin', 'demo_admin']) && $request->action !== 'add_internal_note' && !in_array($request->action, ['quality_approve', 'quality_reject', 'quality_rework'], true)) {
+            return redirect()->back()->withErrors('Admins cannot take operational execution actions on behalf of partners. Admins can leave internal notes or reassign the request.');
+        }
+
         if (in_array($request->action, ['quality_approve', 'quality_reject', 'quality_rework'], true) && !auth()->user()->hasAnyRole(['admin', 'demo_admin'])) {
             return redirect()->back()->withErrors('Only admins can record Sanad quality control decisions.');
         }
@@ -1523,6 +1527,7 @@ class SanadWebController extends Controller
             'provider_id' => 'nullable|integer',
             'handyman_id' => 'nullable|array',
             'handyman_id.*' => 'integer',
+            'reassignment_note' => 'nullable|string|max:2000',
         ]);
 
         $assignmentScope = $request->input('assignment_scope', 'employees_only');
@@ -1537,6 +1542,11 @@ class SanadWebController extends Controller
             $partner = $this->assignablePartners()->firstWhere('id', (int) $request->provider_id);
             if (!$partner) {
                 return redirect()->back()->withErrors('Please select an active partner for this request.');
+            }
+
+            $isReassignment = !empty($previousProviderId) && (int) $previousProviderId !== (int) $partner->id;
+            if ($isReassignment && empty(trim($request->input('reassignment_note', '')))) {
+                return redirect()->back()->withErrors('A mandatory operational note/reason is required when reassigning this request to another partner.');
             }
 
             $previousEmployeeIds = $booking->handymanAdded()->pluck('handyman_id')->map(function ($id) {
@@ -1566,9 +1576,25 @@ class SanadWebController extends Controller
                 ],
             ]);
 
+            if ($request->filled('reassignment_note')) {
+                SanadRequestAction::create([
+                    'booking_id' => $booking->id,
+                    'actor_id' => optional(auth()->user())->id,
+                    'actor_role' => optional(auth()->user())->user_type,
+                    'action' => $isReassignment ? 'reassign_partner' : 'assign_partner',
+                    'previous_status' => $booking->status,
+                    'current_status' => $booking->status,
+                    'previous_stage' => 'assigned_to_partner',
+                    'current_stage' => 'assigned_to_partner',
+                    'reason' => $isReassignment ? 'Partner Reassignment' : 'Partner Assignment',
+                    'internal_note' => $request->reassignment_note,
+                ]);
+            }
+
             $this->audit($request, 'sanad.request.partner_assigned', $booking, [
                 'previous_provider_id' => $previousProviderId,
                 'current_provider_id' => $partner->id,
+                'reassignment_note' => $request->reassignment_note,
                 'cleared_employee_ids' => $previousEmployeeIds,
             ]);
 

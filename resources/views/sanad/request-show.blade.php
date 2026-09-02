@@ -170,10 +170,10 @@
                                 @csrf
                                 @if($isAdminAssignmentUser)
                                     <input type="hidden" name="assignment_scope" value="partner">
-                                    <div class="quick-assignment-row">
-                                        <div class="quick-assignment-field">
+                                    <div class="row">
+                                        <div class="col-md-5 mb-3">
                                             <label class="form-control-label">{{ $isAr ? 'الشريك' : 'Partner' }}</label>
-                                            <select name="provider_id" class="form-control">
+                                            <select name="provider_id" class="form-control" id="admin_partner_select">
                                                 <option value="">{{ $isAr ? 'اختر شريكاً' : 'Select a partner' }}</option>
                                                 @foreach($assignablePartners as $partner)
                                                     <option value="{{ $partner->id }}" {{ (int) old('provider_id', $bookingdata->provider_id) === (int) $partner->id ? 'selected' : '' }}>
@@ -182,13 +182,22 @@
                                                 @endforeach
                                             </select>
                                             @if($assignablePartners->isEmpty())
-                                                <small class="text-muted">{{ $isAr ? 'لا يوجد شركاء نشطون متاحون.' : 'No active partners are available.' }}</small>
+                                                <small class="text-muted d-block mt-1">{{ $isAr ? 'لا يوجد شركاء نشطون متاحون.' : 'No active partners are available.' }}</small>
                                             @else
-                                                <small class="text-muted">{{ $isAr ? 'سيتم إسناد الطلب للشريك ومسح أي إسناد موظفين سابق.' : 'This assigns the request to the partner and clears any previous employee assignment.' }}</small>
+                                                <small class="text-muted d-block mt-1">{{ $isAr ? 'سيتم إسناد الطلب للشريك ومسح أي إسناد موظفين سابق.' : 'This assigns the request to the partner and clears any previous employee assignment.' }}</small>
                                             @endif
                                         </div>
-                                        <div class="quick-assignment-action">
-                                            <button type="submit" class="btn btn-primary quick-primary-btn">{{ $isAr ? 'حفظ الإسناد' : 'Save Assignment' }}</button>
+                                        <div class="col-md-5 mb-3">
+                                            <label class="form-control-label">
+                                                {{ $isAr ? 'سبب / ملاحظة إعادة الإسناد' : 'Reassignment Note / Reason' }}
+                                                @if(!empty($bookingdata->provider_id))
+                                                    <span class="text-danger">* ({{ $isAr ? 'إلزامي عند تغيير الشريك' : 'Mandatory on partner change' }})</span>
+                                                @endif
+                                            </label>
+                                            <input type="text" name="reassignment_note" class="form-control" placeholder="{{ $isAr ? 'اكتب سبب التغيير أو ملاحظات التشغيل...' : 'Reason for reassigning to another partner...' }}" {{ !empty($bookingdata->provider_id) ? 'required' : '' }}>
+                                        </div>
+                                        <div class="col-md-2 mb-3 d-flex align-items-end">
+                                            <button type="submit" class="btn btn-primary quick-primary-btn w-100">{{ $isAr ? 'حفظ الإسناد' : 'Save Assignment' }}</button>
                                         </div>
                                     </div>
                                 @else
@@ -218,40 +227,63 @@
                         </div>
 
                         <div class="sanad-action-panel mt-3">
-                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-                                <div>
-                                    <h5 class="font-weight-bold mb-1">Partner Order Actions</h5>
-                                    <span class="text-muted">Accept, reject, request documents, complete stages, request admin review, or add internal notes</span>
+                            @if($isAdminAssignmentUser)
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                                    <div>
+                                        <h5 class="font-weight-bold mb-1">{{ $isAr ? 'ملاحظات المشرف الداخلية' : 'Admin Internal Notes' }}</h5>
+                                        <span class="text-muted">{{ $isAr ? 'إضافة ملاحظة تشغيلية داخلية للطلب (لا يمكن للمشرف تنفيذ إجراءات الشريك)' : 'Add a private operational note to this request. Admins cannot execute partner stage actions directly.' }}</span>
+                                    </div>
+                                    <span class="badge badge-light">{{ Str::headline($bookingdata->sanad_stage ?: 'submitted') }}</span>
                                 </div>
-                                <span class="badge badge-light">{{ Str::headline($bookingdata->sanad_stage ?: 'submitted') }}</span>
-                            </div>
-                            <form method="POST" action="{{ route('sanad.requests.actions.store', $bookingdata->id) }}">
-                                @csrf
-                                <div class="row">
-                                    <div class="col-lg-3 col-md-6 mb-3">
-                                        <label class="form-control-label">Action</label>
-                                        <select name="action" class="form-control" required>
-                                            <option value="accept_order">Accept Order</option>
-                                            <option value="reject_order">Reject With Reason</option>
-                                            <option value="request_missing_documents">Request Missing Documents</option>
-                                            <option value="reassign_employees">Reassign Employees</option>
-                                            <option value="add_internal_note">Add Internal Note</option>
-                                            <option value="complete_current_stage">Complete Current Stage</option>
-                                            <option value="request_admin_review">Request Admin Review</option>
-                                            <option value="mark_completed">Mark Completed</option>
-                                        </select>
+                                <form method="POST" action="{{ route('sanad.requests.actions.store', $bookingdata->id) }}">
+                                    @csrf
+                                    <input type="hidden" name="action" value="add_internal_note">
+                                    <div class="row align-items-end">
+                                        <div class="col-md-9 mb-3">
+                                            <label class="form-control-label">{{ $isAr ? 'الملاحظة الداخلية' : 'Internal Note' }} <span class="text-danger">*</span></label>
+                                            <input type="text" name="internal_note" class="form-control" placeholder="{{ $isAr ? 'اكتب ملاحظتك التشغيلية الخاصة بالإدارة هنا...' : 'Enter private operational note for this request...' }}" required>
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <button type="submit" class="btn btn-primary quick-primary-btn w-100">{{ $isAr ? 'تسجيل الملاحظة' : 'Add Internal Note' }}</button>
+                                        </div>
                                     </div>
-                                    <div class="col-lg-4 col-md-6 mb-3">
-                                        <label class="form-control-label">Reason</label>
-                                        <input type="text" name="reason" class="form-control" placeholder="Required for rejection, missing docs, reassignment, or review">
+                                </form>
+                            @else
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                                    <div>
+                                        <h5 class="font-weight-bold mb-1">{{ $isAr ? 'إجراءات الشريك للطلب' : 'Partner Order Actions' }}</h5>
+                                        <span class="text-muted">{{ $isAr ? 'قبول، رفض، طلب مستندات، إكمال مراحل، أو إضافة ملاحظات' : 'Accept, reject, request documents, complete stages, request admin review, or add internal notes' }}</span>
                                     </div>
-                                    <div class="col-lg-5 mb-3">
-                                        <label class="form-control-label">Internal Note</label>
-                                        <input type="text" name="internal_note" class="form-control" placeholder="Private operational note">
-                                    </div>
+                                    <span class="badge badge-light">{{ Str::headline($bookingdata->sanad_stage ?: 'submitted') }}</span>
                                 </div>
-                                <button type="submit" class="btn btn-primary quick-primary-btn">Record Action</button>
-                            </form>
+                                <form method="POST" action="{{ route('sanad.requests.actions.store', $bookingdata->id) }}">
+                                    @csrf
+                                    <div class="row">
+                                        <div class="col-lg-3 col-md-6 mb-3">
+                                            <label class="form-control-label">{{ $isAr ? 'الإجراء' : 'Action' }}</label>
+                                            <select name="action" class="form-control" required>
+                                                <option value="accept_order">{{ $isAr ? 'قبول الطلب' : 'Accept Order' }}</option>
+                                                <option value="reject_order">{{ $isAr ? 'رفض مع إبداء السبب' : 'Reject With Reason' }}</option>
+                                                <option value="request_missing_documents">{{ $isAr ? 'طلب مستندات ناقصة' : 'Request Missing Documents' }}</option>
+                                                <option value="reassign_employees">{{ $isAr ? 'إسناد لموظفي الشريك' : 'Reassign Employees' }}</option>
+                                                <option value="add_internal_note">{{ $isAr ? 'إضافة ملاحظة داخلية' : 'Add Internal Note' }}</option>
+                                                <option value="complete_current_stage">{{ $isAr ? 'إكمال المرحلة الحالية' : 'Complete Current Stage' }}</option>
+                                                <option value="request_admin_review">{{ $isAr ? 'طلب مراجعة المشرف' : 'Request Admin Review' }}</option>
+                                                <option value="mark_completed">{{ $isAr ? 'إنهاء الطلب' : 'Mark Completed' }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-lg-4 col-md-6 mb-3">
+                                            <label class="form-control-label">{{ $isAr ? 'السبب (عند الرفض أو النواقص)' : 'Reason' }}</label>
+                                            <input type="text" name="reason" class="form-control" placeholder="{{ $isAr ? 'مطلوب عند الرفض أو النواقص أو المراجعة...' : 'Required for rejection, missing docs, or review' }}">
+                                        </div>
+                                        <div class="col-lg-5 mb-3">
+                                            <label class="form-control-label">{{ $isAr ? 'ملاحظة داخلية' : 'Internal Note' }}</label>
+                                            <input type="text" name="internal_note" class="form-control" placeholder="{{ $isAr ? 'ملاحظة تشغيلية خاصة...' : 'Private operational note' }}">
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary quick-primary-btn">{{ $isAr ? 'تنفيذ الإجراء' : 'Record Action' }}</button>
+                                </form>
+                            @endif
 
                             <div class="sanad-action-timeline mt-4">
                                 @forelse($requestActions as $action)
