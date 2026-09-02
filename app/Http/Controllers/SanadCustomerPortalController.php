@@ -274,6 +274,11 @@ class SanadCustomerPortalController extends Controller
             ->get();
         $verifiedDocuments = $booking->sanadDocuments
             ->where('verification_status', 'approved')
+            ->filter(function ($document) {
+                $visibleTo = collect($document->visible_to ?: []);
+
+                return $visibleTo->contains('customer') || $visibleTo->contains('user');
+            })
             ->sortByDesc('approved_at');
 
         return view('customer-portal.request-show', compact('booking', 'stage', 'progress', 'docs', 'documentChoices', 'openBuzzAlerts', 'verifiedDocuments'));

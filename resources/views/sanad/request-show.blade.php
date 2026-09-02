@@ -248,6 +248,34 @@
                                         </div>
                                     </div>
                                 </form>
+
+                                <div class="border-top pt-3 mt-3">
+                                    <h5 class="font-weight-bold mb-1">{{ $isAr ? 'مشاركة مستند مع العميل' : 'Share Document With Customer' }}</h5>
+                                    <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.customer-documents.store', $bookingdata->id) }}" class="row align-items-end mt-2">
+                                        @csrf
+                                        <div class="col-md-5 mb-3">
+                                            <label class="form-control-label">{{ $isAr ? 'اسم المستند' : 'Document Name' }}</label>
+                                            <select name="document_type" class="form-control" required>
+                                                <option value="">{{ $isAr ? 'اختر اسم المستند' : 'Select document name' }}</option>
+                                                @foreach($shareDocumentTypes as $documentType)
+                                                    <option value="{{ $documentType->name }}">{{ $documentType->localized_name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-control-label">{{ $isAr ? 'المستند' : 'Document' }}</label>
+                                            <x-quick-attachment-input
+                                                name="document"
+                                                accept="image/*,.pdf,.doc,.docx"
+                                                :required="true"
+                                                :label="$isAr ? 'إرفاق مستند' : 'Attach document'"
+                                            />
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <button type="submit" class="btn btn-primary quick-primary-btn w-100">{{ $isAr ? 'حفظ المستند' : 'Save Document' }}</button>
+                                        </div>
+                                    </form>
+                                </div>
                             @else
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                                     <div>
@@ -471,45 +499,6 @@
                         <h5 class="font-weight-bold mb-0">Document Vault</h5>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-light border mb-4">
-                            <strong>Quick document policy:</strong>
-                            documents default to a 48-hour retention window when no date is selected. Customers must download required files before the retention date; Download before deletion guidance stays visible for every retained document.
-                        </div>
-                        @unless($isEmployeeMode)
-                        <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="quick-document-form mb-4">
-                            @csrf
-                            <div class="quick-document-grid">
-                                <div>
-                                    <label class="form-control-label">Document Type</label>
-                                    <input type="text" name="document_type" class="form-control" placeholder="ID, contract, evidence" required>
-                                </div>
-                                <div>
-                                    <label class="form-control-label">File Name</label>
-                                    <input type="text" name="file_name" class="form-control" placeholder="document.pdf">
-                                </div>
-                                <div>
-                                    <label class="form-control-label">Upload File</label>
-                                    <label class="quick-file-picker">
-                                        <input type="file" name="document" accept="image/*,.pdf,.doc,.docx">
-                                        <span class="quick-file-icon"><i class="fas fa-paperclip"></i></span>
-                                        <span class="quick-file-label">Attach document</span>
-                                    </label>
-                                </div>
-                                <div>
-                                    <label class="form-control-label">Retention Until</label>
-                                    <input type="date" name="retention_until" class="form-control">
-                                </div>
-                            </div>
-                            <label class="form-control-label">Visible to:</label>
-                            <div class="sanad-checkbox-row mb-3">
-                                @foreach(collect(config('sanad.document_visibility', []))->unique()->values() as $role)
-                                    <label><input type="checkbox" name="visible_to[]" value="{{ $role }}" {{ $role === 'admin' ? 'checked' : '' }}> {{ $sanadRoleLabel($role) }}</label>
-                                @endforeach
-                            </div>
-                            <button type="submit" class="btn btn-primary quick-primary-btn">Add Document</button>
-                        </form>
-                        @endunless
-
                         <div class="sanad-list">
                             @forelse($documents as $document)
                                 <div class="sanad-list-item">
@@ -542,15 +531,14 @@
                         <div class="quick-section-toolbar">
                             <div>
                                 <h6 class="mb-1">{{ $isAr ? 'طلبات المستندات المنظمة' : 'Structured Document Requests' }}</h6>
-                                <small class="text-muted">{{ $isAr ? 'سجل الطلبات المرسلة من المحادثة.' : 'History of requests sent from chat.' }}</small>
                             </div>
                             <a href="{{ route('sanad.chat.workspace', ['booking_id' => $bookingdata->id]) }}" class="quick-table-btn">
                                 <x-quick-icon name="message" /> {{ $isAr ? 'طلب عبر المحادثة' : 'Request in Chat' }}
                             </a>
                         </div>
-                        @forelse($bookingdata->sanadDocumentRequests()->latest()->get() as $documentRequest)
+                        @foreach($bookingdata->sanadDocumentRequests()->latest()->get() as $documentRequest)
                             <div class="border rounded p-2 mb-2"><strong>{{ $documentRequest->document_name }}</strong> <span class="badge badge-light">{{ Str::headline($documentRequest->status) }}</span><div class="small">Requested from {{ Str::headline($documentRequest->requested_from) }}: {{ $documentRequest->reason }}</div>@if($documentRequest->document)<a href="{{ $documentRequest->document->getFirstMediaUrl('document') }}" target="_blank">Open submission</a>@endif</div>
-                        @empty <div class="text-muted small">No structured document requests.</div> @endforelse
+                        @endforeach
                     </div>
                 </div>
             </div>

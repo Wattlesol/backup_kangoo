@@ -162,6 +162,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::post('sanad/requests/{id}/lifecycle', [SanadWebController::class, 'updateRequestLifecycle'])->name('sanad.requests.lifecycle.update');
     Route::post('sanad/requests/{id}/payment-status', [SanadWebController::class, 'updatePaymentStatus'])->name('sanad.requests.payment.update');
     Route::post('sanad/requests/{id}/documents', [SanadWebController::class, 'storeDocument'])->name('sanad.requests.documents.store');
+    Route::post('sanad/requests/{id}/customer-documents', [SanadWebController::class, 'storeCustomerDocument'])->name('sanad.requests.customer-documents.store');
     Route::post('sanad/requests/{id}/documents/{documentId}/approve', [SanadWebController::class, 'approveDocument'])->name('sanad.requests.documents.approve');
     Route::post('sanad/requests/{id}/documents/{documentId}/review', [SanadWebController::class, 'reviewDocument'])->name('sanad.requests.documents.review');
     Route::post('sanad/requests/{id}/buzz', [SanadWebController::class, 'storeBuzz'])->name('sanad.requests.buzz.store');

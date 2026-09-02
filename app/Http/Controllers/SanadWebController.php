@@ -24,6 +24,7 @@ use App\Models\SanadPartnerServicePerformance;
 use App\Models\User;
 use App\Models\ProviderDocument;
 use App\Models\Service;
+use App\Models\Documents;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -1340,6 +1341,7 @@ class SanadWebController extends Controller
         $billing = $this->requestBilling($bookingdata);
         $requestActions = $bookingdata->sanadRequestActions()->with('actor')->latest()->take(12)->get();
         $qualityControl = $this->requestQualityControl($bookingdata);
+        $shareDocumentTypes = Documents::where('status', 1)->orderBy('name')->get();
 
         return view('sanad.request-show', compact(
             'bookingdata',
@@ -1353,8 +1355,43 @@ class SanadWebController extends Controller
             'monitoring',
             'billing',
             'requestActions',
-            'qualityControl'
+            'qualityControl',
+            'shareDocumentTypes'
         ));
+    }
+
+    public function storeCustomerDocument(Request $request, $id)
+    {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'demo_admin']), 403);
+
+        $booking = Booking::myBooking()->findOrFail($id);
+        $data = $request->validate([
+            'document_type' => ['required', 'string', 'max:255'],
+            'document' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf,doc,docx', 'max:10240'],
+        ]);
+
+        $allowedType = Documents::where('status', 1)->where('name', $data['document_type'])->exists();
+        abort_unless($allowedType, 422, 'Please select a valid document name.');
+
+        $document = SanadDocumentVaultItem::create([
+            'booking_id' => $booking->id,
+            'service_id' => $booking->service_id,
+            'owner_id' => $booking->customer_id,
+            'uploaded_by' => auth()->id(),
+            'document_type' => $data['document_type'],
+            'document_key' => Str::slug($data['document_type'], '_'),
+            'source' => 'admin',
+            'visible_to' => ['admin', 'demo_admin', 'user', 'customer'],
+            'file_name' => $request->file('document')->getClientOriginalName(),
+            'verification_status' => 'approved',
+            'approved_at' => now(),
+            'approved_by' => auth()->id(),
+        ]);
+
+        storeMediaFile($document, $request->file('document'), 'document');
+        $this->audit($request, 'sanad.customer_document.shared', $document);
+
+        return redirect()->back()->withSuccess('Document shared with the customer.');
     }
 
     public function storeRequestAction(Request $request, $id)
