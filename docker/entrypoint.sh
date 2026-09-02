@@ -25,7 +25,9 @@ php artisan view:clear >/dev/null 2>&1 || true
 
 kangoo-restore-database
 
-php artisan migrate --force >/dev/null 2>&1 || true
+echo "Running database migrations..."
+php artisan migrate --force --no-interaction
+echo "Database migrations completed."
 
 if [ "${RUN_SEEDERS:-false}" = "true" ]; then
   php artisan db:seed --force
