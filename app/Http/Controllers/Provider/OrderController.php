@@ -148,9 +148,7 @@ class OrderController extends Controller
 
         $pageTitle = (app()->getLocale() === 'ar' ? 'طلب مسند #' : 'Assigned Order #') . $booking->quick_reference;
         $currentlyAssignedIds = $booking->handymanAdded->pluck('handyman_id')->map(fn ($id) => (int) $id);
-        $employees = $this->employeesQuery()->get()->filter(function ($employee) use ($currentlyAssignedIds) {
-            return $employee->isScheduledToWorkAt(now()) || $currentlyAssignedIds->contains((int) $employee->id);
-        })->values();
+        $employees = $this->employeesQuery()->get();
         $recommendations = $this->employeeRecommendations($booking, $employees);
         $workflowTemplates = SanadPartnerWorkflowTemplate::with(['steps', 'serviceLinks.service'])
             ->where('provider_id', auth()->id())
@@ -228,9 +226,7 @@ class OrderController extends Controller
             'workflow_template_id' => 'nullable|integer',
         ]);
 
-        $allowed = $this->employeesQuery()->get()
-            ->filter(fn ($employee) => $employee->dailyAvailableCapacity(now()) > 0)
-            ->pluck('id')->map(fn ($id) => (int) $id);
+        $allowed = $this->employeesQuery()->pluck('id')->map(fn ($id) => (int) $id);
         $employeeIds = collect($request->handyman_id ?: [])->map(fn ($id) => (int) $id)->filter()->unique()->values();
         if ($employeeIds->diff($allowed)->isNotEmpty()) {
             return redirect()->back()->withErrors('One or more selected employees cannot be assigned to this order.');
@@ -660,10 +656,10 @@ class OrderController extends Controller
             $serviceSkills = collect(optional($booking->service)->required_employee_skills ?: []);
             $skillScore = $serviceSkills->isEmpty() ? 20 : $serviceSkills->intersect($skills)->count() * 20;
             $isOnShift = $employee->isScheduledToWorkAt(now());
-            $availabilityScore = $isOnShift && ($employee->sanad_employee_status === 'available' || $employee->is_available) ? 20 : 0;
+            $availabilityScore = ($isOnShift || $employee->is_available || $employee->sanad_employee_status === 'available') ? 20 : 10;
             $workloadScore = max(0, 20 - (($active / $capacity) * 20));
-            $qualityScore = min(20, ((float) $employee->sanad_quality_score / 100) * 20);
-            $slaScore = min(20, ((float) $employee->sanad_sla_compliance_rate / 100) * 20);
+            $qualityScore = min(20, ((float) ($employee->sanad_quality_score ?: 80) / 100) * 20);
+            $slaScore = min(20, ((float) ($employee->sanad_sla_compliance_rate ?: 90) / 100) * 20);
 
             $employee->recommendation_score = round($skillScore + $availabilityScore + $workloadScore + $qualityScore + $slaScore, 2);
             $employee->recommendation_breakdown = [

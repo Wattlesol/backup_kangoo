@@ -155,9 +155,9 @@
                                 </div>
                                 <div class="col-md-4 form-group">
                                     <label>{{ $isAr ? 'الموظفون' : 'Employees' }}</label>
-                                    <select name="handyman_id[]" class="form-control select2" multiple>
+                                    <select name="handyman_id[]" class="form-control select2" multiple data-placeholder="{{ $isAr ? 'اختر الموظفين' : 'Select employees' }}">
                                         @foreach($employees as $employee)
-                                            <option value="{{ $employee->id }}" {{ $booking->handymanAdded->pluck('handyman_id')->contains($employee->id) ? 'selected' : '' }}>{{ $employee->display_name }}</option>
+                                            <option value="{{ $employee->id }}" {{ $booking->handymanAdded->pluck('handyman_id')->contains($employee->id) ? 'selected' : '' }}>{{ $employee->display_name }} @if($employee->sanad_employee_status) ({{ ucfirst($employee->sanad_employee_status) }}) @endif</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -285,8 +285,15 @@
                                 <input name="document_type" class="form-control mb-2" placeholder="{{ $isAr ? 'نوع مستند مخصص' : 'Custom document type' }}" required>
                                 <small class="d-block text-muted mb-2">{{ $isAr ? 'لا توجد متطلبات مستندات معدّة للخدمة؛ سيُحفظ الملف كمستند داعم مخصص.' : 'No service document requirements are configured, so this upload will be stored as a custom supporting document.' }}</small>
                             @endif
-                            <input type="file" name="document" class="form-control mb-2" required>
-                            <button class="btn btn-primary btn-sm">{{ $isAr ? 'رفع المستند' : 'Upload Document' }}</button>
+                            <div class="custom-file-upload-box mb-3 mt-2">
+                                <input type="file" name="document" id="partner-document-file" class="d-none" required onchange="var n = this.files[0] ? this.files[0].name : ''; document.getElementById('partner-file-name-display').textContent = n || '{{ $isAr ? 'لم يتم اختيار ملف' : 'No file chosen' }}'; document.getElementById('partner-file-name-display').classList.toggle('text-primary', !!n);">
+                                <label for="partner-document-file" class="btn btn-outline-primary btn-sm d-flex align-items-center justify-content-center gap-2 mb-1 w-100 py-2" style="cursor:pointer; border-style:dashed; border-width:2px; border-radius:8px;">
+                                    <i class="fas fa-cloud-upload-alt fa-lg"></i>
+                                    <span class="font-weight-bold">{{ $isAr ? 'اختيار ملف المستند' : 'Choose Document File' }}</span>
+                                </label>
+                                <div id="partner-file-name-display" class="text-muted small text-center">{{ $isAr ? 'لم يتم اختيار ملف' : 'No file chosen' }}</div>
+                            </div>
+                            <button class="btn btn-primary btn-sm w-100"><i class="fas fa-upload mr-1"></i> {{ $isAr ? 'رفع المستند' : 'Upload Document' }}</button>
                         </form>
                     </div>
                 </div>
