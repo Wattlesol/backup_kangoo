@@ -465,7 +465,7 @@
                 </div>
             </div>
 
-            <div class="col-lg-6">
+            <div class="col-12">
                 <div class="quick-card sanad-ops-section" id="quick-request-documents">
                     <div class="card-header">
                         <h5 class="font-weight-bold mb-0">Document Vault</h5>
@@ -555,39 +555,7 @@
                 </div>
             </div>
 
-            @unless($isEmployeeMode)
-            <div class="col-lg-6">
-                <div class="quick-card sanad-ops-section">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div>
-                            <h5 class="font-weight-bold mb-0">{{ $isAr ? 'تنبيهات وطلبات Buzz' : 'Buzz Notifications & Requests' }}</h5>
-                            <small class="text-muted">{{ $isAr ? 'سجل التنبيهات والطلبات المرسلة لهذا الطلب.' : 'History of notifications and requests sent for this request.' }}</small>
-                        </div>
-                        <a href="{{ route('sanad.chat.workspace', ['booking_id' => $bookingdata->id]) }}" class="quick-table-btn">
-                            <x-quick-icon name="message" /> {{ $isAr ? 'فتح المحادثة' : 'Open Chat' }}
-                        </a>
-                    </div>
-                    <div class="card-body">
-                        <div class="sanad-list">
-                            @forelse($buzzAlerts as $alert)
-                                <div class="sanad-list-item">
-                                    <div>
-                                        <strong>{{ Str::headline($alert->priority) }} buzz</strong>
-                                        <span>{{ $alert->message ?: '-' }}</span>
-                                        <small>To: {{ $sanadRoleLabel($alert->recipient_role) }}</small>
-                                    </div>
-                                    <div class="sanad-list-actions">
-                                        <span class="badge badge-light">{{ Str::headline($alert->status) }}</span>
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="sanad-empty-state">No Buzz alerts awaiting acknowledgement yet</div>
-                            @endforelse
-                        </div>
-                    </div>
-                </div>
-            </div>
-            @endunless
+
 
         </div>
     </div>
