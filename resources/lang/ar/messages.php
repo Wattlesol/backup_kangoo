@@ -122,6 +122,7 @@ return array(
   'set_as_featured' => 'تعيين كمميز',
   'msg_fail_to_delete' => 'تعذر حذف :item',
   'provider' => 'الشريك',
+  'pending_provider' => 'اعتمادات الشركاء',
   'discount' => 'الخصم',
   'price_type' => 'نوع السعر',
   'fixed' => 'ثابت',

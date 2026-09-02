@@ -203,7 +203,11 @@ class HandymanController extends Controller
         $id = $request->id;
         $auth_user = authSession();
 
-        $handymandata = User::find($id);
+        $handymanQuery = User::query();
+        if ($auth_user->hasRole('provider')) {
+            $handymanQuery->where('user_type', 'handyman')->where('provider_id', $auth_user->id);
+        }
+        $handymandata = $id ? $handymanQuery->findOrFail($id) : null;
         $pageTitle = __('messages.update_form_title',['form'=> __('messages.handyman')]);
 
         if($handymandata == null){
@@ -304,7 +308,11 @@ class HandymanController extends Controller
             $data['password'] = bcrypt($data['password']);
             $user = User::create($data);
         }else{
-            $user = User::findOrFail($id);
+            $userQuery = User::query();
+            if (auth()->user()->hasRole('provider')) {
+                $userQuery->where('user_type', 'handyman')->where('provider_id', auth()->id());
+            }
+            $user = $userQuery->findOrFail($id);
             // User data...
             // $user->removeRole($user->user_type);
             $user->fill($data)->update();
@@ -333,7 +341,7 @@ class HandymanController extends Controller
             return comman_message_response($message);
 		}
 
-		return redirect(route('handyman.index'))->withSuccess($message);
+		return redirect(auth()->user()->hasRole('provider') ? route('provider.employees.index') : route('handyman.index'))->withSuccess($message);
     }
 
     /**

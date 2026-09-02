@@ -11,7 +11,9 @@
                     <span class="text-muted">{{ $isAr ? 'شروط المستندات المطلوبة، ملفات الشركاء، وجاهزية التحقق' : 'Required document rules, provider submissions, and verification readiness' }}</span>
                 </div>
                 @if($auth_user->can('document add'))
-                    <a href="{{ route('document.create') }}" class="btn btn-sm btn-primary"><i class="fa fa-plus-circle"></i> {{ $isAr ? 'إضافة نوع مستند' : 'Add Document Type' }}</a>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="window.location.assign('{{ route('document.create') }}')" aria-label="{{ $isAr ? 'إضافة نوع مستند' : 'Add Document Type' }}">
+                        <i class="fa fa-plus-circle"></i> {{ $isAr ? 'إضافة نوع مستند' : 'Add Document Type' }}
+                    </button>
                 @endif
             </div>
             <div class="card-body">

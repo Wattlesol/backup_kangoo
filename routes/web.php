@@ -376,9 +376,9 @@ Route::group(['middleware' => ['auth', 'verified']], function()
     Route::get('details/{id}',[BookingController::class,'bookingDetailsData'])->name('booking.detailsdata');
 
     // Setting
-    Route::get('setting/{page?}',[ SettingController::class, 'settings'])->name('setting.index')->middleware('sanad.module:settings,read');
+    Route::get('setting/{page?}',[ SettingController::class, 'settings'])->name('setting.index');
     Route::post('setting/mobile-hero', [ SettingController::class, 'saveMobileHero'])->name('setting.mobile-hero.save')->middleware('sanad.module:settings,write');
-    Route::post('/layout-page',[ SettingController::class, 'layoutPage'])->name('layout_page')->middleware('sanad.module:settings,write');
+    Route::post('/layout-page',[ SettingController::class, 'layoutPage'])->name('layout_page');
 
     // Route::post('settings/save',[ SettingController::class , 'settingsUpdates'])->name('settingsUpdates');
     // Route::post('dashboard-setting',[ SettingController::class , 'dashboardtogglesetting'])->name('togglesetting');
@@ -773,7 +773,7 @@ Route::group(['middleware' => ['auth', 'verified']], function()
 });
 
 // Provider Dashboard Routes (Single Store Architecture) - Different prefix to avoid conflict
-Route::group(['prefix' => 'provider-dashboard', 'middleware' => ['auth', 'role:provider']], function () {
+Route::group(['prefix' => 'provider-dashboard', 'middleware' => ['auth', 'role:provider', 'user.type:provider']], function () {
         Route::get('dashboard', [ProviderOrderController::class, 'dashboard'])->name('provider.dashboard');
 
         // Order Management
@@ -795,6 +795,7 @@ Route::group(['prefix' => 'provider-dashboard', 'middleware' => ['auth', 'role:p
         Route::get('kanban', [ProviderOrderController::class, 'kanban'])->name('provider.kanban.index');
         Route::post('kanban/{id}/move', [ProviderOrderController::class, 'moveKanban'])->name('provider.kanban.move');
         Route::get('employees', [ProviderOrderController::class, 'employees'])->name('provider.employees.index');
+        Route::delete('employees/{id}', [ProviderOrderController::class, 'destroyEmployee'])->name('provider.employees.destroy');
         Route::get('performance', [ProviderOrderController::class, 'performance'])->name('provider.performance.index');
         Route::get('financial-center', [ProviderOrderController::class, 'financial'])->name('provider.financial.index');
         Route::get('notification-center', [ProviderOrderController::class, 'notifications'])->name('provider.notifications.index');

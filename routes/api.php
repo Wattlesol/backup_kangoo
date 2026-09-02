@@ -110,6 +110,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('sanad/requests/{id}/document-requests', [ API\SanadController::class, 'createDocumentRequest' ]);
     Route::post('sanad/ai/ask', [ API\SanadController::class, 'aiAsk' ]);
     Route::post('sanad/ai/knowledge', [ API\SanadController::class, 'storeAiKnowledge' ]);
+    Route::get('sanad/partner-performance', [ API\SanadController::class, 'partnerPerformance' ]);
     Route::get('booking-list', [ API\BookingController::class, 'getBookingList' ] );
     Route::post('booking-detail', [ API\BookingController::class, 'getBookingDetail' ] );
     Route::post('save-booking-rating', [ API\BookingController::class, 'saveBookingRating' ] );

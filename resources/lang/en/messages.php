@@ -122,6 +122,7 @@ return array(
   'set_as_featured' => 'Set as featured',
   'msg_fail_to_delete' => ':item can\\\'t be delete.',
   'provider' => 'Partner',
+  'pending_provider' => 'Partner Approvals',
   'discount' => 'Discount',
   'price_type' => 'Price type',
   'fixed' => 'Fixed',

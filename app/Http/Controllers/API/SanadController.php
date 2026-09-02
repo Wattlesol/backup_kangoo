@@ -933,4 +933,44 @@ class SanadController extends Controller
 
         return array_values(array_unique(array_intersect($allowed, $roles)));
     }
+
+    public function partnerPerformance(Request $request)
+    {
+        $performances = \App\Models\SanadPartnerServicePerformance::with(['provider', 'service'])
+            ->when($request->filled('provider_id'), fn ($query) => $query->where('provider_id', $request->provider_id))
+            ->when($request->filled('service_id'), fn ($query) => $query->where('service_id', $request->service_id))
+            ->orderByDesc('quality_score')
+            ->orderByDesc('completed_orders')
+            ->paginate($request->per_page ?: 25);
+
+        $performanceRows = collect($performances->items());
+        $totalRecords = $performances->total();
+        $averageQuality = $totalRecords > 0 ? round((float) $performanceRows->avg('quality_score'), 1) : 0;
+        $averageSla = $totalRecords > 0 ? round((float) $performanceRows->avg('sla_compliance_rate'), 1) : 0;
+        $averageAcceptance = $totalRecords > 0 ? round((float) $performanceRows->avg('acceptance_rate'), 1) : 0;
+        $completedOrders = (int) $performanceRows->sum('completed_orders');
+
+        $performanceProviderIds = \App\Models\SanadPartnerServicePerformance::query()->whereNotNull('provider_id')->distinct()->pluck('provider_id');
+        $performanceServiceIds = \App\Models\SanadPartnerServicePerformance::query()->whereNotNull('service_id')->distinct()->pluck('service_id');
+        $performancePartners = \App\Models\User::query()->whereIn('id', $performanceProviderIds)->orderBy('display_name')->get(['id', 'display_name', 'first_name', 'last_name']);
+        $performanceServices = \App\Models\Service::query()->whereIn('id', $performanceServiceIds)->orderBy('name')->get(['id', 'name']);
+
+        return comman_custom_response([
+            'pagination' => [
+                'total_items' => $performances->total(),
+                'per_page' => $performances->perPage(),
+                'currentPage' => $performances->currentPage(),
+                'totalPages' => $performances->lastPage(),
+            ],
+            'kpis' => [
+                'average_quality' => $averageQuality,
+                'average_sla' => $averageSla,
+                'average_acceptance' => $averageAcceptance,
+                'completed_orders' => $completedOrders,
+            ],
+            'partners' => $performancePartners,
+            'services' => $performanceServices,
+            'data' => $performances->items(),
+        ]);
+    }
 }

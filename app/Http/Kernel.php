@@ -72,6 +72,7 @@ class Kernel extends HttpKernel
         'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
         'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
         'sanad.module' => \App\Http\Middleware\EnsureSanadModulePermission::class,
+        'user.type' => \App\Http\Middleware\EnsureUserType::class,
         'maintenance' => \App\Http\Middleware\MaintenanceMode::class,
         'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
     ];

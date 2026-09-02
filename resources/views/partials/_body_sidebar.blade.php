@@ -4,8 +4,19 @@
     $authUser = auth()->user();
     $userType = $authUser->user_type ?? 'customer';
     $currentRoute = Route::currentRouteName();
-    $canViewPayment = !$authUser || empty($authUser->provider_id) || $authUser->hasSanadModulePermission('payment_status', 'read');
-    $canViewTeam = !$authUser || empty($authUser->provider_id) || $authUser->hasSanadModulePermission('team_employees', 'read');
+    $canViewAssignedTasks = $authUser && (
+        $authUser->hasSanadModulePermission('my_tasks', 'read') ||
+        $authUser->hasSanadModulePermission('orders', 'read')
+    );
+    $canViewRequestDocuments = $authUser && $authUser->hasSanadModulePermission('request_documents', 'read');
+    $canViewCustomerChat = $authUser && $authUser->hasSanadModulePermission('customer_chat', 'read');
+    $canViewPayment = $authUser && (
+        $authUser->hasSanadModulePermission('payment_status', 'read') ||
+        $authUser->hasSanadModulePermission('payments', 'read')
+    );
+    // The employee directory route still uses the legacy Spatie permission,
+    // so navigation must mirror that exact authorization check.
+    $canViewTeam = $authUser && $authUser->can('handyman list');
 
     $portalTitle = match($userType) {
         'admin', 'demo_admin' => $isAr ? 'بوابة الإدارة' : 'Admin portal',
@@ -266,7 +277,7 @@
             </details>
 
             <!-- 11. System & Operations Settings -->
-            <details {{ in_array($currentRoute, ['plans.index', 'document.index', 'slider.index', 'pushNotification.index']) ? 'open' : '' }}>
+            <details {{ in_array($currentRoute, ['plans.index', 'document.index']) ? 'open' : '' }}>
                 <summary>
                     <span>{{ $isAr ? 'النظام والإعدادات' : 'System & settings' }}</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -279,14 +290,6 @@
                     <a href="{{ route('document.index') }}" class="{{ $currentRoute === 'document.index' ? 'active' : '' }}">
                         <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <span>{{ $isAr ? 'أنواع المستندات' : 'Document types' }}</span>
-                    </a>
-                    <a href="{{ route('slider.index') }}" class="{{ $currentRoute === 'slider.index' ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                        <span>{{ $isAr ? 'الشرائح الإعلانية' : 'Sliders' }}</span>
-                    </a>
-                    <a href="{{ route('pushNotification.index') }}" class="{{ $currentRoute === 'pushNotification.index' ? 'active' : '' }}">
-                        <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                        <span>{{ $isAr ? 'إشعارات النظام' : 'Push notifications' }}</span>
                     </a>
                 </div>
             </details>
@@ -370,13 +373,6 @@
                     </a>
                 </div>
             </details>
-@php
-            if (auth()->user()->user_type == "handyman") {
-                // employee navigation
-            }
-            $canViewPayment = !$authUser || empty($authUser->provider_id) || $authUser->hasSanadModulePermission('payment_status', 'read');
-            $canViewTeam = !$authUser || empty($authUser->provider_id) || $authUser->hasSanadModulePermission('team_employees', 'read');
-        @endphp
         @elseif($userType === 'handyman')
             <div class="quick-sidebar-group quick-sidebar-primary">
                 <a href="{{ route('home') }}" class="{{ in_array($currentRoute, ['home']) ? 'active' : '' }}">
@@ -395,18 +391,24 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                 </summary>
                 <div class="quick-sidebar-group">
+                    @if($canViewAssignedTasks)
                     <a href="{{ route('sanad.requests.index') }}" class="{{ in_array($currentRoute, ['sanad.requests.index', 'sanad.requests.show']) ? 'active' : '' }}">
                         <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
                         <span>{{ $isAr ? 'الطلبات والمهام المسندة' : 'Assigned Tasks' }}</span>
                     </a>
+                    @endif
+                    @if($canViewRequestDocuments)
                     <a href="{{ route('sanad.documents.queue') }}" class="{{ $currentRoute === 'sanad.documents.queue' ? 'active' : '' }}">
                         <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
                         <span>{{ $isAr ? 'طلبات النواقص والمستندات' : 'Document Requests' }}</span>
                     </a>
+                    @endif
+                    @if($canViewCustomerChat)
                     <a href="{{ route('sanad.chat.workspace') }}" class="{{ $currentRoute === 'sanad.chat.workspace' ? 'active' : '' }}">
                         <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                         <span>{{ $isAr ? 'محادثات المستفيدين' : 'Customer Chat' }}</span>
                     </a>
+                    @endif
                     @if($canViewPayment)
                         <a href="{{ route('payment.index') }}" class="{{ $currentRoute === 'payment.index' ? 'active' : '' }}">
                             <svg class="quick-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
@@ -490,6 +492,7 @@
         @php
             $footerSettingsUrl = match($userType) {
                 'provider' => route('provider.profile.index'),
+                'handyman' => route('setting.index', ['page' => 'profile_form']),
                 'customer', 'user' => route('customer-portal.profile'),
                 default => route('setting.index'),
             };

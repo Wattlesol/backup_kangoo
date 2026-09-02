@@ -1760,6 +1760,11 @@ class SanadWebController extends Controller
 
     public function storeDocument(Request $request, $id)
     {
+        abort_if(
+            auth()->user()->user_type === 'handyman' || auth()->user()->hasRole('handyman'),
+            403,
+            'Employees may review customer-submitted documents but cannot upload request documents.'
+        );
         abort_unless($this->canUseDocumentReviewModule(true), 403);
         $this->abortUnlessEmployeeFlag('upload_documents');
         $booking = Booking::myBooking()->findOrFail($id);

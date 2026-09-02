@@ -37,6 +37,8 @@ class SettingController extends Controller
             }
         }
 
+        $this->authorizeSettingsPage($auth_user, $page);
+
         $heroSlider = \App\Models\Slider::firstOrNew([]);
         $services = \App\Models\Service::where('status', 1)->where('service_type', 'service')->pluck('name', 'id');
 
@@ -74,6 +76,7 @@ class SettingController extends Controller
     {
         $page = $request->page;
         $auth_user = authSession();
+        $this->authorizeSettingsPage($auth_user, $page);
         $user_id = $auth_user->id;
         $settings = AppSetting::first();
         $user_data = User::find($user_id);
@@ -356,6 +359,21 @@ class SettingController extends Controller
         }
 
         return response()->json($data);
+    }
+
+    private function authorizeSettingsPage(User $user, ?string $page): void
+    {
+        if ($user->hasAnyRole(['admin', 'demo_admin'])) {
+            return;
+        }
+
+        $allowedPages = ['profile_form', 'password_form'];
+        if ($user->user_type === 'provider') {
+            $allowedPages[] = 'time_slot';
+            $allowedPages[] = 'partner_documents';
+        }
+
+        abort_unless(in_array($page, $allowedPages, true), 403);
     }
 
     /**

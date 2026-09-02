@@ -494,6 +494,35 @@ class OrderController extends Controller
         return view('provider.employees', compact('pageTitle', 'employees'));
     }
 
+    public function destroyEmployee($id)
+    {
+        $employee = User::query()
+            ->where('user_type', 'handyman')
+            ->where('provider_id', auth()->id())
+            ->findOrFail($id);
+
+        $hasActiveOrders = BookingHandymanMapping::where('handyman_id', $employee->id)
+            ->whereHas('bookings', function ($query) {
+                $query->whereNotIn('sanad_stage', ['completed', 'closed'])
+                    ->where('status', '!=', 'cancelled');
+            })
+            ->exists();
+
+        if ($hasActiveOrders) {
+            return redirect()->back()->withErrors(
+                app()->getLocale() === 'ar'
+                    ? 'لا يمكن إزالة موظف لديه طلبات نشطة. أعد إسناد الطلبات أولاً.'
+                    : 'This employee has active orders. Reassign those orders before removing the employee.'
+            );
+        }
+
+        $employee->delete();
+
+        return redirect()->route('provider.employees.index')->withSuccess(
+            app()->getLocale() === 'ar' ? 'تمت إزالة الموظف بنجاح.' : 'Staff member removed successfully.'
+        );
+    }
+
     public function performance()
     {
         $pageTitle = app()->getLocale() === 'ar' ? 'أداء الموظفين' : 'Employee Performance';

@@ -19,6 +19,7 @@
         ->implode(', ');
     $selectedEmployeeIds = $bookingdata->handymanAdded->pluck('handyman_id')->map(fn ($id) => (int) $id);
     $isAdminAssignmentUser = auth()->user()->hasAnyRole(['admin', 'demo_admin']);
+    $isEmployeeMode = auth()->user()->user_type === 'handyman' || auth()->user()->hasRole('handyman');
 @endphp
 <div class="quick-request-detail" dir="{{ $isAr ? 'rtl' : 'ltr' }}">
         <div class="row">
@@ -442,6 +443,7 @@
                             <strong>Quick document policy:</strong>
                             documents default to a 48-hour retention window when no date is selected. Customers must download required files before the retention date; Download before deletion guidance stays visible for every retained document.
                         </div>
+                        @unless($isEmployeeMode)
                         <form method="POST" enctype="multipart/form-data" action="{{ route('sanad.requests.documents.store', $bookingdata->id) }}" class="quick-document-form mb-4">
                             @csrf
                             <div class="quick-document-grid">
@@ -474,6 +476,7 @@
                             </div>
                             <button type="submit" class="btn btn-primary quick-primary-btn">Add Document</button>
                         </form>
+                        @endunless
 
                         <div class="sanad-list">
                             @forelse($documents as $document)
@@ -520,6 +523,7 @@
                 </div>
             </div>
 
+            @unless($isEmployeeMode)
             <div class="col-lg-6">
                 <div class="quick-card sanad-ops-section">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -551,6 +555,7 @@
                     </div>
                 </div>
             </div>
+            @endunless
 
         </div>
     </div>
